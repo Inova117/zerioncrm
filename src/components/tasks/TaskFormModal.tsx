@@ -28,7 +28,12 @@ export function TaskFormModal({
   const [title, setTitle] = useState('');
   const [notes, setNotes] = useState('');
   const [cadence, setCadence] = useState<TaskCadence>(defaultCadence);
-  const [assignedTo, setAssignedTo] = useState(currentUserId);
+  // Admins assign to a team member, so default to the first employee shown in the
+  // dropdown (never the admin's own id, which isn't an option and would be saved
+  // silently). Employees always own their own tasks.
+  const [assignedTo, setAssignedTo] = useState(
+    isAdmin ? employees[0]?.id ?? currentUserId : currentUserId
+  );
   const [leadId, setLeadId] = useState<string>('');
   const [dueDate, setDueDate] = useState('');
   const [saving, setSaving] = useState(false);

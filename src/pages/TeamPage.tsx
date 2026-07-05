@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { AppLayout } from '../components/layout/AppLayout';
 import { UserFormModal } from '../components/team/UserFormModal';
+import { EmployeeProfileModal } from '../components/team/EmployeeProfileModal';
 import { Modal } from '../components/ui/Modal';
 import { Avatar } from '../components/ui/Avatar';
 import { PageLoader, EmptyState } from '../components/ui/misc';
@@ -25,6 +26,7 @@ export function TeamPage() {
     useData();
 
   const [formOpen, setFormOpen] = useState(false);
+  const [profileFor, setProfileFor] = useState<User | null>(null);
   const [resetFor, setResetFor] = useState<User | null>(null);
   const [newPass, setNewPass] = useState('');
   const [resetMsg, setResetMsg] = useState<string | null>(null);
@@ -58,7 +60,12 @@ export function TeamPage() {
     return (
       <div key={u.id} className={cn('card p-4', !u.active && 'opacity-60')}>
         <div className="flex items-start justify-between gap-3">
-          <div className="flex items-start gap-3">
+          <button
+            type="button"
+            onClick={() => setProfileFor(u)}
+            className="-m-1 flex items-start gap-3 rounded-lg p-1 text-left transition-colors hover:bg-surface-50"
+            title="Ver perfil, tareas y prospectos"
+          >
             <Avatar name={u.name} color={u.avatarColor} size="lg" />
             <div className="min-w-0">
               <div className="flex items-center gap-2">
@@ -75,7 +82,7 @@ export function TeamPage() {
                 {roleLabel(u.role)} · desde {fmtDate(u.createdAt)}
               </p>
             </div>
-          </div>
+          </button>
         </div>
 
         {/* Stats for employees */}
@@ -191,6 +198,15 @@ export function TeamPage() {
       )}
 
       <UserFormModal open={formOpen} onClose={() => setFormOpen(false)} onSubmit={createUser} />
+
+      {/* Employee profile — their tasks & leads */}
+      <EmployeeProfileModal
+        user={profileFor}
+        open={Boolean(profileFor)}
+        onClose={() => setProfileFor(null)}
+        tasks={tasks}
+        leads={leads}
+      />
 
       {/* Reset password */}
       <Modal

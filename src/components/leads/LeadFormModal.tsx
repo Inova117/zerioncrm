@@ -39,8 +39,11 @@ export function LeadFormModal({
   isAdmin,
   initial,
 }: LeadFormModalProps) {
+  // For new leads, an admin assigns to a team member, so default to the first
+  // employee actually shown in the dropdown (not the admin's own id, which isn't
+  // an option and would be saved silently).
   const [form, setForm] = useState<NewLeadInput>(
-    initial ? { ...initial } : empty(currentUserId)
+    initial ? { ...initial } : empty(isAdmin ? employees[0]?.id ?? currentUserId : currentUserId)
   );
   const [saving, setSaving] = useState(false);
 
