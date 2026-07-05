@@ -11,8 +11,18 @@ import type { Lead, Temperature } from '../types';
 
 export function LeadsPage() {
   const { user, isAdmin } = useAuth();
-  const { loading, leads, users, createLead, updateLead, moveLead, removeLead, loadComments, addComment } =
-    useData();
+  const {
+    loading,
+    leads,
+    users,
+    createLead,
+    updateLead,
+    moveLead,
+    reorderLeads,
+    removeLead,
+    loadComments,
+    addComment,
+  } = useData();
 
   const [query, setQuery] = useState('');
   const [ownerFilter, setOwnerFilter] = useState<string>('all');
@@ -21,6 +31,8 @@ export function LeadsPage() {
   const [detail, setDetail] = useState<Lead | null>(null);
 
   const employees = useMemo(() => users.filter((u) => u.role === 'employee'), [users]);
+  // Only active employees are assignable (deactivated can't log in). (bug #15)
+  const activeEmployees = useMemo(() => employees.filter((u) => u.active), [employees]);
   const usersById = useMemo(() => new Map(users.map((u) => [u.id, u])), [users]);
 
   // Employees only see their own leads; admin sees everyone (with a filter).
@@ -124,6 +136,7 @@ export function LeadsPage() {
               users={users}
               onOpenLead={setDetail}
               onMove={handleMove}
+              onReorder={reorderLeads}
             />
           )}
         </div>
@@ -137,7 +150,7 @@ export function LeadsPage() {
           setFormOpen(false);
           setEditing(null);
         }}
-        employees={employees}
+        employees={activeEmployees}
         currentUserId={user.id}
         isAdmin={isAdmin}
         initial={editing}
@@ -154,7 +167,6 @@ export function LeadsPage() {
         onClose={() => setDetail(null)}
         owner={detailLead ? usersById.get(detailLead.assignedTo) : undefined}
         usersById={usersById}
-        currentUser={user}
         onEdit={openEdit}
         onMove={handleMove}
         onDelete={removeLead}

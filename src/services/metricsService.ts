@@ -23,8 +23,13 @@ export function cumulativeFunnel(leads: Lead[]): FunnelStage[] {
 }
 
 export interface Totals {
-  contactadas: number; // leads that are at least "frio" (i.e. actually contacted)
+  // Every lead that left "nuevo" — i.e. was actually contacted. Deliberately
+  // INCLUDES "perdido": a lost lead was still contacted, and it must count
+  // against the conversion rate (convGlobal = clientes / contactadas). (bug #18)
+  contactadas: number;
   tibios: number;
+  // Point-in-time count of leads currently in "caliente" ("negociando ahora"),
+  // intentionally NOT cumulative like tibios/reuniones. (bug #19)
   calientes: number;
   reuniones: number;
   clientes: number;

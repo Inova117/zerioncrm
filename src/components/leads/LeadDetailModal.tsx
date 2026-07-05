@@ -26,7 +26,6 @@ interface LeadDetailModalProps {
   onClose: () => void;
   owner?: User;
   usersById: Map<string, User>;
-  currentUser: User;
   onEdit: (lead: Lead) => void;
   onMove: (leadId: string, to: Temperature) => Promise<void> | void;
   onDelete: (leadId: string) => Promise<void>;
@@ -59,7 +58,6 @@ export function LeadDetailModal({
   onClose,
   owner,
   usersById,
-  currentUser,
   onEdit,
   onMove,
   onDelete,
@@ -71,14 +69,19 @@ export function LeadDetailModal({
   const [loading, setLoading] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
+  // Key the effect on the lead id (stable), NOT the lead object or loadComments
+  // (both change identity on every provider render), so it doesn't re-fetch and
+  // reset confirmDelete on each unrelated state update. (bug #20)
+  const leadId = lead?.id;
   useEffect(() => {
-    if (!lead || !open) return;
+    if (!leadId || !open) return;
     setLoading(true);
     setConfirmDelete(false);
-    loadComments(lead.id)
+    loadComments(leadId)
       .then(setComments)
       .finally(() => setLoading(false));
-  }, [lead, open, loadComments]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leadId, open]);
 
   if (!lead) return null;
 
@@ -103,8 +106,8 @@ export function LeadDetailModal({
 
   return (
     <Modal open={open} onClose={onClose} size="lg">
-      {/* Header */}
-      <div className="-mt-1 mb-4 flex flex-wrap items-start justify-between gap-3">
+      {/* Header (pr-9 leaves room for the modal's corner close button) */}
+      <div className="-mt-1 mb-4 flex flex-wrap items-start justify-between gap-3 pr-9">
         <div className="flex items-start gap-3">
           <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
             <Building2 className="h-5 w-5" />
@@ -242,7 +245,10 @@ export function LeadDetailModal({
             {comments.map((c) => {
               const meta = activityMeta[c.type];
               const Icon = meta.icon;
-              const author = usersById.get(c.authorId) ?? currentUser;
+              // Don't misattribute an ex-employee's activity to the current viewer;
+              // show a neutral label if the author no longer exists. (bug #16)
+              const author = usersById.get(c.authorId);
+              const authorName = author ? author.name.split(' ')[0] : 'Usuario eliminado';
               return (
                 <div key={c.id} className="flex gap-3">
                   <div
@@ -256,7 +262,7 @@ export function LeadDetailModal({
                   <div className="min-w-0 flex-1">
                     <p className="text-sm text-surface-700">{c.body}</p>
                     <p className="mt-0.5 text-[11px] text-surface-400">
-                      {author.name.split(' ')[0]} · {fromNow(c.createdAt)}
+                      {authorName} · {fromNow(c.createdAt)}
                     </p>
                   </div>
                 </div>

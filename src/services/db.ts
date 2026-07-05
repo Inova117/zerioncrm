@@ -42,7 +42,13 @@ function read<T>(name: string, fallback: T): T {
 }
 
 function write<T>(name: string, value: T): void {
-  localStorage.setItem(key(name), JSON.stringify(value));
+  try {
+    localStorage.setItem(key(name), JSON.stringify(value));
+  } catch (err) {
+    // Symmetric with read()'s try/catch: don't let a quota/serialization error
+    // crash a mutation. Surface it for debugging without throwing. (bug #24)
+    console.error(`[db] no se pudo guardar "${name}":`, err);
+  }
 }
 
 /** Seed localStorage once. Safe to call on every app boot. */

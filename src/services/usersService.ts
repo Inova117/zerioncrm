@@ -72,10 +72,27 @@ export const usersService = {
     return { error: null };
   },
 
-  /** Delete an employee (and their credential). Leads keep their assignedTo id. */
-  async remove(userId: string): Promise<void> {
+  /**
+   * Delete an employee (and their credential). Their leads & tasks are reassigned
+   * to `reassignTo` (the acting admin) so no row is left with a dangling
+   * assignedTo. Comments keep their original authorId (history is preserved; the
+   * UI renders a deleted author gracefully).
+   * SUPABASE: declare FKs with a deliberate ON DELETE policy (SET NULL / RESTRICT)
+   *   and do the reassignment in a transaction / Edge Function.
+   */
+  async remove(userId: string, reassignTo?: string): Promise<void> {
     await delay();
     table.set('users', table.get('users').filter((u) => u.id !== userId));
     table.set('credentials', table.get('credentials').filter((c) => c.userId !== userId));
+    if (reassignTo) {
+      table.set(
+        'leads',
+        table.get('leads').map((l) => (l.assignedTo === userId ? { ...l, assignedTo: reassignTo } : l))
+      );
+      table.set(
+        'tasks',
+        table.get('tasks').map((t) => (t.assignedTo === userId ? { ...t, assignedTo: reassignTo } : t))
+      );
+    }
   },
 };

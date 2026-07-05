@@ -1,4 +1,5 @@
 import { useDroppable } from '@dnd-kit/core';
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import type { Lead, Temperature, User } from '../../types';
 import { stageConfig } from '../../lib/constants';
 import { cn, fmtCompact } from '../../lib/utils';
@@ -13,7 +14,7 @@ interface KanbanColumnProps {
 
 export function KanbanColumn({ temperature, leads, usersById, onOpenLead }: KanbanColumnProps) {
   const s = stageConfig(temperature);
-  const { setNodeRef, isOver } = useDroppable({ id: temperature });
+  const { setNodeRef, isOver } = useDroppable({ id: temperature, data: { type: 'column' } });
   const total = leads.reduce((sum, l) => sum + l.value, 0);
 
   return (
@@ -40,14 +41,16 @@ export function KanbanColumn({ temperature, leads, usersById, onOpenLead }: Kanb
           isOver ? cn(s.ring, s.soft) : 'border-transparent'
         )}
       >
-        {leads.map((lead) => (
-          <LeadCard
-            key={lead.id}
-            lead={lead}
-            owner={usersById.get(lead.assignedTo)}
-            onOpen={onOpenLead}
-          />
-        ))}
+        <SortableContext items={leads.map((l) => l.id)} strategy={verticalListSortingStrategy}>
+          {leads.map((lead) => (
+            <LeadCard
+              key={lead.id}
+              lead={lead}
+              owner={usersById.get(lead.assignedTo)}
+              onOpen={onOpenLead}
+            />
+          ))}
+        </SortableContext>
         {leads.length === 0 && (
           <div className="flex flex-1 items-center justify-center rounded-lg py-6 text-center text-xs text-surface-300">
             Suelta aquí

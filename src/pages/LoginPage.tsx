@@ -1,17 +1,21 @@
 import { useState } from 'react';
-import { useNavigate, Navigate } from 'react-router-dom';
+import { useNavigate, Navigate, useLocation } from 'react-router-dom';
 import { Lock, Mail, ShieldCheck, Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export function LoginPage() {
   const { user, signIn } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  if (user) return <Navigate to="/" replace />;
+  // Where the user was headed before being bounced to /login (bug #14).
+  const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname || '/';
+
+  if (user) return <Navigate to={from} replace />;
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -20,7 +24,7 @@ export function LoginPage() {
     const err = await signIn(email, password);
     setLoading(false);
     if (err) setError(err);
-    else navigate('/', { replace: true });
+    else navigate(from, { replace: true });
   }
 
   return (

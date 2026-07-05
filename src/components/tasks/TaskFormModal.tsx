@@ -48,7 +48,9 @@ export function TaskFormModal({
       cadence,
       assignedTo,
       leadId: leadId || null,
-      dueDate: dueDate ? new Date(dueDate).toISOString() : null,
+      // Parse the date-only input in LOCAL time, not UTC midnight — otherwise it
+      // shifts a day back for users west of UTC (México/LatAm). (bug #3)
+      dueDate: dueDate ? new Date(`${dueDate}T00:00:00`).toISOString() : null,
     });
     setSaving(false);
     onClose();

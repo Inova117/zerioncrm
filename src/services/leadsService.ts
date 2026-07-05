@@ -93,6 +93,12 @@ export const leadsService = {
     await delay();
     table.set('leads', table.get('leads').filter((l) => l.id !== id));
     table.set('comments', table.get('comments').filter((c) => c.leadId !== id));
+    // Detach any tasks linked to this lead so they don't keep a dangling leadId.
+    // SUPABASE: the FK is declared ON DELETE SET NULL, which does this server-side.
+    table.set(
+      'tasks',
+      table.get('tasks').map((t) => (t.leadId === id ? { ...t, leadId: null } : t))
+    );
   },
 
   // ---- Comments / activity -------------------------------------------------

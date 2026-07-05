@@ -197,7 +197,13 @@ export function TeamPage() {
         </div>
       )}
 
-      <UserFormModal open={formOpen} onClose={() => setFormOpen(false)} onSubmit={createUser} />
+      {/* key remounts the form on each open → fresh fields + new temp password (bug #2) */}
+      <UserFormModal
+        key={formOpen ? 'user-form-open' : 'user-form-closed'}
+        open={formOpen}
+        onClose={() => setFormOpen(false)}
+        onSubmit={createUser}
+      />
 
       {/* Employee profile — their tasks & leads */}
       <EmployeeProfileModal

@@ -40,7 +40,7 @@ export function DashboardPage() {
           task.assignedTo === user?.id &&
           !task.done &&
           task.cadence === 'daily' &&
-          inCadenceWindow(task.dueDate, 'daily')
+          inCadenceWindow(task.dueDate ?? task.createdAt, 'daily')
       ),
     [tasks, user]
   );

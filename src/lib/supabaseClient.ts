@@ -9,6 +9,23 @@
 //   3. Copy .env.example → .env and fill VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY
 //   4. Flip USE_SUPABASE to true and swap the service implementations
 //      (each service in src/services/* has a // SUPABASE: ... note showing the query)
+//
+// TWO THINGS TO HANDLE DURING INTEGRATION (they don't bite in the mock layer):
+//
+//  • camelCase ⇆ snake_case (bug #12): the TS types use camelCase
+//    (assignedTo, lastContactAt, meetingAt…) but the SQL columns are snake_case
+//    (assigned_to, last_contact_at, meeting_at…). A raw select('*') returns
+//    snake_case keys, so fields would read as `undefined` across the app. Map at
+//    the service boundary — either add row→model / model→row mappers in each
+//    service, or expose the columns aliased (e.g. `select('assigned_to as
+//    assignedTo, ...')`). Keep the mapping in ONE place so components never see
+//    raw rows.
+//
+//  • Role scoping (bug #22): today every logged-in client loads all rows and the
+//    UI filters by role for presentation only — fine for a mock, NOT a security
+//    boundary. With Supabase the RLS policies in supabase/schema.sql are the real
+//    boundary (admin sees all; each employee only their own). Don't rely on the
+//    client filter for security; trust RLS.
 // ============================================================================
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';

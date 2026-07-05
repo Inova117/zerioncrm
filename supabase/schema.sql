@@ -144,7 +144,13 @@ create policy "comments read"   on public.comments for select
     select 1 from public.leads l where l.id = lead_id and l.assigned_to = auth.uid()));
 drop policy if exists "comments insert" on public.comments;
 create policy "comments insert" on public.comments for insert
-  with check (author_id = auth.uid());
+  with check (
+    author_id = auth.uid()
+    and exists (
+      select 1 from public.leads l
+      where l.id = lead_id and (public.is_admin() or l.assigned_to = auth.uid())
+    )
+  );
 drop policy if exists "comments delete" on public.comments;
 create policy "comments delete" on public.comments for delete
   using (public.is_admin() or author_id = auth.uid());

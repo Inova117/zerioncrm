@@ -88,16 +88,25 @@ export function DataProvider({ children }: { children: ReactNode }) {
       if (updated) setLeads((prev) => prev.map((l) => (l.id === id ? updated : l)));
     },
     async moveLead(id, temperature) {
-      // optimistic
+      // optimistic for snappy UI…
       setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, temperature } : l)));
-      await leadsService.move(id, temperature, authorId);
+      // …then apply the authoritative row (also carries meetingAt/lastContactAt the
+      // service set), so a later edit can't resend stale fields. (bug #1)
+      const updated = await leadsService.move(id, temperature, authorId);
+      if (updated) setLeads((prev) => prev.map((l) => (l.id === id ? updated : l)));
     },
     async reorderLeads(orderedIds) {
       await leadsService.reorder(orderedIds);
+      setLeads((prev) => {
+        const pos = new Map(orderedIds.map((lid, i) => [lid, i]));
+        return prev.map((l) => (pos.has(l.id) ? { ...l, position: pos.get(l.id)! } : l));
+      });
     },
     async removeLead(id) {
       await leadsService.remove(id);
       setLeads((prev) => prev.filter((l) => l.id !== id));
+      // detach tasks that pointed at this lead so they don't dangle (bug #17)
+      setTasks((prev) => prev.map((t) => (t.leadId === id ? { ...t, leadId: null } : t)));
     },
 
     async loadComments(leadId) {
@@ -105,10 +114,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
     },
     async addComment(leadId, body) {
       await leadsService.addActivity(leadId, authorId, 'comment', body);
-      await leadsService.update(leadId, {});
-      setLeads((prev) =>
-        prev.map((l) => (l.id === leadId ? { ...l, lastContactAt: new Date().toISOString() } : l))
-      );
+      // persist lastContactAt (not just optimistic) so it survives a reload (bug #13)
+      const updated = await leadsService.update(leadId, { lastContactAt: new Date().toISOString() });
+      if (updated) setLeads((prev) => prev.map((l) => (l.id === leadId ? updated : l)));
     },
     async removeComment(id) {
       await leadsService.removeComment(id);
@@ -144,8 +152,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
       return usersService.setPassword(id, password);
     },
     async removeUser(id) {
-      await usersService.remove(id);
-      setUsers((prev) => prev.filter((u) => u.id !== id));
+      // Reassign this user's leads & tasks to the acting admin so nothing is left
+      // orphaned (invalid assignedTo breaks avatars, filters & metrics). (bug #5)
+      await usersService.remove(id, authorId);
+      await reload();
     },
 
     userById: (id) => users.find((u) => u.id === id),

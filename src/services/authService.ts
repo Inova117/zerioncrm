@@ -40,6 +40,13 @@ export const authService = {
   getCurrentUser(): User | null {
     const id = session.get();
     if (!id) return null;
-    return table.get('users').find((u) => u.id === id) ?? null;
+    const user = table.get('users').find((u) => u.id === id) ?? null;
+    // A user deactivated (or deleted) while logged in must lose access on the next
+    // session restore, not keep a valid session. (bug #9)
+    if (!user || !user.active) {
+      session.set(null);
+      return null;
+    }
+    return user;
   },
 };

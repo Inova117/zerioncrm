@@ -88,7 +88,8 @@ export const STAGES: StageConfig[] = [
   },
 ];
 
-/** Columns shown on the Kanban board (Perdido is handled via card action / filter). */
+/** Columns shown on the Kanban board (includes Perdido so lost leads stay
+ *  visible, countable and recoverable by dragging them back). */
 export const BOARD_STAGES: Temperature[] = [
   'nuevo',
   'frio',
@@ -96,6 +97,7 @@ export const BOARD_STAGES: Temperature[] = [
   'caliente',
   'reunion',
   'cliente',
+  'perdido',
 ];
 
 export const stageConfig = (t: Temperature): StageConfig =>
