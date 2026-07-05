@@ -18,22 +18,28 @@ const widths = { sm: 'max-w-md', md: 'max-w-xl', lg: 'max-w-3xl' };
 
 export function Modal({ open, onClose, children, title, subtitle, size = 'md', footer }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
+  // Keep the latest onClose in a ref so the focus effect can depend ONLY on
+  // `open`. Otherwise an inline onClose (recreated every parent render) would
+  // re-run the whole effect on each keystroke, stealing focus. (bugs #2, #3)
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
 
   useEffect(() => {
     if (!open) return;
-    // Remember what had focus, move focus into the dialog, and trap Tab within it
-    // so keyboard users don't wander behind the modal. (bug #21)
+    const dialog = dialogRef.current;
     const previouslyFocused = document.activeElement as HTMLElement | null;
     const focusables = () =>
       Array.from(
-        dialogRef.current?.querySelectorAll<HTMLElement>(
+        dialog?.querySelectorAll<HTMLElement>(
           'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])'
         ) ?? []
       ).filter((el) => el.offsetParent !== null);
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (e.key !== 'Tab') return;
@@ -52,18 +58,22 @@ export function Modal({ open, onClose, children, title, subtitle, size = 'md', f
 
     document.addEventListener('keydown', onKey);
     document.body.style.overflow = 'hidden';
-    // Focus the first field/button (fall back to the dialog itself).
+    // Initial focus: respect a field's autoFocus if React already placed focus
+    // inside the dialog; otherwise focus the first NON-close control (never the
+    // "Cerrar" X, which is first in the DOM). (bug #3)
     requestAnimationFrame(() => {
-      const items = focusables();
-      (items[0] ?? dialogRef.current)?.focus();
+      const active = document.activeElement;
+      if (active && dialog?.contains(active) && active !== dialog) return;
+      const items = focusables().filter((el) => el.getAttribute('aria-label') !== 'Cerrar');
+      (items[0] ?? dialog)?.focus();
     });
 
     return () => {
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = '';
-      previouslyFocused?.focus?.();
+      if (previouslyFocused && document.contains(previouslyFocused)) previouslyFocused.focus();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 

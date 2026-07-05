@@ -10,6 +10,13 @@
 --
 -- Seguridad: los registros en Auth deben crearse SOLO por el admin (desactiva
 -- "Enable sign ups" en Authentication → Providers → Email). Ver README.
+--
+-- NOTA (#26): este archivo y supabase/migrations/20260704000000_init.sql son
+--   ESPEJOS; si editas uno, edita el otro (schema.sql = pegar en el editor SQL;
+--   migrations = flujo CLI `supabase db push`).
+-- NOTA (#24): leads.position no tiene lógica de "siguiente posición" en el
+--   servidor; el cliente asigna max(position)+1 al crear (igual que el mock). Si
+--   insertas leads por SQL directo, setea position explícitamente para no colisionar.
 -- ============================================================================
 
 create extension if not exists "pgcrypto";
@@ -73,15 +80,29 @@ create index if not exists leads_assigned_idx    on public.leads(assigned_to);
 create index if not exists leads_temperature_idx on public.leads(temperature);
 
 -- Comments / activity --------------------------------------------------------
+-- author_id is ON DELETE SET NULL: deleting an ex-employee must not be blocked by
+-- their past comments; the history stays and the UI shows "Usuario eliminado". (#17)
 create table if not exists public.comments (
   id         uuid primary key default gen_random_uuid(),
   lead_id    uuid not null references public.leads(id) on delete cascade,
-  author_id  uuid not null references public.profiles(id),
+  author_id  uuid references public.profiles(id) on delete set null,
   type       activity_t not null default 'comment',
   body       text not null,
   created_at timestamptz not null default now()
 );
 create index if not exists comments_lead_idx on public.comments(lead_id);
+-- For DBs where the table already exists (create-if-not-exists won't alter it):
+alter table public.comments alter column author_id drop not null;
+do $$ begin
+  alter table public.comments drop constraint if exists comments_author_id_fkey;
+  alter table public.comments add constraint comments_author_id_fkey
+    foreign key (author_id) references public.profiles(id) on delete set null;
+exception when others then null; end $$;
+
+-- NOTE: leads.assigned_to and tasks.assigned_to are NOT NULL with the default
+-- ON DELETE (RESTRICT) on purpose: you must REASSIGN a user's leads/tasks before
+-- deleting them (the app / Edge Function does this), so a delete can never orphan
+-- rows with an invalid owner. (bug #17 companion)
 
 -- Tasks ----------------------------------------------------------------------
 create table if not exists public.tasks (

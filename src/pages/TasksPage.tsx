@@ -8,7 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { CADENCES } from '../lib/constants';
 import type { TaskCadence } from '../types';
-import { cn, pct, inCadenceWindow } from '../lib/utils';
+import { cn, pct, taskIsCurrent } from '../lib/utils';
 
 export function TasksPage() {
   const { user, isAdmin } = useAuth();
@@ -19,8 +19,13 @@ export function TasksPage() {
   const [formCadence, setFormCadence] = useState<TaskCadence>('daily');
 
   const employees = useMemo(() => users.filter((u) => u.role === 'employee'), [users]);
-  // Only active employees can be assigned (deactivated ones can't log in). (bug #15)
+  // Only active employees can be assigned (deactivated ones can't log in) (#15);
+  // if there are none, fall back to the admin so nothing is assigned silently (#19).
   const activeEmployees = useMemo(() => employees.filter((u) => u.active), [employees]);
+  const assignableEmployees = useMemo(
+    () => (activeEmployees.length ? activeEmployees : user ? [user] : []),
+    [activeEmployees, user]
+  );
   const usersById = useMemo(() => new Map(users.map((u) => [u.id, u])), [users]);
   const leadsById = useMemo(() => new Map(leads.map((l) => [l.id, l])), [leads]);
 
@@ -69,13 +74,11 @@ export function TasksPage() {
       ) : (
         <div className="grid gap-5 lg:grid-cols-3">
           {CADENCES.map((c) => {
-            // Only show tasks whose window is current, so daily/weekly/monthly
-            // lists actually reset instead of piling up forever. Tasks without a
-            // due date fall back to their creation date. (bug #4)
+            // Dateless recurring tasks reset by their creation window; DATED tasks
+            // always stay visible (marked overdue if past) so they never vanish
+            // silently. (bugs #4 reset intent, #1 don't hide dated tasks)
             const list = visibleTasks
-              .filter(
-                (t) => t.cadence === c.key && inCadenceWindow(t.dueDate ?? t.createdAt, c.key)
-              )
+              .filter((t) => t.cadence === c.key && taskIsCurrent(t))
               .sort((a, b) => Number(a.done) - Number(b.done));
             const done = list.filter((t) => t.done).length;
             const progress = pct(done, list.length);
@@ -143,7 +146,7 @@ export function TasksPage() {
         key={`${formOpen}-${formCadence}`}
         open={formOpen}
         onClose={() => setFormOpen(false)}
-        employees={activeEmployees}
+        employees={assignableEmployees}
         leads={leads}
         currentUserId={user.id}
         isAdmin={isAdmin}

@@ -12,8 +12,13 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Where the user was headed before being bounced to /login (bug #14).
-  const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname || '/';
+  // Where the user was headed before being bounced to /login — preserve the full
+  // location (path + query + hash), not just the pathname. (bugs #14, #22)
+  const fromLoc = (location.state as { from?: { pathname?: string; search?: string; hash?: string } } | null)
+    ?.from;
+  const from = fromLoc
+    ? `${fromLoc.pathname ?? '/'}${fromLoc.search ?? ''}${fromLoc.hash ?? ''}`
+    : '/';
 
   if (user) return <Navigate to={from} replace />;
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   DndContext,
   DragOverlay,
@@ -21,8 +21,8 @@ interface KanbanBoardProps {
   leads: Lead[];
   users: User[];
   onOpenLead: (lead: Lead) => void;
-  onMove: (leadId: string, to: Temperature) => void;
-  onReorder: (orderedIds: string[]) => void;
+  /** Atomic: change stage (if the column changed) + persist the target column order. */
+  onCommit: (leadId: string, toTemperature: Temperature, orderedVisibleIds: string[]) => void;
 }
 
 function buildColumns(leads: Lead[]): Columns {
@@ -36,13 +36,16 @@ function buildColumns(leads: Lead[]): Columns {
   return cols;
 }
 
-export function KanbanBoard({ leads, users, onOpenLead, onMove, onReorder }: KanbanBoardProps) {
+export function KanbanBoard({ leads, users, onOpenLead, onCommit }: KanbanBoardProps) {
   const [columns, setColumns] = useState<Columns>(() => buildColumns(leads));
   const [activeId, setActiveId] = useState<string | null>(null);
+  const dragging = useRef(false);
 
   // Resync board grouping whenever the underlying leads change (create, filter,
-  // move persisted, etc.). No drag is in flight at that point.
+  // committed drag, etc.) — but never mid-drag, or it would clobber the live
+  // reparent state. (bug #13)
   useEffect(() => {
+    if (dragging.current) return;
     setColumns(buildColumns(leads));
   }, [leads]);
 
@@ -60,6 +63,7 @@ export function KanbanBoard({ leads, users, onOpenLead, onMove, onReorder }: Kan
   };
 
   function onDragStart(e: DragStartEvent) {
+    dragging.current = true;
     setActiveId(String(e.active.id));
   }
 
@@ -88,27 +92,34 @@ export function KanbanBoard({ leads, users, onOpenLead, onMove, onReorder }: Kan
 
   function onDragEnd(e: DragEndEvent) {
     const { active, over } = e;
+    dragging.current = false;
     setActiveId(null);
-    if (!over) return;
-    const activeId = String(active.id);
+    if (!over) {
+      setColumns(buildColumns(leads)); // no drop target → undo any reparent
+      return;
+    }
+    const draggedId = String(active.id);
     const overId = String(over.id);
-    const container = findContainer(activeId); // where it ended up after onDragOver
+    const container = findContainer(draggedId); // where it ended up after onDragOver
     if (!container) return;
 
     let finalColumns = columns;
     const items = columns[container];
-    const activeIndex = items.indexOf(activeId);
+    const activeIndex = items.indexOf(draggedId);
     const overIndex = overId in columns ? items.length - 1 : items.indexOf(overId);
     if (activeIndex !== overIndex && overIndex >= 0) {
       finalColumns = { ...columns, [container]: arrayMove(items, activeIndex, overIndex) };
       setColumns(finalColumns);
     }
 
-    // Persist: temperature change (if the column changed) + new ordering.
-    const lead = leadsById.get(activeId);
-    const targetTemp = container as Temperature;
-    if (lead && lead.temperature !== targetTemp) onMove(activeId, targetTemp);
-    onReorder(finalColumns[container]);
+    // One atomic persist (stage change if any + column order). No racing writes.
+    onCommit(draggedId, container as Temperature, finalColumns[container]);
+  }
+
+  function onDragCancel() {
+    dragging.current = false;
+    setActiveId(null);
+    setColumns(buildColumns(leads)); // undo the live reparent from onDragOver (bug #5)
   }
 
   const activeLead = activeId ? leadsById.get(activeId) : null;
@@ -120,7 +131,7 @@ export function KanbanBoard({ leads, users, onOpenLead, onMove, onReorder }: Kan
       onDragStart={onDragStart}
       onDragOver={onDragOver}
       onDragEnd={onDragEnd}
-      onDragCancel={() => setActiveId(null)}
+      onDragCancel={onDragCancel}
     >
       <div className="flex h-full gap-4 overflow-x-auto px-4 pb-4 pt-1 sm:px-6">
         {BOARD_STAGES.map((stage) => (

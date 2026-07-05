@@ -18,7 +18,7 @@ export function LeadsPage() {
     createLead,
     updateLead,
     moveLead,
-    reorderLeads,
+    commitDrag,
     removeLead,
     loadComments,
     addComment,
@@ -34,6 +34,17 @@ export function LeadsPage() {
   // Only active employees are assignable (deactivated can't log in). (bug #15)
   const activeEmployees = useMemo(() => employees.filter((u) => u.active), [employees]);
   const usersById = useMemo(() => new Map(users.map((u) => [u.id, u])), [users]);
+
+  // Options for the assignee dropdown: active employees, plus the current owner
+  // when editing (even if now inactive) so it isn't blank (#11); fall back to the
+  // admin themselves when there are no active employees (#19).
+  const assignableEmployees = useMemo(() => {
+    let list = activeEmployees;
+    const owner = editing ? usersById.get(editing.assignedTo) : undefined;
+    if (owner && !list.some((u) => u.id === owner.id)) list = [...list, owner];
+    if (list.length === 0 && user) list = [user];
+    return list;
+  }, [activeEmployees, editing, usersById, user]);
 
   // Employees only see their own leads; admin sees everyone (with a filter).
   const visibleLeads = useMemo(() => {
@@ -117,7 +128,9 @@ export function LeadsPage() {
         <div className="min-h-0 flex-1">
           {loading ? (
             <PageLoader />
-          ) : visibleLeads.length === 0 && !query ? (
+          ) : leads.length === 0 ? (
+            // Onboarding empty state only when there are truly no leads — not when a
+            // filter/search simply hides them (that just shows empty columns). (bug #12)
             <div className="px-4 sm:px-6">
               <EmptyState
                 icon={<KanbanSquare className="h-10 w-10" />}
@@ -135,8 +148,7 @@ export function LeadsPage() {
               leads={visibleLeads}
               users={users}
               onOpenLead={setDetail}
-              onMove={handleMove}
-              onReorder={reorderLeads}
+              onCommit={commitDrag}
             />
           )}
         </div>
@@ -150,7 +162,7 @@ export function LeadsPage() {
           setFormOpen(false);
           setEditing(null);
         }}
-        employees={activeEmployees}
+        employees={assignableEmployees}
         currentUserId={user.id}
         isAdmin={isAdmin}
         initial={editing}

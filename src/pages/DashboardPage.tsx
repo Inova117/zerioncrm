@@ -18,7 +18,7 @@ import { PageLoader } from '../components/ui/misc';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { cumulativeFunnel, totals, employeeStats } from '../services/metricsService';
-import { fmtMoney, inCadenceWindow } from '../lib/utils';
+import { fmtMoney, taskIsCurrent } from '../lib/utils';
 
 export function DashboardPage() {
   const { user, isAdmin } = useAuth();
@@ -40,7 +40,7 @@ export function DashboardPage() {
           task.assignedTo === user?.id &&
           !task.done &&
           task.cadence === 'daily' &&
-          inCadenceWindow(task.dueDate ?? task.createdAt, 'daily')
+          taskIsCurrent(task)
       ),
     [tasks, user]
   );

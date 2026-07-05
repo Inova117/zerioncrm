@@ -1,7 +1,7 @@
-import { Check, Trash2, Link2, CalendarClock } from 'lucide-react';
+import { Check, Trash2, Link2, CalendarClock, AlertTriangle } from 'lucide-react';
 import type { Lead, Task, User } from '../../types';
 import { Avatar } from '../ui/Avatar';
-import { cn, fmtDate } from '../../lib/utils';
+import { cn, fmtDate, isOverdue } from '../../lib/utils';
 
 interface TaskItemProps {
   task: Task;
@@ -45,9 +45,19 @@ export function TaskItem({ task, owner, lead, showOwner, onToggle, onRemove }: T
         {task.notes && <p className="mt-0.5 text-xs text-surface-400">{task.notes}</p>}
         <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[11px] text-surface-400">
           {task.dueDate && (
-            <span className="inline-flex items-center gap-1">
-              <CalendarClock className="h-3 w-3" />
+            <span
+              className={cn(
+                'inline-flex items-center gap-1',
+                isOverdue(task.dueDate, task.done) && 'font-medium text-caliente'
+              )}
+            >
+              {isOverdue(task.dueDate, task.done) ? (
+                <AlertTriangle className="h-3 w-3" />
+              ) : (
+                <CalendarClock className="h-3 w-3" />
+              )}
               {fmtDate(task.dueDate)}
+              {isOverdue(task.dueDate, task.done) && ' · vencida'}
             </span>
           )}
           {lead && (

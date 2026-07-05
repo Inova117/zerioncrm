@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { Comment, Lead, Task, Temperature, User } from '../types';
 import { leadsService } from '../services/leadsService';
@@ -20,7 +20,8 @@ interface DataContextValue {
   createLead: (input: NewLeadInput) => Promise<Lead>;
   updateLead: (id: string, patch: Partial<Lead>) => Promise<void>;
   moveLead: (id: string, temperature: Temperature) => Promise<void>;
-  reorderLeads: (orderedIds: string[]) => Promise<void>;
+  /** Atomic drag commit: change stage (if needed) + reorder the target column. */
+  commitDrag: (leadId: string, toTemperature: Temperature, orderedVisibleIds: string[]) => Promise<void>;
   removeLead: (id: string) => Promise<void>;
 
   // Comments
@@ -71,7 +72,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const authorId = user?.id ?? '';
 
-  const value: DataContextValue = {
+  // Memoized so the context value keeps a stable identity between renders that
+  // don't change the data — avoids re-render / effect-refire storms in consumers
+  // (e.g. modal focus effects). Recomputed only when the underlying data changes. (#15)
+  const value = useMemo<DataContextValue>(() => ({
     loading,
     users,
     leads,
@@ -95,12 +99,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
       const updated = await leadsService.move(id, temperature, authorId);
       if (updated) setLeads((prev) => prev.map((l) => (l.id === id ? updated : l)));
     },
-    async reorderLeads(orderedIds) {
-      await leadsService.reorder(orderedIds);
-      setLeads((prev) => {
-        const pos = new Map(orderedIds.map((lid, i) => [lid, i]));
-        return prev.map((l) => (pos.has(l.id) ? { ...l, position: pos.get(l.id)! } : l));
-      });
+    async commitDrag(leadId, toTemperature, orderedVisibleIds) {
+      // One atomic operation: stage change (if any) + column reorder, finished
+      // with a SINGLE authoritative reload. No two setLeads racing. (bugs #4, #14)
+      const lead = leads.find((l) => l.id === leadId);
+      if (lead && lead.temperature !== toTemperature) {
+        await leadsService.move(leadId, toTemperature, authorId);
+      }
+      await leadsService.reorderColumn(toTemperature, orderedVisibleIds);
+      setLeads(await leadsService.list());
     },
     async removeLead(id) {
       await leadsService.remove(id);
@@ -159,7 +166,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     },
 
     userById: (id) => users.find((u) => u.id === id),
-  };
+  }), [loading, users, leads, tasks, authorId, reload]);
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
 }

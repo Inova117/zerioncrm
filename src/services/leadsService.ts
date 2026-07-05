@@ -64,6 +64,13 @@ export const leadsService = {
     const patch: Partial<Lead> = {
       temperature,
       lastContactAt: nowISO(),
+      // Land at the bottom of the destination column so a stage change from the
+      // detail modal (no drag position) doesn't drop the card at a random spot. (#6)
+      position:
+        table
+          .get('leads')
+          .filter((l) => l.temperature === temperature)
+          .reduce((m, l) => Math.max(m, l.position), 0) + 1,
     };
     if (temperature === 'reunion' && !current.meetingAt) {
       patch.meetingAt = nowISO();
@@ -78,14 +85,27 @@ export const leadsService = {
     return updated;
   },
 
-  /** Reorder within/between columns after a drag. */
-  async reorder(orderedIds: string[]): Promise<void> {
-    const posById = new Map(orderedIds.map((id, i) => [id, i]));
+  /**
+   * Reorder a single column. `orderedVisibleIds` is the new order of the leads
+   * the user can actually see (the board may be filtered by owner/search). We
+   * splice that order back into the FULL column so hidden leads keep their
+   * relative slots instead of being scrambled. (bug #4)
+   */
+  async reorderColumn(temperature: Temperature, orderedVisibleIds: string[]): Promise<void> {
+    const all = table.get('leads');
+    const visible = new Set(orderedVisibleIds);
+    const colSorted = all
+      .filter((l) => l.temperature === temperature)
+      .sort((a, b) => a.position - b.position);
+    // Walk the full column; at each visible slot, drop in the next visible id.
+    let vi = 0;
+    const mergedIds = colSorted.map((l) =>
+      visible.has(l.id) && vi < orderedVisibleIds.length ? orderedVisibleIds[vi++] : l.id
+    );
+    const posById = new Map(mergedIds.map((id, i) => [id, i]));
     table.set(
       'leads',
-      table.get('leads').map((l) =>
-        posById.has(l.id) ? { ...l, position: posById.get(l.id)! } : l
-      )
+      all.map((l) => (posById.has(l.id) ? { ...l, position: posById.get(l.id)! } : l))
     );
   },
 

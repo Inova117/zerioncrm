@@ -13,8 +13,16 @@ import { es } from 'date-fns/locale';
 export const cn = (...inputs: ClassValue[]) => clsx(inputs);
 
 /** Collision-resistant enough id for the mock layer. Supabase will use gen_random_uuid(). */
-export const uid = (prefix = ''): string =>
-  `${prefix}${crypto.randomUUID?.() ?? Math.random().toString(36).slice(2)}`;
+let uidSeq = 0;
+export const uid = (prefix = ''): string => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return `${prefix}${crypto.randomUUID()}`;
+  }
+  // Fallback for non-secure contexts: time + monotonic counter + randomness so
+  // two ids created in the same tick can't collide. (bug #25)
+  uidSeq = (uidSeq + 1) % 1_000_000;
+  return `${prefix}${Date.now().toString(36)}-${uidSeq.toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+};
 
 export const nowISO = (): string => new Date().toISOString();
 
@@ -45,6 +53,23 @@ export const inCadenceWindow = (
   if (cadence === 'weekly') return isThisWeek(d, { weekStartsOn: 1 });
   return isThisMonth(d);
 };
+
+/**
+ * Should a task appear in its cadence column right now?
+ *  - With an explicit due date → ALWAYS visible (never hide a dated task, even if
+ *    overdue — the user must be able to complete or delete it).
+ *  - Without a due date → it's a recurring task that resets by creation window.
+ * Used by BOTH the Tasks board and the Dashboard so their counts always match.
+ */
+export const taskIsCurrent = (task: {
+  dueDate: string | null;
+  createdAt: string;
+  cadence: 'daily' | 'weekly' | 'monthly';
+}): boolean => (task.dueDate != null ? true : inCadenceWindow(task.createdAt, task.cadence));
+
+/** A dated, not-yet-done task whose due date has already passed. */
+export const isOverdue = (dueDate: string | null, done: boolean): boolean =>
+  !done && dueDate != null && parseISO(dueDate).getTime() < Date.now();
 
 export const fmtMoney = (n: number): string =>
   n > 0

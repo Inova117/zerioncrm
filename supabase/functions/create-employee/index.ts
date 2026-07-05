@@ -71,7 +71,15 @@ Deno.serve(async (req) => {
   if (profileErr) {
     // Roll back the orphaned auth user so the admin can retry the same email
     // instead of hitting "email already registered" forever. (bug #23)
-    await admin.auth.admin.deleteUser(created.user.id);
+    const { error: rollbackErr } = await admin.auth.admin.deleteUser(created.user.id);
+    if (rollbackErr) {
+      // Rollback itself failed → surface BOTH so the operator can clean up the
+      // now-orphaned auth user manually instead of a silent inconsistency.
+      return json(
+        { error: profileErr.message, rollbackError: rollbackErr.message, orphanUserId: created.user.id },
+        500
+      );
+    }
     return json({ error: profileErr.message }, 400);
   }
 

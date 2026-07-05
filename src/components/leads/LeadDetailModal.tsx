@@ -67,6 +67,7 @@ export function LeadDetailModal({
   const [comments, setComments] = useState<Comment[]>([]);
   const [draft, setDraft] = useState('');
   const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   // Key the effect on the lead id (stable), NOT the lead object or loadComments
@@ -75,11 +76,16 @@ export function LeadDetailModal({
   const leadId = lead?.id;
   useEffect(() => {
     if (!leadId || !open) return;
+    let cancelled = false; // ignore a stale in-flight response (bug #21)
     setLoading(true);
     setConfirmDelete(false);
+    setDraft(''); // don't leak a half-typed comment onto another lead (bug #8)
     loadComments(leadId)
-      .then(setComments)
-      .finally(() => setLoading(false));
+      .then((c) => !cancelled && setComments(c))
+      .finally(() => !cancelled && setLoading(false));
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leadId, open]);
 
@@ -92,10 +98,15 @@ export function LeadDetailModal({
 
   async function submitComment(e: React.FormEvent) {
     e.preventDefault();
-    if (!lead || !draft.trim()) return;
-    await addComment(lead.id, draft.trim());
-    setDraft('');
-    await refresh();
+    if (!lead || !draft.trim() || submitting) return; // guard double submit (bug #7)
+    setSubmitting(true);
+    try {
+      await addComment(lead.id, draft.trim());
+      setDraft('');
+      await refresh();
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   async function changeStage(to: Temperature) {
@@ -229,7 +240,11 @@ export function LeadDetailModal({
                   if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submitComment(e);
                 }}
               />
-              <button type="submit" className="btn-primary shrink-0" disabled={!draft.trim()}>
+              <button
+                type="submit"
+                className="btn-primary shrink-0"
+                disabled={!draft.trim() || submitting}
+              >
                 <Send className="h-4 w-4" />
               </button>
             </div>

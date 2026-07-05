@@ -30,6 +30,24 @@ const empty = (assignedTo: string): NewLeadInput => ({
   assignedTo,
 });
 
+/** Pick ONLY editable fields off a lead — never carry id/position/createdAt into
+ *  an update patch, which would resend server-managed fields as if edited. (#18) */
+const toForm = (l: Lead): NewLeadInput => ({
+  company: l.company,
+  contactName: l.contactName,
+  role: l.role,
+  email: l.email,
+  phone: l.phone,
+  website: l.website,
+  industry: l.industry,
+  source: l.source,
+  channel: l.channel,
+  reason: l.reason,
+  temperature: l.temperature,
+  value: l.value,
+  assignedTo: l.assignedTo,
+});
+
 export function LeadFormModal({
   open,
   onClose,
@@ -43,7 +61,7 @@ export function LeadFormModal({
   // employee actually shown in the dropdown (not the admin's own id, which isn't
   // an option and would be saved silently).
   const [form, setForm] = useState<NewLeadInput>(
-    initial ? { ...initial } : empty(isAdmin ? employees[0]?.id ?? currentUserId : currentUserId)
+    initial ? toForm(initial) : empty(isAdmin ? employees[0]?.id ?? currentUserId : currentUserId)
   );
   const [saving, setSaving] = useState(false);
 
