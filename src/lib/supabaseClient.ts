@@ -33,10 +33,18 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
-/** Master switch. Keep false until the .env is filled and the schema is applied. */
-export const USE_SUPABASE = false;
-
 export const supabase: SupabaseClient | null =
-  url && anonKey ? createClient(url, anonKey) : null;
+  url && anonKey
+    ? createClient(url, anonKey, {
+        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
+      })
+    : null;
 
 export const isSupabaseConfigured = Boolean(url && anonKey);
+
+/**
+ * When true, the services talk to Supabase; when false they use the local mock.
+ * This is now driven purely by whether .env has the Supabase vars — set them and
+ * you're in production; remove them and you're back to the local mock for dev.
+ */
+export const USE_SUPABASE = isSupabaseConfigured;

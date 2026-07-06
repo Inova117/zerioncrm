@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import type { User } from '../types';
 import { authService } from '../services/authService';
 import { ensureSeeded } from '../services/db';
+import { USE_SUPABASE } from '../lib/supabaseClient';
 
 interface AuthContextValue {
   user: User | null;
@@ -19,9 +20,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    ensureSeeded();
-    setUser(authService.getCurrentUser());
-    setLoading(false);
+    if (!USE_SUPABASE) ensureSeeded(); // only bootstrap the local mock, never in prod
+    let active = true;
+    authService
+      .getCurrentUser()
+      .then((u) => {
+        if (active) setUser(u);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    // React to logout / token refresh / deactivation from anywhere.
+    const unsubscribe = authService.onAuthChange((u) => {
+      if (active) setUser(u);
+    });
+    return () => {
+      active = false;
+      unsubscribe();
+    };
   }, []);
 
   const value = useMemo<AuthContextValue>(

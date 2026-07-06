@@ -92,24 +92,13 @@ supabase/
 
 ---
 
-## 🔌 Migración a Supabase (el "mapa del backend")
+## 🔌 Backend Supabase (YA CABLEADO)
 
-Todo está preparado para que el cambio sea **quirúrgico**: los componentes y los contextos
-llaman a `services/*`; solo hay que reimplementar esos servicios contra Supabase.
-
-**Pasos**
-
-1. Crea un proyecto en [supabase.com](https://supabase.com).
-2. Pega `supabase/schema.sql` en el editor SQL y ejecútalo (crea tablas, tipos y **RLS**).
-3. En **Authentication → Providers → Email**, **desactiva "Enable sign ups"**
-   (así nadie se registra solo).
-4. Despliega la Edge Function: `supabase functions deploy create-employee`.
-   Es la que crea empleados con el `service_role` tras verificar que quien llama es admin.
-5. `cp .env.example .env` y rellena `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`.
-6. En `src/lib/supabaseClient.ts` pon `USE_SUPABASE = true` y sustituye el cuerpo de cada
-   función de `services/*`. Cada método ya lleva un comentario `// SUPABASE: …` con la consulta.
-
-**Correspondencia tipos ⇆ tablas**
+La app ya usa Supabase de verdad. El interruptor es automático: **si hay variables
+`VITE_SUPABASE_*` en `.env`, corre contra Supabase; si no, usa el mock local** para
+desarrollo (ver `USE_SUPABASE` en `src/lib/supabaseClient.ts`). Cada servicio en
+`services/*` tiene su implementación Supabase y su mock; el mapeo camelCase↔snake_case
+vive en `services/mappers.ts`.
 
 | Tipo TS (`src/types`) | Tabla (`schema.sql`) |
 | --------------------- | -------------------- |
@@ -118,21 +107,29 @@ llaman a `services/*`; solo hay que reimplementar esos servicios contra Supabase
 | `Comment`             | `comments`           |
 | `Task`                | `tasks`              |
 
-**Ejemplo de reemplazo** (en `leadsService.ts`):
+### ✅ Checklist de go-live (pasos en tu dashboard/CLI)
 
-```ts
-// Mock (hoy):
-async list() { return table.get('leads'); }
+1. **SQL** — pega **todo** `supabase/schema.sql` en el editor SQL de Supabase y ejecútalo.
+   Es idempotente e incluye los `GRANT` (imprescindibles), las políticas **RLS** y un
+   trigger que crea el perfil al crear un usuario de Auth.
+2. **Desactiva signups** — Authentication → Providers → Email → apaga **"Enable Sign Ups"**
+   (solo el admin crea cuentas).
+3. **Crea tu admin** — Authentication → Users → **Add user** (`admin@zerionstudio.com` +
+   contraseña, marca *Auto Confirm*). Luego, en el editor SQL:
+   `update public.profiles set role='admin' where email='admin@zerionstudio.com';`
+4. **Despliega la Edge Function** (alta de empleados desde la app):
+   ```bash
+   supabase login
+   supabase link --project-ref kvgrjqszmfiylqwnuhpr
+   supabase functions deploy admin-users
+   ```
+   (`SERVICE_ROLE`, `URL` y `ANON_KEY` se inyectan solas en las Edge Functions.)
+5. **Local:** `.env` con `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY` (ya creado).
+   **Netlify:** Site settings → Environment variables → añade esas dos y redeploy.
 
-// Supabase (después):
-async list() {
-  const { data } = await supabase!.from('leads').select('*').order('position');
-  return data ?? [];
-}
-```
-
-La seguridad (quién ve/edita qué) queda garantizada por las **políticas RLS** del `schema.sql`:
-el admin ve todo; cada empleado solo sus propios leads y tareas.
+La seguridad (quién ve/edita qué) la garantizan las **políticas RLS** del `schema.sql`:
+el admin ve todo; cada empleado solo sus propios leads y tareas. La `anon key` es pública
+por diseño (viaja en el bundle); el `service_role` solo vive en la Edge Function.
 
 ---
 

@@ -1,7 +1,9 @@
-import type { User, Credential, Role } from '../types';
+import type { User, Role } from '../types';
 import { table, delay } from './db';
 import { uid, nowISO } from '../lib/utils';
 import { AVATAR_COLORS } from '../lib/constants';
+import { supabase } from '../lib/supabaseClient';
+import { rowToUser } from './mappers';
 
 export interface NewUserInput {
   name: string;
@@ -10,21 +12,88 @@ export interface NewUserInput {
   role: Role;
 }
 
-export const usersService = {
-  /** SUPABASE: supabase.from('profiles').select('*').order('created_at') */
-  async list(): Promise<User[]> {
+export interface UsersService {
+  list(): Promise<User[]>;
+  create(input: NewUserInput): Promise<{ user: User | null; error: string | null }>;
+  setActive(userId: string, active: boolean): Promise<void>;
+  setPassword(userId: string, password: string): Promise<{ error: string | null }>;
+  remove(userId: string, reassignTo?: string): Promise<void>;
+}
+
+// ---------------------------------------------------------------------------
+// Supabase implementation. Privileged actions (create auth user, change another
+// user's password, delete auth user) require the service_role, so they go
+// through the `admin-users` Edge Function which verifies the caller is an admin.
+// ---------------------------------------------------------------------------
+async function invokeAdmin(body: Record<string, unknown>): Promise<{ data: any; error: string | null }> {
+  const { data, error } = await supabase!.functions.invoke('admin-users', { body });
+  if (error) {
+    // Prefer the function's own JSON error message when present.
+    const msg = (data && (data as any).error) || error.message || 'Error del servidor';
+    return { data: null, error: msg };
+  }
+  if (data && (data as any).error) return { data: null, error: (data as any).error };
+  return { data, error: null };
+}
+
+const supabaseUsersService: UsersService = {
+  async list() {
+    const { data, error } = await supabase!
+      .from('profiles')
+      .select('*')
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    return (data ?? []).map(rowToUser);
+  },
+
+  async create(input) {
+    if (input.password.length < 6) {
+      return { user: null, error: 'La contraseña debe tener al menos 6 caracteres.' };
+    }
+    const { data, error } = await invokeAdmin({
+      action: 'create',
+      name: input.name.trim(),
+      email: input.email.trim().toLowerCase(),
+      password: input.password,
+      role: input.role,
+    });
+    if (error) return { user: null, error };
+    return { user: data?.user ? rowToUser(data.user) : null, error: null };
+  },
+
+  async setActive(userId, active) {
+    const { error } = await supabase!.from('profiles').update({ active }).eq('id', userId);
+    if (error) throw error;
+  },
+
+  async setPassword(userId, password) {
+    if (password.length < 6) return { error: 'La contraseña debe tener al menos 6 caracteres.' };
+    const { error } = await invokeAdmin({ action: 'set-password', userId, password });
+    return { error };
+  },
+
+  async remove(userId, reassignTo) {
+    // Reassign this user's rows FIRST (single bulk update each) so the FK to
+    // profiles isn't violated when the auth user (and its profile) is deleted.
+    if (reassignTo) {
+      await supabase!.from('leads').update({ assigned_to: reassignTo }).eq('assigned_to', userId);
+      await supabase!.from('tasks').update({ assigned_to: reassignTo }).eq('assigned_to', userId);
+    }
+    const { error } = await invokeAdmin({ action: 'delete', userId });
+    if (error) throw new Error(error);
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Mock implementation (local dev)
+// ---------------------------------------------------------------------------
+const mockUsersService: UsersService = {
+  async list() {
     await delay();
     return [...table.get('users')].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   },
 
-  /**
-   * Admin creates an employee account (users cannot self-register).
-   * SUPABASE: this becomes an Edge Function / server call using the service_role
-   *   key: supabase.auth.admin.createUser({ email, password, email_confirm: true })
-   *   followed by an insert into `profiles`. The anon client can NOT do this,
-   *   which is exactly the "only the admin creates accounts" guarantee.
-   */
-  async create(input: NewUserInput): Promise<{ user: User | null; error: string | null }> {
+  async create(input) {
     await delay();
     const email = input.email.trim().toLowerCase();
     const users = table.get('users');
@@ -34,7 +103,6 @@ export const usersService = {
     if (input.password.length < 6) {
       return { user: null, error: 'La contraseña debe tener al menos 6 caracteres.' };
     }
-
     const user: User = {
       id: uid('usr-'),
       email,
@@ -45,24 +113,16 @@ export const usersService = {
       createdAt: nowISO(),
     };
     table.set('users', [...users, user]);
-
-    const cred: Credential = { userId: user.id, email, password: input.password };
-    table.set('credentials', [...table.get('credentials'), cred]);
-
+    table.set('credentials', [...table.get('credentials'), { userId: user.id, email, password: input.password }]);
     return { user, error: null };
   },
 
-  /** Toggle active/inactive. SUPABASE: update profiles set active = :v where id = :id */
-  async setActive(userId: string, active: boolean): Promise<void> {
+  async setActive(userId, active) {
     await delay();
-    table.set(
-      'users',
-      table.get('users').map((u) => (u.id === userId ? { ...u, active } : u))
-    );
+    table.set('users', table.get('users').map((u) => (u.id === userId ? { ...u, active } : u)));
   },
 
-  /** Change a user's password. SUPABASE: supabase.auth.admin.updateUserById(id, { password }) */
-  async setPassword(userId: string, password: string): Promise<{ error: string | null }> {
+  async setPassword(userId, password) {
     await delay();
     if (password.length < 6) return { error: 'La contraseña debe tener al menos 6 caracteres.' };
     table.set(
@@ -72,27 +132,15 @@ export const usersService = {
     return { error: null };
   },
 
-  /**
-   * Delete an employee (and their credential). Their leads & tasks are reassigned
-   * to `reassignTo` (the acting admin) so no row is left with a dangling
-   * assignedTo. Comments keep their original authorId (history is preserved; the
-   * UI renders a deleted author gracefully).
-   * SUPABASE: declare FKs with a deliberate ON DELETE policy (SET NULL / RESTRICT)
-   *   and do the reassignment in a transaction / Edge Function.
-   */
-  async remove(userId: string, reassignTo?: string): Promise<void> {
+  async remove(userId, reassignTo) {
     await delay();
     table.set('users', table.get('users').filter((u) => u.id !== userId));
     table.set('credentials', table.get('credentials').filter((c) => c.userId !== userId));
     if (reassignTo) {
-      table.set(
-        'leads',
-        table.get('leads').map((l) => (l.assignedTo === userId ? { ...l, assignedTo: reassignTo } : l))
-      );
-      table.set(
-        'tasks',
-        table.get('tasks').map((t) => (t.assignedTo === userId ? { ...t, assignedTo: reassignTo } : t))
-      );
+      table.set('leads', table.get('leads').map((l) => (l.assignedTo === userId ? { ...l, assignedTo: reassignTo } : l)));
+      table.set('tasks', table.get('tasks').map((t) => (t.assignedTo === userId ? { ...t, assignedTo: reassignTo } : t)));
     }
   },
 };
+
+export const usersService: UsersService = supabase ? supabaseUsersService : mockUsersService;

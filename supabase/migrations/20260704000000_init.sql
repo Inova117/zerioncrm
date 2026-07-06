@@ -202,6 +202,45 @@ drop trigger if exists leads_touch on public.leads;
 create trigger leads_touch before update on public.leads
   for each row execute function public.touch_updated_at();
 
+-- ---------------------------------------------------------------------------
+-- GRANTS (CRÍTICO) — sin esto PostgREST devuelve "42501 permission denied".
+-- Toda la app corre autenticada; RLS filtra las filas. anon no necesita nada
+-- (el login usa la Auth API, no la REST API).
+-- ---------------------------------------------------------------------------
+grant usage on schema public to authenticated;
+grant all on all tables in schema public to authenticated;
+grant all on all sequences in schema public to authenticated;
+grant execute on all functions in schema public to authenticated;
+-- Que las tablas/funciones FUTURAS también hereden el grant:
+alter default privileges in schema public grant all on tables to authenticated;
+alter default privileges in schema public grant all on sequences to authenticated;
+alter default privileges in schema public grant execute on functions to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Al crear un usuario en Auth (dashboard o Edge Function) se crea su perfil
+-- automáticamente. El rol/nombre/color salen de user_metadata. (Cuentas SOLO por
+-- el admin: recuerda desactivar "Enable sign ups" en Auth → Providers → Email.)
+-- ---------------------------------------------------------------------------
+create or replace function public.handle_new_user()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  insert into public.profiles (id, email, name, role, avatar_color)
+  values (
+    new.id,
+    new.email,
+    coalesce(new.raw_user_meta_data->>'name', split_part(new.email, '@', 1)),
+    coalesce((new.raw_user_meta_data->>'role')::role_t, 'employee'),
+    coalesce(new.raw_user_meta_data->>'avatar_color', '#6366f1')
+  )
+  on conflict (id) do nothing;
+  return new;
+end; $$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function public.handle_new_user();
+
 -- ============================================================================
 -- VERIFICACIÓN — corre esto después para confirmar que todo quedó bien:
 --
