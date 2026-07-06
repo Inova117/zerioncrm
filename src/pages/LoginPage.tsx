@@ -133,7 +133,7 @@ export function LoginPage() {
               <span className="font-mono">zerion2026</span>
             </p>
             <p>
-              Empleada: <span className="font-mono">lucia@zerionstudio.com</span> ·{' '}
+              Staff: <span className="font-mono">lucia@zerionstudio.com</span> ·{' '}
               <span className="font-mono">lucia123</span>
             </p>
           </div>

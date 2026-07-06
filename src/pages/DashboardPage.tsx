@@ -155,7 +155,7 @@ export function DashboardPage() {
                 <div>
                   <h2 className="text-sm font-semibold text-surface-800">Desempeño del equipo</h2>
                   <p className="text-xs text-surface-400">
-                    Actividad de outreach por empleado.
+                    Actividad de outreach del staff.
                   </p>
                 </div>
               </div>

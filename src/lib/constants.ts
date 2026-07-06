@@ -139,7 +139,7 @@ export const cadenceLabel = (c: TaskCadence): string =>
 // Roles
 // ---------------------------------------------------------------------------
 export const roleLabel = (r: Role): string =>
-  r === 'admin' ? 'Administrador' : 'Empleado';
+  r === 'admin' ? 'Administrador' : 'Staff';
 
 // Avatar palette used when creating users
 export const AVATAR_COLORS = [

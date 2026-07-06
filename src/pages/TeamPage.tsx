@@ -155,10 +155,10 @@ export function TeamPage() {
   return (
     <AppLayout
       title="Equipo"
-      subtitle="Crea y administra las cuentas de tus empleados."
+      subtitle="Crea y administra las cuentas de tu staff."
       actions={
         <button className="btn-primary" onClick={() => setFormOpen(true)}>
-          <UserPlus className="h-4 w-4" /> <span className="hidden sm:inline">Nuevo empleado</span>
+          <UserPlus className="h-4 w-4" /> <span className="hidden sm:inline">Nuevo staff</span>
         </button>
       }
     >
@@ -175,16 +175,16 @@ export function TeamPage() {
 
           <section>
             <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-surface-400">
-              Empleados ({employees.length})
+              Staff ({employees.length})
             </h2>
             {employees.length === 0 ? (
               <EmptyState
                 icon={<UsersIcon className="h-10 w-10" />}
-                title="Aún no hay empleados"
+                title="Aún no hay staff"
                 description="Crea la primera cuenta para tu equipo de outreach."
                 action={
                   <button className="btn-primary" onClick={() => setFormOpen(true)}>
-                    <UserPlus className="h-4 w-4" /> Nuevo empleado
+                    <UserPlus className="h-4 w-4" /> Nuevo staff
                   </button>
                 }
               />

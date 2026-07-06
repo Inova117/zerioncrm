@@ -39,8 +39,8 @@ export function UserFormModal({ open, onClose, onSubmit }: UserFormModalProps) {
     <Modal
       open={open}
       onClose={onClose}
-      title="Crear cuenta de empleado"
-      subtitle="Solo el administrador puede crear cuentas. El empleado entra con estos datos."
+      title="Crear cuenta de staff"
+      subtitle="Solo el administrador puede crear cuentas. El staff entra con estos datos."
     >
       <form onSubmit={submit} className="space-y-4">
         <div>
@@ -85,13 +85,13 @@ export function UserFormModal({ open, onClose, onSubmit }: UserFormModalProps) {
             </button>
           </div>
           <p className="mt-1 text-xs text-surface-400">
-            Comparte estos datos con el empleado. Podrá cambiarla luego contigo.
+            Comparte estos datos con la persona. Podrá cambiarla luego contigo.
           </p>
         </div>
         <div>
           <label className="label">Rol</label>
           <select className="input" value={role} onChange={(e) => setRole(e.target.value as Role)}>
-            <option value="employee">Empleado</option>
+            <option value="employee">Staff</option>
             <option value="admin">Administrador</option>
           </select>
         </div>

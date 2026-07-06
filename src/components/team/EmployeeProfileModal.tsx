@@ -47,7 +47,7 @@ export function EmployeeProfileModal({ user, open, onClose, tasks, leads }: Empl
             </span>
           </h3>
           {myTasks.length === 0 ? (
-            <EmptyState title="Sin tareas" description="Este empleado no tiene tareas asignadas." />
+            <EmptyState title="Sin tareas" description="Esta persona no tiene tareas asignadas." />
           ) : (
             <div className="space-y-3">
               {CADENCES.map((c) => {
@@ -99,7 +99,7 @@ export function EmployeeProfileModal({ user, open, onClose, tasks, leads }: Empl
             Prospectos asignados
           </h3>
           {myLeads.length === 0 ? (
-            <EmptyState title="Sin prospectos" description="Este empleado no tiene prospectos asignados." />
+            <EmptyState title="Sin prospectos" description="Esta persona no tiene prospectos asignados." />
           ) : (
             <div className="space-y-1.5">
               {myLeads.map((l) => (

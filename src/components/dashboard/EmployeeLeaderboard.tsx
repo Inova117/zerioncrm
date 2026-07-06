@@ -4,7 +4,7 @@ import { cn, pct } from '../../lib/utils';
 
 export function EmployeeLeaderboard({ stats }: { stats: EmployeeStats[] }) {
   if (stats.length === 0) {
-    return <p className="py-6 text-center text-sm text-surface-400">Aún no hay empleados.</p>;
+    return <p className="py-6 text-center text-sm text-surface-400">Aún no hay staff.</p>;
   }
 
   return (
@@ -12,7 +12,7 @@ export function EmployeeLeaderboard({ stats }: { stats: EmployeeStats[] }) {
       <table className="w-full min-w-[540px] text-sm">
         <thead>
           <tr className="border-b border-surface-200 text-left text-xs uppercase tracking-wide text-surface-400">
-            <th className="px-2 py-2 font-medium">Empleado</th>
+            <th className="px-2 py-2 font-medium">Staff</th>
             <th className="px-2 py-2 text-center font-medium">Contactadas</th>
             <th className="px-2 py-2 text-center font-medium">Tibios+</th>
             <th className="px-2 py-2 text-center font-medium">Calientes</th>
