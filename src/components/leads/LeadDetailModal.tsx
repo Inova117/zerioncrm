@@ -18,7 +18,7 @@ import { Modal } from '../ui/Modal';
 import { Avatar } from '../ui/Avatar';
 import { TemperatureBadge } from '../ui/TemperatureBadge';
 import { STAGES, sourceLabel } from '../../lib/constants';
-import { cn, fmtDateTime, fmtMoney, fromNow } from '../../lib/utils';
+import { cn, fmtDateTime, fmtMoney, fromNow, mailLink, telLink, waLink, webLink } from '../../lib/utils';
 
 interface LeadDetailModalProps {
   lead: Lead | null;
@@ -165,6 +165,37 @@ export function LeadDetailModal({
           )}
         </div>
       </div>
+
+      {/* Quick contact actions — open the user's mail / phone / WhatsApp app. */}
+      {(lead.email || lead.phone || lead.website) && (
+        <div className="mb-4 flex flex-wrap gap-2">
+          {lead.email && (
+            <a href={mailLink(lead.email)} className="btn-secondary" onClick={(e) => e.stopPropagation()}>
+              <Mail className="h-4 w-4" /> Email
+            </a>
+          )}
+          {lead.phone && (
+            <a
+              href={waLink(lead.phone)}
+              target="_blank"
+              rel="noreferrer"
+              className="btn-secondary text-emerald-600"
+            >
+              <MessageCircle className="h-4 w-4" /> WhatsApp
+            </a>
+          )}
+          {lead.phone && (
+            <a href={telLink(lead.phone)} className="btn-secondary">
+              <Phone className="h-4 w-4" /> Llamar
+            </a>
+          )}
+          {lead.website && (
+            <a href={webLink(lead.website)} target="_blank" rel="noreferrer" className="btn-secondary">
+              <Globe className="h-4 w-4" /> Sitio web
+            </a>
+          )}
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Left: details */}

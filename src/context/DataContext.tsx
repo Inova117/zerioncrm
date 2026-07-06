@@ -14,6 +14,7 @@ interface DataContextValue {
   users: User[];
   leads: Lead[];
   tasks: Task[];
+  commentCounts: Record<string, number>;
   reload: () => Promise<void>;
 
   // Leads
@@ -52,16 +53,19 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [users, setUsers] = useState<User[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
 
   const reload = useCallback(async () => {
-    const [u, l, t] = await Promise.all([
+    const [u, l, t, cc] = await Promise.all([
       usersService.list(),
       leadsService.list(),
       tasksService.list(),
+      leadsService.commentCounts(),
     ]);
     setUsers(u);
     setLeads(l);
     setTasks(t);
+    setCommentCounts(cc);
   }, []);
 
   useEffect(() => {
@@ -80,6 +84,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     users,
     leads,
     tasks,
+    commentCounts,
     reload,
 
     async createLead(input) {
@@ -121,6 +126,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     },
     async addComment(leadId, body) {
       await leadsService.addActivity(leadId, authorId, 'comment', body);
+      setCommentCounts((prev) => ({ ...prev, [leadId]: (prev[leadId] ?? 0) + 1 }));
       // persist lastContactAt (not just optimistic) so it survives a reload (bug #13)
       const updated = await leadsService.update(leadId, { lastContactAt: new Date().toISOString() });
       if (updated) setLeads((prev) => prev.map((l) => (l.id === leadId ? updated : l)));
@@ -166,7 +172,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     },
 
     userById: (id) => users.find((u) => u.id === id),
-  }), [loading, users, leads, tasks, authorId, reload]);
+  }), [loading, users, leads, tasks, commentCounts, authorId, reload]);
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
 }

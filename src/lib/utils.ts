@@ -8,6 +8,7 @@ import {
   parseISO,
 } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { AVATAR_COLORS } from './constants';
 
 /** Tailwind-friendly conditional classnames. */
 export const cn = (...inputs: ClassValue[]) => clsx(inputs);
@@ -85,3 +86,33 @@ export const fmtCompact = (n: number): string =>
 
 export const pct = (part: number, total: number): number =>
   total <= 0 ? 0 : Math.round((part / total) * 100);
+
+// ---------------------------------------------------------------------------
+// Prospect UX helpers
+// ---------------------------------------------------------------------------
+/** Whole days since an ISO date (Infinity if never). */
+export const daysSince = (iso: string | null | undefined): number =>
+  iso ? Math.floor((Date.now() - parseISO(iso).getTime()) / 86_400_000) : Infinity;
+
+export type FollowUp = 'fresh' | 'due' | 'stale';
+/** Follow-up "traffic light": fresh ≤3d, due ≤7d, stale after that. */
+export const followUpLevel = (lastContactAt: string | null | undefined): FollowUp => {
+  const d = daysSince(lastContactAt);
+  if (d <= 3) return 'fresh';
+  if (d <= 7) return 'due';
+  return 'stale';
+};
+
+/** Deterministic brand color for a company name (so its avatar is stable). */
+export const colorFromString = (s: string): string => {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return AVATAR_COLORS[h % AVATAR_COLORS.length];
+};
+
+// Contact deep-links (open the user's mail/phone/WhatsApp app).
+export const mailLink = (email: string) => `mailto:${email.trim()}`;
+export const telLink = (phone: string) => `tel:${phone.replace(/[^\d+]/g, '')}`;
+export const waLink = (phone: string) => `https://wa.me/${phone.replace(/[^\d]/g, '')}`;
+export const webLink = (site: string) =>
+  /^https?:\/\//i.test(site) ? site : `https://${site}`;

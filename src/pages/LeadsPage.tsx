@@ -1,13 +1,18 @@
 import { useMemo, useState } from 'react';
-import { Plus, Search, KanbanSquare } from 'lucide-react';
+import { Plus, Search, KanbanSquare, LayoutList, Columns3, Flame, Clock, User as UserIcon } from 'lucide-react';
 import { AppLayout } from '../components/layout/AppLayout';
 import { KanbanBoard } from '../components/leads/KanbanBoard';
+import { LeadsTable } from '../components/leads/LeadsTable';
+import { PulseBar } from '../components/leads/PulseBar';
 import { LeadFormModal } from '../components/leads/LeadFormModal';
 import { LeadDetailModal } from '../components/leads/LeadDetailModal';
 import { PageLoader, EmptyState } from '../components/ui/misc';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import type { Lead, Temperature } from '../types';
+import { cn, followUpLevel } from '../lib/utils';
+
+type View = 'board' | 'list';
 
 export function LeadsPage() {
   const { user, isAdmin } = useAuth();
@@ -15,6 +20,7 @@ export function LeadsPage() {
     loading,
     leads,
     users,
+    commentCounts,
     createLead,
     updateLead,
     moveLead,
@@ -26,18 +32,16 @@ export function LeadsPage() {
 
   const [query, setQuery] = useState('');
   const [ownerFilter, setOwnerFilter] = useState<string>('all');
+  const [view, setView] = useState<View>('board');
+  const [chips, setChips] = useState<Set<string>>(new Set());
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Lead | null>(null);
   const [detail, setDetail] = useState<Lead | null>(null);
 
   const employees = useMemo(() => users.filter((u) => u.role === 'employee'), [users]);
-  // Only active employees are assignable (deactivated can't log in). (bug #15)
   const activeEmployees = useMemo(() => employees.filter((u) => u.active), [employees]);
   const usersById = useMemo(() => new Map(users.map((u) => [u.id, u])), [users]);
 
-  // Options for the assignee dropdown: active employees, plus the current owner
-  // when editing (even if now inactive) so it isn't blank (#11); fall back to the
-  // admin themselves when there are no active employees (#19).
   const assignableEmployees = useMemo(() => {
     let list = activeEmployees;
     const owner = editing ? usersById.get(editing.assignedTo) : undefined;
@@ -46,10 +50,27 @@ export function LeadsPage() {
     return list;
   }, [activeEmployees, editing, usersById, user]);
 
-  // Employees only see their own leads; admin sees everyone (with a filter).
-  const visibleLeads = useMemo(() => {
+  const defaultAssignee = isAdmin ? activeEmployees[0]?.id ?? user?.id ?? '' : user?.id ?? '';
+
+  // Role + owner scope (the "book of business" the pulse bar summarizes).
+  const scopedLeads = useMemo(() => {
     let list = isAdmin ? leads : leads.filter((l) => l.assignedTo === user?.id);
     if (isAdmin && ownerFilter !== 'all') list = list.filter((l) => l.assignedTo === ownerFilter);
+    return list;
+  }, [leads, isAdmin, user, ownerFilter]);
+
+  // Quick-filter chips + search applied on top.
+  const visibleLeads = useMemo(() => {
+    let list = scopedLeads;
+    if (chips.has('mine')) list = list.filter((l) => l.assignedTo === user?.id);
+    if (chips.has('hot')) list = list.filter((l) => l.temperature === 'caliente');
+    if (chips.has('stale'))
+      list = list.filter(
+        (l) =>
+          l.temperature !== 'cliente' &&
+          l.temperature !== 'perdido' &&
+          followUpLevel(l.lastContactAt) === 'stale'
+      );
     if (query.trim()) {
       const q = query.toLowerCase();
       list = list.filter(
@@ -60,20 +81,44 @@ export function LeadsPage() {
       );
     }
     return list;
-  }, [leads, isAdmin, user, ownerFilter, query]);
+  }, [scopedLeads, chips, user, query]);
 
-  // Keep the open detail modal in sync with the latest data.
   const detailLead = detail ? leads.find((l) => l.id === detail.id) ?? null : null;
+
+  const toggleChip = (key: string) =>
+    setChips((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
 
   async function handleMove(leadId: string, to: Temperature) {
     await moveLead(leadId, to);
+  }
+
+  async function handleQuickAdd(temperature: Temperature, company: string) {
+    await createLead({
+      company,
+      contactName: '',
+      role: '',
+      email: '',
+      phone: '',
+      website: '',
+      industry: '',
+      source: 'otro',
+      channel: '',
+      reason: '',
+      temperature,
+      value: 0,
+      assignedTo: defaultAssignee,
+    });
   }
 
   function openCreate() {
     setEditing(null);
     setFormOpen(true);
   }
-
   function openEdit(lead: Lead) {
     setDetail(null);
     setEditing(lead);
@@ -81,6 +126,12 @@ export function LeadsPage() {
   }
 
   if (!user) return null;
+
+  const chipDefs = [
+    { key: 'mine', label: 'Míos', icon: UserIcon, show: isAdmin },
+    { key: 'hot', label: 'Calientes', icon: Flame, show: true },
+    { key: 'stale', label: 'Sin seguimiento', icon: Clock, show: true },
+  ].filter((c) => c.show);
 
   return (
     <AppLayout
@@ -95,7 +146,7 @@ export function LeadsPage() {
     >
       <div className="flex h-full flex-col">
         {/* Toolbar */}
-        <div className="flex flex-wrap items-center gap-2 px-4 py-3 sm:px-6">
+        <div className="flex flex-wrap items-center gap-2 px-4 pt-3 sm:px-6">
           <div className="relative flex-1 sm:max-w-xs">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-surface-400" />
             <input
@@ -106,11 +157,7 @@ export function LeadsPage() {
             />
           </div>
           {isAdmin && (
-            <select
-              className="input w-auto"
-              value={ownerFilter}
-              onChange={(e) => setOwnerFilter(e.target.value)}
-            >
+            <select className="input w-auto" value={ownerFilter} onChange={(e) => setOwnerFilter(e.target.value)}>
               <option value="all">Todo el equipo</option>
               {employees.map((u) => (
                 <option key={u.id} value={u.id}>
@@ -119,18 +166,67 @@ export function LeadsPage() {
               ))}
             </select>
           )}
+
+          {/* View toggle */}
+          <div className="flex items-center rounded-lg border border-surface-300 bg-white p-0.5">
+            {([
+              ['board', Columns3, 'Tablero'],
+              ['list', LayoutList, 'Lista'],
+            ] as const).map(([v, Icon, label]) => (
+              <button
+                key={v}
+                onClick={() => setView(v)}
+                title={label}
+                className={cn(
+                  'flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors',
+                  view === v ? 'bg-brand-50 text-brand-700' : 'text-surface-500 hover:text-surface-700'
+                )}
+              >
+                <Icon className="h-4 w-4" />
+                <span className="hidden sm:inline">{label}</span>
+              </button>
+            ))}
+          </div>
+
           <span className="ml-auto text-sm text-surface-400">
             {visibleLeads.length} prospecto{visibleLeads.length === 1 ? '' : 's'}
           </span>
         </div>
 
-        {/* Board */}
-        <div className="min-h-0 flex-1">
+        {/* Filter chips */}
+        <div className="flex flex-wrap items-center gap-1.5 px-4 pt-2.5 sm:px-6">
+          {chipDefs.map(({ key, label, icon: Icon }) => {
+            const active = chips.has(key);
+            return (
+              <button
+                key={key}
+                onClick={() => toggleChip(key)}
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors',
+                  active
+                    ? 'border-brand-300 bg-brand-50 text-brand-700'
+                    : 'border-surface-200 text-surface-500 hover:bg-surface-50'
+                )}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Pulse bar */}
+        {!loading && leads.length > 0 && (
+          <div className="px-4 pt-2.5 sm:px-6">
+            <PulseBar leads={scopedLeads} />
+          </div>
+        )}
+
+        {/* Content */}
+        <div className={cn('min-h-0 flex-1 pt-3', view === 'list' && 'overflow-y-auto')}>
           {loading ? (
             <PageLoader />
           ) : leads.length === 0 ? (
-            // Onboarding empty state only when there are truly no leads — not when a
-            // filter/search simply hides them (that just shows empty columns). (bug #12)
             <div className="px-4 sm:px-6">
               <EmptyState
                 icon={<KanbanSquare className="h-10 w-10" />}
@@ -143,13 +239,17 @@ export function LeadsPage() {
                 }
               />
             </div>
-          ) : (
+          ) : view === 'board' ? (
             <KanbanBoard
               leads={visibleLeads}
               users={users}
+              commentCounts={commentCounts}
               onOpenLead={setDetail}
               onCommit={commitDrag}
+              onQuickAdd={handleQuickAdd}
             />
+          ) : (
+            <LeadsTable leads={visibleLeads} usersById={usersById} onOpenLead={setDetail} />
           )}
         </div>
       </div>

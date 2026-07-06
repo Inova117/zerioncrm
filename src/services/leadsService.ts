@@ -19,8 +19,15 @@ export interface LeadsService {
   reorderColumn(temperature: Temperature, orderedVisibleIds: string[]): Promise<void>;
   remove(id: string): Promise<void>;
   comments(leadId: string): Promise<Comment[]>;
+  commentCounts(): Promise<Record<string, number>>;
   addActivity(leadId: string, authorId: string, type: ActivityType, body: string): Promise<Comment>;
   removeComment(id: string): Promise<void>;
+}
+
+function tally(leadIds: string[]): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const id of leadIds) counts[id] = (counts[id] ?? 0) + 1;
+  return counts;
 }
 
 // ---------------------------------------------------------------------------
@@ -127,6 +134,11 @@ const supabaseLeadsService: LeadsService = {
     return (data ?? []).map(rowToComment);
   },
 
+  async commentCounts() {
+    const { data } = await supabase!.from('comments').select('lead_id');
+    return tally((data ?? []).map((r) => r.lead_id as string));
+  },
+
   async addActivity(leadId, authorId, type, body) {
     const { data, error } = await supabase!
       .from('comments')
@@ -231,6 +243,10 @@ const mockLeadsService: LeadsService = {
       .get('comments')
       .filter((c) => c.leadId === leadId)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  },
+
+  async commentCounts() {
+    return tally(table.get('comments').map((c) => c.leadId));
   },
 
   async addActivity(leadId, authorId, type, body) {

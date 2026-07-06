@@ -20,9 +20,11 @@ type Columns = Record<string, string[]>;
 interface KanbanBoardProps {
   leads: Lead[];
   users: User[];
+  commentCounts: Record<string, number>;
   onOpenLead: (lead: Lead) => void;
   /** Atomic: change stage (if the column changed) + persist the target column order. */
   onCommit: (leadId: string, toTemperature: Temperature, orderedVisibleIds: string[]) => void;
+  onQuickAdd: (temperature: Temperature, company: string) => void;
 }
 
 function buildColumns(leads: Lead[]): Columns {
@@ -36,7 +38,14 @@ function buildColumns(leads: Lead[]): Columns {
   return cols;
 }
 
-export function KanbanBoard({ leads, users, onOpenLead, onCommit }: KanbanBoardProps) {
+export function KanbanBoard({
+  leads,
+  users,
+  commentCounts,
+  onOpenLead,
+  onCommit,
+  onQuickAdd,
+}: KanbanBoardProps) {
   const [columns, setColumns] = useState<Columns>(() => buildColumns(leads));
   const [activeId, setActiveId] = useState<string | null>(null);
   const dragging = useRef(false);
@@ -143,7 +152,9 @@ export function KanbanBoard({ leads, users, onOpenLead, onCommit }: KanbanBoardP
               return l ? [l] : [];
             })}
             usersById={usersById}
+            commentCounts={commentCounts}
             onOpenLead={onOpenLead}
+            onQuickAdd={onQuickAdd}
           />
         ))}
       </div>
