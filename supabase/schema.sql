@@ -43,6 +43,10 @@ do $$ begin
   create type activity_t as enum ('comment','stage_change','contact','meeting');
 exception when duplicate_object then null; end $$;
 
+do $$ begin
+  create type service_t as enum ('web','app','ecommerce','branding','marketing','mantenimiento','consultoria','otro');
+exception when duplicate_object then null; end $$;
+
 -- Profiles (1:1 con auth.users) ----------------------------------------------
 create table if not exists public.profiles (
   id           uuid primary key references auth.users on delete cascade,
@@ -68,7 +72,9 @@ create table if not exists public.leads (
   channel         text default '',
   reason          text default '',
   temperature     temperature_t not null default 'nuevo',
+  service         service_t not null default 'otro',
   value           numeric not null default 0,
+  mrr             numeric not null default 0,
   position        int not null default 0,
   assigned_to     uuid not null references public.profiles(id),
   created_at      timestamptz not null default now(),
@@ -78,6 +84,9 @@ create table if not exists public.leads (
 );
 create index if not exists leads_assigned_idx    on public.leads(assigned_to);
 create index if not exists leads_temperature_idx on public.leads(temperature);
+-- For DBs where the leads table already exists (create-if-not-exists won't alter it):
+alter table public.leads add column if not exists service service_t not null default 'otro';
+alter table public.leads add column if not exists mrr numeric not null default 0;
 
 -- Comments / activity --------------------------------------------------------
 -- author_id is ON DELETE SET NULL: deleting an ex-employee must not be blocked by

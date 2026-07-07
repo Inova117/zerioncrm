@@ -1,4 +1,4 @@
-import type { User, Credential, Lead, Comment, Task } from '../types';
+import type { User, Credential, Lead, Comment, Task, Service } from '../types';
 
 // ============================================================================
 // Seed data for the local/mock backend.
@@ -70,7 +70,7 @@ export const seedCredentials: Credential[] = [
 let pos = 0;
 const p = () => pos++;
 
-export const seedLeads: Lead[] = [
+const rawLeads: Omit<Lead, 'service' | 'mrr'>[] = [
   {
     id: 'lead-1', company: 'Cafetería Aroma', contactName: 'Marta Ruiz', role: 'Dueña',
     email: 'marta@aroma.mx', phone: '+52 55 1234 5678', website: 'aroma.mx',
@@ -176,6 +176,19 @@ export const seedLeads: Lead[] = [
     createdAt: ago(40), updatedAt: ago(18), lastContactAt: ago(18), meetingAt: null,
   },
 ];
+
+// Tag each seed lead with an agency service line + a few retainers (MRR).
+const seedServices: Service[] = [
+  'web', 'app', 'ecommerce', 'ecommerce', 'app', 'branding', 'app', 'app',
+  'web', 'app', 'ecommerce', 'ecommerce', 'mantenimiento',
+];
+const seedMrr = [0, 0, 0, 0, 1500, 0, 0, 2500, 0, 3000, 1200, 800, 0];
+
+export const seedLeads: Lead[] = rawLeads.map((l, i) => ({
+  ...l,
+  service: seedServices[i] ?? 'otro',
+  mrr: seedMrr[i] ?? 0,
+}));
 
 // ---- Comments (activity) ---------------------------------------------------
 export const seedComments: Comment[] = [

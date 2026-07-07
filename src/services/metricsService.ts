@@ -36,6 +36,8 @@ export interface Totals {
   perdidos: number;
   pipelineValue: number; // $ of open (non-cliente, non-perdido) leads
   wonValue: number;
+  mrrActive: number; // recurring revenue locked in (retainers of won clients)
+  mrrPipeline: number; // potential recurring revenue in open deals
   convContactoTibio: number; // %
   convTibioReunion: number;
   convGlobal: number; // clientes / contactadas
@@ -57,6 +59,8 @@ export function totals(leads: Lead[]): Totals {
     perdidos: leads.filter((l) => l.temperature === 'perdido').length,
     pipelineValue: open.reduce((s, l) => s + l.value, 0),
     wonValue: clientes.reduce((s, l) => s + l.value, 0),
+    mrrActive: clientes.reduce((s, l) => s + l.mrr, 0),
+    mrrPipeline: open.reduce((s, l) => s + l.mrr, 0),
     convContactoTibio: pct(tibiosPlus.length, contactadas),
     convTibioReunion: pct(reunionesPlus.length, tibiosPlus.length),
     convGlobal: pct(clientes.length, contactadas),

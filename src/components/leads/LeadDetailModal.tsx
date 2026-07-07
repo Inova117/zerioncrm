@@ -12,12 +12,15 @@ import {
   CalendarClock,
   MessageCircle,
   Target,
+  Layers,
+  Repeat,
+  DollarSign,
 } from 'lucide-react';
 import type { Comment, Lead, Temperature, User, ActivityType } from '../../types';
 import { Modal } from '../ui/Modal';
 import { Avatar } from '../ui/Avatar';
 import { TemperatureBadge } from '../ui/TemperatureBadge';
-import { STAGES, sourceLabel } from '../../lib/constants';
+import { STAGES, sourceLabel, serviceLabel } from '../../lib/constants';
 import { cn, fmtDateTime, fmtMoney, fromNow, mailLink, telLink, waLink, webLink } from '../../lib/utils';
 
 interface LeadDetailModalProps {
@@ -206,8 +209,14 @@ export function LeadDetailModal({
             <InfoRow icon={Globe} label="Sitio web" value={lead.website} />
             <InfoRow icon={Building2} label="Industria" value={lead.industry} />
             <InfoRow icon={Target} label="Fuente" value={sourceLabel(lead.source)} />
+            <InfoRow icon={Layers} label="Servicio" value={serviceLabel(lead.service)} />
             <InfoRow icon={MessageCircle} label="Canal" value={lead.channel} />
-            <InfoRow icon={CalendarClock} label="Valor estimado" value={fmtMoney(lead.value)} />
+            <InfoRow icon={DollarSign} label="Presupuesto" value={fmtMoney(lead.value)} />
+            <InfoRow
+              icon={Repeat}
+              label="Retainer / MRR"
+              value={lead.mrr > 0 ? `${fmtMoney(lead.mrr)}/mes` : '—'}
+            />
             <InfoRow
               icon={CalendarClock}
               label="Reunión"

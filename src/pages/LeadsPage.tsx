@@ -110,7 +110,9 @@ export function LeadsPage() {
       channel: '',
       reason: '',
       temperature,
+      service: 'web',
       value: 0,
+      mrr: 0,
       assignedTo: defaultAssignee,
     });
   }

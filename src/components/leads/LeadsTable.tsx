@@ -4,7 +4,7 @@ import type { Lead, User } from '../../types';
 import { Avatar } from '../ui/Avatar';
 import { TemperatureBadge } from '../ui/TemperatureBadge';
 import { EmptyState } from '../ui/misc';
-import { STAGES, sourceLabel } from '../../lib/constants';
+import { STAGES, sourceLabel, serviceLabel } from '../../lib/constants';
 import {
   cn,
   colorFromString,
@@ -72,6 +72,7 @@ export function LeadsTable({ leads, usersById, onOpenLead }: LeadsTableProps) {
             <tr className="border-b border-surface-200 text-left text-xs uppercase tracking-wide text-surface-400">
               <Th k="company">Empresa</Th>
               <Th k="temperature">Etapa</Th>
+              <th className="px-3 py-2 font-medium">Servicio</th>
               <Th k="value" className="text-right">
                 Valor
               </Th>
@@ -111,8 +112,14 @@ export function LeadsTable({ leads, usersById, onOpenLead }: LeadsTableProps) {
                   <td className="px-3 py-2.5">
                     <TemperatureBadge temperature={lead.temperature} />
                   </td>
-                  <td className="px-3 py-2.5 text-right font-medium text-surface-700">
-                    {fmtMoney(lead.value)}
+                  <td className="px-3 py-2.5 text-surface-500">{serviceLabel(lead.service)}</td>
+                  <td className="px-3 py-2.5 text-right">
+                    <div className="font-medium text-surface-700">{fmtMoney(lead.value)}</div>
+                    {lead.mrr > 0 && (
+                      <div className="text-[11px] font-medium text-emerald-600">
+                        {fmtMoney(lead.mrr)}/mes
+                      </div>
+                    )}
                   </td>
                   <td className="px-3 py-2.5 text-surface-500">{sourceLabel(lead.source)}</td>
                   <td className="px-3 py-2.5">

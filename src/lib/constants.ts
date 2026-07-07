@@ -1,4 +1,4 @@
-import type { Temperature, Source, TaskCadence, Role } from '../types';
+import type { Temperature, Source, Service, TaskCadence, Role } from '../types';
 
 // ---------------------------------------------------------------------------
 // Pipeline stages (Kanban columns) — ordered
@@ -122,6 +122,23 @@ export const SOURCES: { key: Source; label: string }[] = [
 
 export const sourceLabel = (s: Source): string =>
   SOURCES.find((x) => x.key === s)?.label ?? s;
+
+// ---------------------------------------------------------------------------
+// Agency service lines
+// ---------------------------------------------------------------------------
+export const SERVICES: { key: Service; label: string }[] = [
+  { key: 'web', label: 'Sitio web' },
+  { key: 'app', label: 'App / Software' },
+  { key: 'ecommerce', label: 'E-commerce' },
+  { key: 'branding', label: 'Branding / Diseño' },
+  { key: 'marketing', label: 'Marketing / Ads' },
+  { key: 'mantenimiento', label: 'Mantenimiento' },
+  { key: 'consultoria', label: 'Consultoría' },
+  { key: 'otro', label: 'Otro' },
+];
+
+export const serviceLabel = (s: Service): string =>
+  SERVICES.find((x) => x.key === s)?.label ?? s;
 
 // ---------------------------------------------------------------------------
 // Tasks

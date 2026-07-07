@@ -14,6 +14,7 @@ export function PulseBar({ leads }: { leads: Lead[] }) {
     { label: 'Reuniones', value: String(t.reuniones), dot: 'bg-reunion' },
     { label: 'Clientes', value: String(t.clientes), dot: 'bg-cliente' },
     { label: 'Pipeline', value: fmtMoney(t.pipelineValue), dot: 'bg-brand-500' },
+    { label: 'MRR activo', value: t.mrrActive > 0 ? `${fmtMoney(t.mrrActive)}/mes` : '—', dot: 'bg-emerald-500' },
   ];
 
   return (

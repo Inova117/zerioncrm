@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import type { Lead, Source, Temperature, User } from '../../types';
+import type { Lead, Source, Service, Temperature, User } from '../../types';
 import { Modal } from '../ui/Modal';
-import { SOURCES, STAGES } from '../../lib/constants';
+import { SOURCES, SERVICES, STAGES } from '../../lib/constants';
 import type { NewLeadInput } from '../../services/leadsService';
 
 interface LeadFormModalProps {
@@ -26,7 +26,9 @@ const empty = (assignedTo: string): NewLeadInput => ({
   channel: '',
   reason: '',
   temperature: 'nuevo',
+  service: 'web',
   value: 0,
+  mrr: 0,
   assignedTo,
 });
 
@@ -44,7 +46,9 @@ const toForm = (l: Lead): NewLeadInput => ({
   channel: l.channel,
   reason: l.reason,
   temperature: l.temperature,
+  service: l.service,
   value: l.value,
+  mrr: l.mrr,
   assignedTo: l.assignedTo,
 });
 
@@ -191,7 +195,21 @@ export function LeadFormModal({
             </select>
           </div>
           <div>
-            <label className="label">Valor estimado (USD)</label>
+            <label className="label">Tipo de servicio</label>
+            <select
+              className="input"
+              value={form.service}
+              onChange={(e) => set('service', e.target.value as Service)}
+            >
+              {SERVICES.map((s) => (
+                <option key={s.key} value={s.key}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="label">Presupuesto del proyecto (USD)</label>
             <input
               type="number"
               min={0}
@@ -199,6 +217,17 @@ export function LeadFormModal({
               value={form.value || ''}
               onChange={(e) => set('value', Number(e.target.value) || 0)}
               placeholder="0"
+            />
+          </div>
+          <div>
+            <label className="label">Retainer / MRR (USD al mes)</label>
+            <input
+              type="number"
+              min={0}
+              className="input"
+              value={form.mrr || ''}
+              onChange={(e) => set('mrr', Number(e.target.value) || 0)}
+              placeholder="0 si no es recurrente"
             />
           </div>
           {isAdmin && (

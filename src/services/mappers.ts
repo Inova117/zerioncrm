@@ -3,7 +3,7 @@
 // camelCase. Keep ALL of that translation here so components/services never see
 // raw rows. (resolves the camelCase↔snake_case gap, audit#1 #12)
 // ============================================================================
-import type { User, Lead, Comment, Task, Role, Temperature, Source, TaskCadence, ActivityType } from '../types';
+import type { User, Lead, Comment, Task, Role, Temperature, Source, Service, TaskCadence, ActivityType } from '../types';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -32,7 +32,9 @@ export const rowToLead = (r: any): Lead => ({
   channel: r.channel ?? '',
   reason: r.reason ?? '',
   temperature: r.temperature as Temperature,
+  service: (r.service ?? 'otro') as Service,
   value: Number(r.value ?? 0),
+  mrr: Number(r.mrr ?? 0),
   position: r.position ?? 0,
   assignedTo: r.assigned_to,
   createdAt: r.created_at,
@@ -55,7 +57,9 @@ export const leadToRow = (l: Partial<Lead>): Record<string, unknown> => {
   if (l.channel !== undefined) row.channel = l.channel;
   if (l.reason !== undefined) row.reason = l.reason;
   if (l.temperature !== undefined) row.temperature = l.temperature;
+  if (l.service !== undefined) row.service = l.service;
   if (l.value !== undefined) row.value = l.value;
+  if (l.mrr !== undefined) row.mrr = l.mrr;
   if (l.position !== undefined) row.position = l.position;
   if (l.assignedTo !== undefined) row.assigned_to = l.assignedTo;
   if (l.lastContactAt !== undefined) row.last_contact_at = l.lastContactAt;

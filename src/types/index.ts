@@ -55,6 +55,17 @@ export type Source =
   | 'llamada'
   | 'otro';
 
+/** Agency service line the opportunity is about. */
+export type Service =
+  | 'web'
+  | 'app'
+  | 'ecommerce'
+  | 'branding'
+  | 'marketing'
+  | 'mantenimiento'
+  | 'consultoria'
+  | 'otro';
+
 export interface Lead {
   id: UUID;
   company: string;
@@ -70,8 +81,12 @@ export interface Lead {
   /** Why they are a potential client. */
   reason: string;
   temperature: Temperature;
-  /** Estimated deal value in USD (0 if unknown). */
+  /** Agency service line (web, app, retainer…). */
+  service: Service;
+  /** One-time estimated project value in USD (0 if unknown). */
   value: number;
+  /** Monthly recurring revenue / retainer in USD (0 if not a retainer). */
+  mrr: number;
   /** Manual ordering within a Kanban column. */
   position: number;
   assignedTo: UUID; // employee/user id

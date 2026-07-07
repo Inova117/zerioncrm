@@ -1,9 +1,9 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Building2, CalendarClock, MessageCircle, AlertCircle } from 'lucide-react';
+import { Building2, CalendarClock, MessageCircle, AlertCircle, Layers, Repeat } from 'lucide-react';
 import type { Lead, User } from '../../types';
 import { Avatar } from '../ui/Avatar';
-import { sourceLabel, stageConfig } from '../../lib/constants';
+import { sourceLabel, serviceLabel, stageConfig } from '../../lib/constants';
 import { cn, fmtMoney, fmtDate, fromNow, colorFromString, initials, followUpLevel } from '../../lib/utils';
 
 function CompanyAvatar({ name }: { name: string }) {
@@ -37,20 +37,27 @@ function CardBody({ lead, owner, commentCount = 0 }: { lead: Lead; owner?: User;
             </p>
           </div>
         </div>
-        {lead.value > 0 && (
-          <span className="shrink-0 rounded-md bg-surface-100 px-1.5 py-0.5 text-[11px] font-semibold text-surface-600">
-            {fmtMoney(lead.value)}
-          </span>
-        )}
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          {lead.value > 0 && (
+            <span className="rounded-md bg-surface-100 px-1.5 py-0.5 text-[11px] font-semibold text-surface-600">
+              {fmtMoney(lead.value)}
+            </span>
+          )}
+          {lead.mrr > 0 && (
+            <span className="inline-flex items-center gap-0.5 rounded-md bg-emerald-50 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-600">
+              <Repeat className="h-2.5 w-2.5" />
+              {fmtMoney(lead.mrr)}/mes
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
-        {lead.industry && (
-          <span className="badge bg-brand-50 text-brand-600">
-            <Building2 className="h-3 w-3" />
-            {lead.industry}
-          </span>
-        )}
+        <span className="badge bg-brand-50 text-brand-600">
+          <Layers className="h-3 w-3" />
+          {serviceLabel(lead.service)}
+        </span>
+        {lead.industry && <span className="badge bg-surface-100 text-surface-500">{lead.industry}</span>}
         <span className="badge bg-surface-100 text-surface-500">{sourceLabel(lead.source)}</span>
         {lead.meetingAt && (
           <span className="badge bg-violet-50 text-violet-600">
