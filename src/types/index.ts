@@ -140,6 +140,15 @@ export interface Task {
   dueDate: ISODate | null;
   createdAt: ISODate;
   completedAt: ISODate | null;
+  /** Recurring objective: auto-resets each cadence period (vs a one-off task). */
+  recurring: boolean;
+  /** Numeric goal for the period (0 = a plain done/undone task, no progress bar). */
+  target: number;
+  /** Current progress toward `target` in the period identified by `periodKey`. */
+  progress: number;
+  /** The period the progress/done belong to (e.g. "2026-07-08", "2026-W28",
+   *  "2026-07"). If it's not the current period, progress/done read as reset. */
+  periodKey: string | null;
 }
 
 // ---------------------------------------------------------------------------

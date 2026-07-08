@@ -1,4 +1,5 @@
 import type { User, Credential, Lead, Contact, Comment, Task, Service } from '../types';
+import { currentPeriodKey } from '../lib/objectives';
 
 // ============================================================================
 // Seed data for the local/mock backend.
@@ -224,7 +225,7 @@ export const seedComments: Comment[] = [
 ];
 
 // ---- Tasks -----------------------------------------------------------------
-export const seedTasks: Task[] = [
+const rawTasks: Omit<Task, 'recurring' | 'target' | 'progress' | 'periodKey'>[] = [
   { id: 't1', title: 'Contactar 10 empresas nuevas', notes: 'Sector restaurantes en CDMX', cadence: 'daily',
     done: false, assignedTo: U_LUCIA, leadId: null, dueDate: ahead(0), createdAt: ago(0), completedAt: null },
   { id: 't2', title: 'Responder DMs pendientes', notes: '', cadence: 'daily',
@@ -246,3 +247,20 @@ export const seedTasks: Task[] = [
   { id: 't10', title: 'Reporte mensual de outreach', notes: 'Para revisión del fundador', cadence: 'monthly',
     done: false, assignedTo: U_SARA, leadId: null, dueDate: ahead(25), createdAt: ago(3), completedAt: null },
 ];
+
+// A few of the seed tasks are recurring OBJECTIVES with a numeric target + partial
+// progress this period, to show the progress bars & auto-reset in action.
+const objectiveSeed: Record<string, { target: number; progress: number }> = {
+  t1: { target: 10, progress: 6 }, // daily: contactar 10 empresas
+  t9: { target: 8, progress: 3 }, // daily: contactar 8 empresas
+  t4: { target: 5, progress: 2 }, // weekly: enviar 5 propuestas
+  t7: { target: 3, progress: 1 }, // monthly: 3 clientes nuevos
+  t8: { target: 100, progress: 42 }, // monthly: 100 empresas contactadas
+};
+
+export const seedTasks: Task[] = rawTasks.map((t) => {
+  const o = objectiveSeed[t.id];
+  return o
+    ? { ...t, dueDate: null, recurring: true, target: o.target, progress: o.progress, periodKey: currentPeriodKey(t.cadence) }
+    : { ...t, recurring: false, target: 0, progress: 0, periodKey: null };
+});

@@ -36,6 +36,8 @@ export function TaskFormModal({
   );
   const [leadId, setLeadId] = useState<string>('');
   const [dueDate, setDueDate] = useState('');
+  const [recurring, setRecurring] = useState(true);
+  const [target, setTarget] = useState<number>(0);
   const [saving, setSaving] = useState(false);
 
   async function submit(e: React.FormEvent) {
@@ -50,7 +52,9 @@ export function TaskFormModal({
       leadId: leadId || null,
       // Parse the date-only input in LOCAL time, not UTC midnight — otherwise it
       // shifts a day back for users west of UTC (México/LatAm). (bug #3)
-      dueDate: dueDate ? new Date(`${dueDate}T00:00:00`).toISOString() : null,
+      dueDate: recurring || !dueDate ? null : new Date(`${dueDate}T00:00:00`).toISOString(),
+      recurring,
+      target: target > 0 ? Math.round(target) : 0,
     });
     setSaving(false);
     onClose();
@@ -81,6 +85,25 @@ export function TaskFormModal({
             placeholder="Detalle opcional"
           />
         </div>
+        {/* Recurring objective vs one-off task */}
+        <div className="rounded-lg border border-surface-200 p-3">
+          <label className="flex cursor-pointer items-start gap-2.5">
+            <input
+              type="checkbox"
+              className="mt-0.5 rounded border-surface-300 text-brand-600 focus:ring-brand-500"
+              checked={recurring}
+              onChange={(e) => setRecurring(e.target.checked)}
+            />
+            <span>
+              <span className="text-sm font-medium text-surface-800">Objetivo recurrente</span>
+              <span className="block text-xs text-surface-400">
+                Se reinicia solo cada {cadence === 'daily' ? 'día' : cadence === 'weekly' ? 'semana' : 'mes'} — no
+                hay que crearlo de nuevo. Desactívalo para una tarea única con fecha.
+              </span>
+            </span>
+          </label>
+        </div>
+
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className="label">Frecuencia</label>
@@ -97,14 +120,27 @@ export function TaskFormModal({
             </select>
           </div>
           <div>
-            <label className="label">Fecha límite</label>
+            <label className="label">Meta (número, opcional)</label>
             <input
-              type="date"
+              type="number"
+              min={0}
               className="input"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
+              value={target || ''}
+              onChange={(e) => setTarget(Number(e.target.value) || 0)}
+              placeholder="Ej. 25 contactos"
             />
           </div>
+          {!recurring && (
+            <div>
+              <label className="label">Fecha límite</label>
+              <input
+                type="date"
+                className="input"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+              />
+            </div>
+          )}
           {isAdmin && (
             <div>
               <label className="label">Asignar a</label>

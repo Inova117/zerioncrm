@@ -9,10 +9,11 @@ import { useData } from '../context/DataContext';
 import { CADENCES } from '../lib/constants';
 import type { TaskCadence } from '../types';
 import { cn, pct, taskIsCurrent } from '../lib/utils';
+import { taskDone } from '../lib/objectives';
 
 export function TasksPage() {
   const { user, isAdmin } = useAuth();
-  const { loading, tasks, leads, users, createTask, toggleTask, removeTask } = useData();
+  const { loading, tasks, leads, users, createTask, toggleTask, setTaskProgress, removeTask } = useData();
 
   const [ownerFilter, setOwnerFilter] = useState('all');
   const [formOpen, setFormOpen] = useState(false);
@@ -74,13 +75,12 @@ export function TasksPage() {
       ) : (
         <div className="grid gap-5 lg:grid-cols-3">
           {CADENCES.map((c) => {
-            // Dateless recurring tasks reset by their creation window; DATED tasks
-            // always stay visible (marked overdue if past) so they never vanish
-            // silently. (bugs #4 reset intent, #1 don't hide dated tasks)
+            // Recurring objectives always show (they auto-reset each period);
+            // one-off dated tasks use the cadence window. (objetivos + bugs #1/#4)
             const list = visibleTasks
-              .filter((t) => t.cadence === c.key && taskIsCurrent(t))
-              .sort((a, b) => Number(a.done) - Number(b.done));
-            const done = list.filter((t) => t.done).length;
+              .filter((t) => t.cadence === c.key && (t.recurring || taskIsCurrent(t)))
+              .sort((a, b) => Number(taskDone(a)) - Number(taskDone(b)));
+            const done = list.filter((t) => taskDone(t)).length;
             const progress = pct(done, list.length);
             return (
               <section key={c.key} className="flex flex-col">
@@ -115,6 +115,7 @@ export function TasksPage() {
                         lead={task.leadId ? leadsById.get(task.leadId) : undefined}
                         showOwner={isAdmin}
                         onToggle={toggleTask}
+                        onSetProgress={setTaskProgress}
                         onRemove={removeTask}
                       />
                     ))

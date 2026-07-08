@@ -1,6 +1,7 @@
 import type { Lead, Task, User, EmployeeStats, FunnelStage, Temperature, Service } from '../types';
 import { pct } from '../lib/utils';
 import { SERVICES } from '../lib/constants';
+import { taskDone } from '../lib/objectives';
 
 // Ordering used to decide "reached at least this stage" for funnel math.
 const ORDER: Temperature[] = ['nuevo', 'frio', 'tibio', 'caliente', 'reunion', 'cliente'];
@@ -89,7 +90,7 @@ export function employeeStats(
         reuniones: own.filter((l) => rank(l.temperature) >= rank('reunion') && l.temperature !== 'perdido').length,
         clientes,
         perdidos: own.filter((l) => l.temperature === 'perdido').length,
-        tasksDone: ownTasks.filter((t) => t.done).length,
+        tasksDone: ownTasks.filter((t) => taskDone(t)).length,
         tasksTotal: ownTasks.length,
         conversionRate: pct(clientes, contacted),
       };

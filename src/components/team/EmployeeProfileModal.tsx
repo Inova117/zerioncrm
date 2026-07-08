@@ -6,6 +6,7 @@ import { TemperatureBadge } from '../ui/TemperatureBadge';
 import { EmptyState } from '../ui/misc';
 import { CADENCES, roleLabel } from '../../lib/constants';
 import { cn, fmtDate, fmtMoney } from '../../lib/utils';
+import { taskDone } from '../../lib/objectives';
 
 interface EmployeeProfileModalProps {
   user: User | null;
@@ -20,7 +21,7 @@ export function EmployeeProfileModal({ user, open, onClose, tasks, leads }: Empl
 
   const myTasks = tasks.filter((t) => t.assignedTo === user.id);
   const myLeads = leads.filter((l) => l.assignedTo === user.id);
-  const doneCount = myTasks.filter((t) => t.done).length;
+  const doneCount = myTasks.filter((t) => taskDone(t)).length;
 
   return (
     <Modal open={open} onClose={onClose} size="lg">
@@ -64,7 +65,7 @@ export function EmployeeProfileModal({ user, open, onClose, tasks, leads }: Empl
                           key={t.id}
                           className="flex items-start gap-2 rounded-lg border border-surface-200 px-2.5 py-2"
                         >
-                          {t.done ? (
+                          {taskDone(t) ? (
                             <CheckSquare className="mt-0.5 h-4 w-4 shrink-0 text-cliente" />
                           ) : (
                             <Square className="mt-0.5 h-4 w-4 shrink-0 text-surface-300" />
@@ -73,10 +74,15 @@ export function EmployeeProfileModal({ user, open, onClose, tasks, leads }: Empl
                             <p
                               className={cn(
                                 'text-sm text-surface-700',
-                                t.done && 'text-surface-400 line-through'
+                                taskDone(t) && 'text-surface-400 line-through'
                               )}
                             >
                               {t.title}
+                              {t.target > 0 && (
+                                <span className="ml-1 text-[11px] font-normal text-surface-400">
+                                  · {t.progress}/{t.target}
+                                </span>
+                              )}
                             </p>
                             {t.dueDate && (
                               <p className="text-[11px] text-surface-400">Vence {fmtDate(t.dueDate)}</p>

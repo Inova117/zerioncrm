@@ -136,9 +136,18 @@ create table if not exists public.tasks (
   lead_id      uuid references public.leads(id) on delete set null,
   due_date     timestamptz,
   created_at   timestamptz not null default now(),
-  completed_at timestamptz
+  completed_at timestamptz,
+  recurring    boolean not null default false,
+  target       numeric not null default 0,
+  progress     numeric not null default 0,
+  period_key   text
 );
 create index if not exists tasks_assigned_idx on public.tasks(assigned_to);
+-- For DBs where the tasks table already exists (create-if-not-exists won't alter it):
+alter table public.tasks add column if not exists recurring  boolean not null default false;
+alter table public.tasks add column if not exists target     numeric not null default 0;
+alter table public.tasks add column if not exists progress   numeric not null default 0;
+alter table public.tasks add column if not exists period_key text;
 
 -- ---------------------------------------------------------------------------
 -- Helper: ¿el usuario actual es admin?

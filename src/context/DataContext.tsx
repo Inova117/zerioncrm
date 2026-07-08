@@ -7,6 +7,7 @@ import { tasksService } from '../services/tasksService';
 import type { NewTaskInput } from '../services/tasksService';
 import { usersService } from '../services/usersService';
 import type { NewUserInput } from '../services/usersService';
+import { currentPeriodKey } from '../lib/objectives';
 import { useAuth } from './AuthContext';
 
 interface DataContextValue {
@@ -41,6 +42,8 @@ interface DataContextValue {
   // Tasks
   createTask: (input: NewTaskInput) => Promise<void>;
   toggleTask: (id: string) => Promise<void>;
+  /** Set a target-based objective's progress for the current period. */
+  setTaskProgress: (id: string, value: number) => Promise<void>;
   updateTask: (id: string, patch: Partial<Task>) => Promise<void>;
   removeTask: (id: string) => Promise<void>;
 
@@ -186,8 +189,31 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setTasks((prev) => [task, ...prev]);
     },
     async toggleTask(id) {
-      const updated = await tasksService.toggle(id);
-      if (updated) setTasks((prev) => prev.map((t) => (t.id === id ? updated : t)));
+      const task = tasks.find((t) => t.id === id);
+      if (!task) return;
+      const done = !task.done;
+      // A recurring objective "claims" the current period when toggled. (auto-reset)
+      const patch: Partial<Task> = {
+        done,
+        completedAt: done ? new Date().toISOString() : null,
+        ...(task.recurring ? { periodKey: currentPeriodKey(task.cadence) } : {}),
+      };
+      await tasksService.update(id, patch);
+      setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)));
+    },
+    async setTaskProgress(id, value) {
+      const task = tasks.find((t) => t.id === id);
+      if (!task) return;
+      const progress = Math.max(0, Math.round(value));
+      const done = task.target > 0 ? progress >= task.target : task.done;
+      const patch: Partial<Task> = {
+        progress,
+        done,
+        completedAt: done ? new Date().toISOString() : null,
+        periodKey: task.recurring ? currentPeriodKey(task.cadence) : task.periodKey,
+      };
+      await tasksService.update(id, patch);
+      setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)));
     },
     async updateTask(id, patch) {
       await tasksService.update(id, patch);

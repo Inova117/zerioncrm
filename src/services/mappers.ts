@@ -110,6 +110,10 @@ export const rowToTask = (r: any): Task => ({
   dueDate: r.due_date,
   createdAt: r.created_at,
   completedAt: r.completed_at,
+  recurring: r.recurring ?? false,
+  target: Number(r.target ?? 0),
+  progress: Number(r.progress ?? 0),
+  periodKey: r.period_key ?? null,
 });
 
 export const taskToRow = (t: Partial<Task>): Record<string, unknown> => {
@@ -122,5 +126,9 @@ export const taskToRow = (t: Partial<Task>): Record<string, unknown> => {
   if (t.leadId !== undefined) row.lead_id = t.leadId;
   if (t.dueDate !== undefined) row.due_date = t.dueDate;
   if (t.completedAt !== undefined) row.completed_at = t.completedAt;
+  if (t.recurring !== undefined) row.recurring = t.recurring;
+  if (t.target !== undefined) row.target = t.target;
+  if (t.progress !== undefined) row.progress = t.progress;
+  if (t.periodKey !== undefined) row.period_key = t.periodKey;
   return row;
 };

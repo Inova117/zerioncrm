@@ -11,6 +11,8 @@ export interface NewTaskInput {
   assignedTo: string;
   leadId: string | null;
   dueDate: string | null;
+  recurring: boolean;
+  target: number;
 }
 
 export interface TasksService {
@@ -86,6 +88,8 @@ const mockTasksService: TasksService = {
       done: false,
       createdAt: nowISO(),
       completedAt: null,
+      progress: 0,
+      periodKey: null,
     };
     table.set('tasks', [...table.get('tasks'), task]);
     return task;

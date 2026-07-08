@@ -19,6 +19,7 @@ import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { cumulativeFunnel, totals, employeeStats } from '../services/metricsService';
 import { fmtMoney, taskIsCurrent } from '../lib/utils';
+import { taskDone } from '../lib/objectives';
 
 export function DashboardPage() {
   const { user, isAdmin } = useAuth();
@@ -38,9 +39,9 @@ export function DashboardPage() {
       tasks.filter(
         (task) =>
           task.assignedTo === user?.id &&
-          !task.done &&
           task.cadence === 'daily' &&
-          taskIsCurrent(task)
+          !taskDone(task) &&
+          (task.recurring || taskIsCurrent(task))
       ),
     [tasks, user]
   );
