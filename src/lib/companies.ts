@@ -64,7 +64,8 @@ export function groupCompanies(leads: Lead[], contacts: Contact[]): CompanyGroup
       industry: groupLeads.find((l) => l.industry)?.industry ?? '',
       leads: groupLeads.sort((a, b) => rank(b.temperature) - rank(a.temperature)),
       contacts: groupContacts,
-      totalValue: groupLeads.reduce((s, l) => s + l.value, 0),
+      // Exclude lost opportunities so an account's value isn't overstated. (#22)
+      totalValue: groupLeads.filter((l) => l.temperature !== 'perdido').reduce((s, l) => s + l.value, 0),
       totalMrr: won.reduce((s, l) => s + l.mrr, 0),
       openCount: open.length,
       wonCount: won.length,

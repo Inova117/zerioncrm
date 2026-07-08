@@ -122,14 +122,16 @@ const supabaseLeadsService: LeadsService = {
     const mergedIds = colSorted.map((l) =>
       visible.has(l.id) && vi < orderedVisibleIds.length ? orderedVisibleIds[vi++] : l.id
     );
-    // Persist only the rows whose position actually changed.
-    await Promise.all(
+    // Persist only the rows whose position actually changed; surface any failure. (#17)
+    const results = await Promise.all(
       mergedIds.map((rid, i) =>
         colSorted.find((l) => l.id === rid)?.position === i
-          ? Promise.resolve()
+          ? Promise.resolve({ error: null })
           : supabase!.from('leads').update({ position: i }).eq('id', rid)
       )
     );
+    const failed = results.find((r) => r && r.error);
+    if (failed?.error) throw failed.error;
   },
 
   async remove(id) {
@@ -149,7 +151,8 @@ const supabaseLeadsService: LeadsService = {
   },
 
   async commentCounts() {
-    const { data } = await supabase!.from('comments').select('lead_id');
+    // Only real comments feed the badge — stage-change activity must not inflate it. (#5)
+    const { data } = await supabase!.from('comments').select('lead_id').eq('type', 'comment');
     return tally((data ?? []).map((r) => r.lead_id as string));
   },
 
@@ -300,7 +303,7 @@ const mockLeadsService: LeadsService = {
   },
 
   async commentCounts() {
-    return tally(table.get('comments').map((c) => c.leadId));
+    return tally(table.get('comments').filter((c) => c.type === 'comment').map((c) => c.leadId));
   },
 
   async addActivity(leadId, authorId, type, body) {

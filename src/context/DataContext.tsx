@@ -20,6 +20,8 @@ interface DataContextValue {
 
   // Leads
   createLead: (input: NewLeadInput) => Promise<Lead>;
+  /** Bulk import: create many, one reload at the end, returns {ok, failed}. */
+  importLeads: (inputs: NewLeadInput[]) => Promise<{ ok: number; failed: number }>;
   updateLead: (id: string, patch: Partial<Lead>) => Promise<void>;
   moveLead: (id: string, temperature: Temperature) => Promise<void>;
   /** Atomic drag commit: change stage (if needed) + reorder the target column. */
@@ -63,18 +65,21 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
 
   const reload = useCallback(async () => {
-    const [u, l, t, ct, cc] = await Promise.all([
+    // allSettled so one failing table doesn't wipe the others' state. (#11)
+    const [u, l, t, ct, cc] = await Promise.allSettled([
       usersService.list(),
       leadsService.list(),
       tasksService.list(),
       leadsService.allContacts(),
       leadsService.commentCounts(),
     ]);
-    setUsers(u);
-    setLeads(l);
-    setTasks(t);
-    setContacts(ct);
-    setCommentCounts(cc);
+    if (u.status === 'fulfilled') setUsers(u.value);
+    if (l.status === 'fulfilled') setLeads(l.value);
+    if (t.status === 'fulfilled') setTasks(t.value);
+    if (ct.status === 'fulfilled') setContacts(ct.value);
+    if (cc.status === 'fulfilled') setCommentCounts(cc.value);
+    const failed = [u, l, t, ct, cc].filter((r) => r.status === 'rejected');
+    if (failed.length) console.error('[reload] fuentes con error:', failed.length);
   }, []);
 
   useEffect(() => {
@@ -101,6 +106,23 @@ export function DataProvider({ children }: { children: ReactNode }) {
       const lead = await leadsService.create(input);
       setLeads((prev) => [...prev, lead]);
       return lead;
+    },
+    async importLeads(inputs) {
+      let ok = 0;
+      let failed = 0;
+      // Persist row by row but DON'T setState per row (avoids O(n²) re-renders);
+      // a single reload at the end shows them all. A bad row is skipped. (#8, #14)
+      for (const input of inputs) {
+        try {
+          await leadsService.create(input);
+          ok++;
+        } catch (e) {
+          failed++;
+          console.error('[import] fila falló:', e);
+        }
+      }
+      await reload();
+      return { ok, failed };
     },
     async updateLead(id, patch) {
       const updated = await leadsService.update(id, patch);

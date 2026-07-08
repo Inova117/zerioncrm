@@ -15,7 +15,33 @@ import {
 } from '../../lib/utils';
 
 type SortKey = 'company' | 'temperature' | 'value' | 'lastContact';
+type SortState = { key: SortKey; dir: 1 | -1 };
 const stageRank = (t: Lead['temperature']) => STAGES.findIndex((s) => s.key === t);
+
+/** Sortable header cell — module-level so it isn't re-created each render (#31). */
+function SortableTh({
+  k,
+  children,
+  className,
+  sort,
+  onToggle,
+}: {
+  k: SortKey;
+  children: React.ReactNode;
+  className?: string;
+  sort: SortState;
+  onToggle: (k: SortKey) => void;
+}) {
+  return (
+    <th className={cn('px-3 py-2 font-medium', className)}>
+      <button onClick={() => onToggle(k)} className="inline-flex items-center gap-1 hover:text-surface-700">
+        {children}
+        {sort.key === k &&
+          (sort.dir === 1 ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />)}
+      </button>
+    </th>
+  );
+}
 
 interface LeadsTableProps {
   leads: Lead[];
@@ -54,31 +80,21 @@ export function LeadsTable({ leads, usersById, onOpenLead }: LeadsTableProps) {
   const toggle = (key: SortKey) =>
     setSort((s) => (s.key === key ? { key, dir: (s.dir * -1) as 1 | -1 } : { key, dir: 1 }));
 
-  const Th = ({ k, children, className }: { k: SortKey; children: React.ReactNode; className?: string }) => (
-    <th className={cn('px-3 py-2 font-medium', className)}>
-      <button onClick={() => toggle(k)} className="inline-flex items-center gap-1 hover:text-surface-700">
-        {children}
-        {sort.key === k &&
-          (sort.dir === 1 ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />)}
-      </button>
-    </th>
-  );
-
   return (
     <div className="px-4 pb-4 sm:px-6">
       <div className="card overflow-x-auto">
         <table className="w-full min-w-[720px] text-sm">
           <thead>
             <tr className="border-b border-surface-200 text-left text-xs uppercase tracking-wide text-surface-400">
-              <Th k="company">Empresa</Th>
-              <Th k="temperature">Etapa</Th>
+              <SortableTh k="company" sort={sort} onToggle={toggle}>Empresa</SortableTh>
+              <SortableTh k="temperature" sort={sort} onToggle={toggle}>Etapa</SortableTh>
               <th className="px-3 py-2 font-medium">Servicio</th>
-              <Th k="value" className="text-right">
+              <SortableTh k="value" className="text-right" sort={sort} onToggle={toggle}>
                 Valor
-              </Th>
+              </SortableTh>
               <th className="px-3 py-2 font-medium">Fuente</th>
               <th className="px-3 py-2 font-medium">Responsable</th>
-              <Th k="lastContact">Últ. contacto</Th>
+              <SortableTh k="lastContact" sort={sort} onToggle={toggle}>Últ. contacto</SortableTh>
             </tr>
           </thead>
           <tbody>

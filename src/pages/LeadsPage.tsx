@@ -11,7 +11,6 @@ import { PageLoader, EmptyState } from '../components/ui/misc';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import type { Lead, Temperature } from '../types';
-import type { NewLeadInput } from '../services/leadsService';
 import { cn, followUpLevel } from '../lib/utils';
 import { toCSV, downloadCSV } from '../lib/csv';
 import { CSV_HEADERS, leadsToRows } from '../lib/leadsCsv';
@@ -26,6 +25,7 @@ export function LeadsPage() {
     users,
     commentCounts,
     createLead,
+    importLeads,
     updateLead,
     moveLead,
     commitDrag,
@@ -55,7 +55,17 @@ export function LeadsPage() {
     return list;
   }, [activeEmployees, editing, usersById, user]);
 
-  const defaultAssignee = isAdmin ? activeEmployees[0]?.id ?? user?.id ?? '' : user?.id ?? '';
+  // When an admin is filtering by an employee, new leads (quick-add / import)
+  // default to THAT employee so the created card isn't hidden by the filter. (#2)
+  const defaultAssignee = isAdmin
+    ? (ownerFilter !== 'all' ? ownerFilter : activeEmployees[0]?.id ?? user?.id ?? '')
+    : user?.id ?? '';
+
+  // Resolve a "Responsable" name from a CSV to a user id (round-trips owners). (#3)
+  const resolveOwner = useMemo(() => {
+    const byName = new Map(users.map((u) => [u.name.trim().toLowerCase(), u.id]));
+    return (name: string) => byName.get(name.trim().toLowerCase());
+  }, [users]);
 
   // Role + owner scope (the "book of business" the pulse bar summarizes).
   const scopedLeads = useMemo(() => {
@@ -115,7 +125,7 @@ export function LeadsPage() {
       channel: '',
       reason: '',
       temperature,
-      service: 'web',
+      service: 'otro',
       value: 0,
       mrr: 0,
       assignedTo: defaultAssignee,
@@ -125,15 +135,6 @@ export function LeadsPage() {
   function handleExport() {
     const csv = toCSV(CSV_HEADERS, leadsToRows(visibleLeads, usersById));
     downloadCSV(`prospectos-${new Date().toISOString().slice(0, 10)}.csv`, csv);
-  }
-
-  async function handleImport(list: NewLeadInput[]) {
-    let n = 0;
-    for (const input of list) {
-      await createLead(input);
-      n++;
-    }
-    return n;
   }
 
   function openCreate() {
@@ -301,12 +302,14 @@ export function LeadsPage() {
         }}
       />
 
-      {/* Import CSV */}
+      {/* Import CSV (keyed so it resets between opens — #7) */}
       <ImportCsvModal
+        key={importOpen ? 'import-open' : 'import-closed'}
         open={importOpen}
         onClose={() => setImportOpen(false)}
         defaultAssignee={defaultAssignee}
-        onImport={handleImport}
+        resolveOwner={resolveOwner}
+        onImport={importLeads}
       />
 
       {/* Detail */}

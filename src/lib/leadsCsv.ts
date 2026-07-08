@@ -56,37 +56,71 @@ const sourceMap = new Map<string, Source>(
   SOURCES.flatMap((s) => [[lc(s.label), s.key] as const, [lc(s.key), s.key] as const])
 );
 
-const parseNum = (v: string): number => {
-  const n = parseFloat((v ?? '').replace(/[^\d.-]/g, ''));
-  return Number.isFinite(n) ? n : 0;
-};
+/** Locale-tolerant number parse: handles "1,500", "1.500", "1,234.56", "1.234,56". */
+export function parseNum(v: string): number {
+  let s = (v ?? '').trim().replace(/[^\d.,-]/g, '');
+  if (!s) return 0;
+  const neg = s.startsWith('-');
+  s = s.replace(/-/g, '');
+  const lastComma = s.lastIndexOf(',');
+  const lastDot = s.lastIndexOf('.');
+  if (lastComma > -1 && lastDot > -1) {
+    // The right-most separator is the decimal; the other groups thousands.
+    s = lastComma > lastDot ? s.replace(/\./g, '').replace(',', '.') : s.replace(/,/g, '');
+  } else if (lastComma > -1) {
+    const dec = s.length - lastComma - 1;
+    s = dec > 0 && dec <= 2 ? s.replace(',', '.') : s.replace(/,/g, ''); // decimal vs thousands
+  } else if (lastDot > -1) {
+    const parts = s.split('.');
+    const dec = parts[parts.length - 1].length;
+    if (parts.length > 2 || dec === 3) s = s.replace(/\./g, ''); // thousands grouping
+  }
+  const n = parseFloat(s);
+  return Number.isFinite(n) ? (neg ? -n : n) : 0;
+}
 
-/** Convert a parsed CSV row → NewLeadInput, or null if it has no company. */
+const stripAccents = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '');
+const normKey = (s: string) => stripAccents(s.trim().toLowerCase());
+
+/**
+ * Convert a parsed CSV row → NewLeadInput, or null if it has no company.
+ * Header lookup is case/accent-insensitive. `resolveOwner` maps a "Responsable"
+ * name to a user id so an exported file round-trips its owners. (#3, #12)
+ */
 export function rowToLeadInput(
   row: Record<string, string>,
-  defaultAssignee: string
+  defaultAssignee: string,
+  resolveOwner?: (name: string) => string | undefined
 ): NewLeadInput | null {
-  const company = (row['Empresa'] ?? row['empresa'] ?? row['Company'] ?? '').trim();
-  if (!company) return null;
+  const nm: Record<string, string> = {};
+  for (const k in row) nm[normKey(k)] = row[k];
   const get = (...keys: string[]) => {
-    for (const k of keys) if (row[k] != null && row[k] !== '') return row[k].trim();
+    for (const k of keys) {
+      const v = nm[normKey(k)];
+      if (v != null && v !== '') return v.trim();
+    }
     return '';
   };
+
+  const company = get('Empresa', 'Company', 'Cuenta');
+  if (!company) return null;
+
+  const ownerName = get('Responsable', 'Owner', 'Vendedor');
   return {
     company,
     contactName: get('Contacto', 'Contact', 'Nombre'),
     role: get('Cargo', 'Role', 'Puesto'),
-    email: get('Email', 'Correo', 'email'),
-    phone: get('Teléfono', 'Telefono', 'Phone', 'teléfono'),
+    email: get('Email', 'Correo'),
+    phone: get('Teléfono', 'Telefono', 'Phone'),
     website: get('Sitio web', 'Website', 'Web'),
     industry: get('Industria', 'Industry'),
-    service: serviceMap.get(lc(get('Servicio', 'Service'))) ?? 'web',
+    service: serviceMap.get(lc(get('Servicio', 'Service'))) ?? 'otro',
     temperature: stageMap.get(lc(get('Temperatura', 'Etapa', 'Stage'))) ?? 'nuevo',
-    value: parseNum(get('Presupuesto', 'Valor', 'Value')),
-    mrr: parseNum(get('MRR', 'Retainer')),
+    value: Math.max(0, parseNum(get('Presupuesto', 'Valor', 'Value'))),
+    mrr: Math.max(0, parseNum(get('MRR', 'Retainer'))),
     source: sourceMap.get(lc(get('Fuente', 'Source'))) ?? 'otro',
     channel: get('Canal', 'Channel'),
-    reason: get('Motivo', 'Reason', '¿Por qué?'),
-    assignedTo: defaultAssignee,
+    reason: get('Motivo', 'Reason'),
+    assignedTo: (ownerName && resolveOwner?.(ownerName)) || defaultAssignee,
   };
 }

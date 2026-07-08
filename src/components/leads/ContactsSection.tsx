@@ -10,6 +10,7 @@ export function ContactsSection({ leadId }: { leadId: string }) {
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
   const myContacts = useMemo(
     () => contacts.filter((c) => c.leadId === leadId).sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
@@ -20,12 +21,24 @@ export function ContactsSection({ leadId }: { leadId: string }) {
     e.preventDefault();
     if (!form.name.trim() || saving) return;
     setSaving(true);
+    setErr(null);
     try {
       await addContact({ leadId, ...form, name: form.name.trim() });
       setForm(emptyForm);
       setAdding(false);
+    } catch {
+      setErr('No se pudo guardar el contacto. Intenta de nuevo.');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function remove(id: string, name: string) {
+    if (!window.confirm(`¿Eliminar a ${name}? Esta acción no se puede deshacer.`)) return;
+    try {
+      await removeContact(id);
+    } catch {
+      setErr('No se pudo eliminar el contacto.');
     }
   }
 
@@ -47,6 +60,8 @@ export function ContactsSection({ leadId }: { leadId: string }) {
           </button>
         )}
       </div>
+
+      {err && <p className="mb-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">{err}</p>}
 
       {myContacts.length === 0 && !adding && (
         <p className="rounded-lg bg-surface-50 px-3 py-3 text-center text-sm text-surface-400">
@@ -84,7 +99,7 @@ export function ContactsSection({ leadId }: { leadId: string }) {
                 </a>
               )}
               <button
-                onClick={() => removeContact(c.id)}
+                onClick={() => remove(c.id, c.name)}
                 className="rounded p-1.5 text-surface-300 opacity-0 transition-opacity hover:text-caliente group-hover:opacity-100"
                 title="Eliminar contacto"
               >

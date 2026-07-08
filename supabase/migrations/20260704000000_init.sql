@@ -280,8 +280,8 @@ create trigger on_auth_user_created
 --
 --   select table_name from information_schema.tables
 --   where table_schema = 'public' order by 1;
---   -- Debe listar: comments, leads, profiles, tasks
+--   -- Debe listar: comments, contacts, leads, profiles, tasks
 --
 --   select count(*) as policies from pg_policies where schemaname = 'public';
---   -- Debe dar: 13
+--   -- Debe dar: 15
 -- ============================================================================

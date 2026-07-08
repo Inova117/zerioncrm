@@ -19,8 +19,11 @@ export interface AuthService {
 // ---------------------------------------------------------------------------
 // Supabase implementation (production)
 // ---------------------------------------------------------------------------
+/** Returns the profile, null if it genuinely doesn't exist (PGRST116), or THROWS
+ *  on a transient/other error so callers can avoid destroying a valid session. (#10) */
 async function fetchProfile(id: string): Promise<User | null> {
-  const { data } = await supabase!.from('profiles').select('*').eq('id', id).single();
+  const { data, error } = await supabase!.from('profiles').select('*').eq('id', id).single();
+  if (error && error.code !== 'PGRST116') throw error;
   return data ? rowToUser(data) : null;
 }
 
@@ -33,7 +36,12 @@ const supabaseAuthService: AuthService = {
     if (error || !data.user) {
       return { user: null, error: 'Correo o contraseña incorrectos.' };
     }
-    const user = await fetchProfile(data.user.id);
+    let user: User | null;
+    try {
+      user = await fetchProfile(data.user.id);
+    } catch {
+      return { user: null, error: 'No se pudo cargar tu perfil. Intenta de nuevo.' };
+    }
     if (!user) return { user: null, error: 'Tu perfil no existe. Contacta al administrador.' };
     if (!user.active) {
       await supabase!.auth.signOut();
@@ -47,25 +55,44 @@ const supabaseAuthService: AuthService = {
   },
 
   async getCurrentUser() {
-    const { data } = await supabase!.auth.getUser();
-    if (!data.user) return null;
-    const user = await fetchProfile(data.user.id);
-    // A user deactivated while logged in loses access on the next restore. (audit#1 #9)
-    if (!user || !user.active) {
-      await supabase!.auth.signOut();
+    // getSession reads the persisted session locally (resilient offline/flaky). (#18)
+    const { data } = await supabase!.auth.getSession();
+    const authUser = data.session?.user;
+    if (!authUser) return null;
+    try {
+      const user = await fetchProfile(authUser.id);
+      // Genuinely missing profile or deactivated → end the session. (audit#1 #9)
+      if (!user || !user.active) {
+        await supabase!.auth.signOut();
+        return null;
+      }
+      return user;
+    } catch {
+      // Transient profile-fetch error → keep the session, just no user this cycle. (#10)
       return null;
     }
-    return user;
   },
 
   onAuthChange(cb) {
-    const { data } = supabase!.auth.onAuthStateChange(async (_event, sess) => {
+    const { data } = supabase!.auth.onAuthStateChange(async (event, sess) => {
+      // getCurrentUser() already handles the initial load; ignore its duplicate
+      // INITIAL_SESSION event to avoid a last-writer-wins race. (#13)
+      if (event === 'INITIAL_SESSION') return;
       if (!sess?.user) {
         cb(null);
         return;
       }
-      const user = await fetchProfile(sess.user.id);
-      cb(user && user.active ? user : null);
+      try {
+        const user = await fetchProfile(sess.user.id);
+        if (!user || !user.active) {
+          await supabase!.auth.signOut(); // deactivated → actually end the session (#19)
+          cb(null);
+          return;
+        }
+        cb(user);
+      } catch {
+        /* transient — keep the current UI user */
+      }
     });
     return () => data.subscription.unsubscribe();
   },

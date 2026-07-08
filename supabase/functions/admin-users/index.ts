@@ -47,7 +47,9 @@ Deno.serve(async (req) => {
 
   // 2) Dispatch.
   if (action === 'create') {
-    const { name, email, password, role = 'employee' } = body;
+    const { name, email, password } = body;
+    // Only allow known roles; anything else would abort the profile trigger's ::role_t cast. (#26)
+    const role = body.role === 'admin' ? 'admin' : 'employee';
     if (!email || !password || password.length < 6) {
       return json({ error: 'Correo y contraseña (mín. 6) son obligatorios' }, 400);
     }
@@ -73,9 +75,15 @@ Deno.serve(async (req) => {
   }
 
   if (action === 'delete') {
-    const { userId } = body;
+    const { userId, reassignTo } = body;
     if (!userId) return json({ error: 'userId requerido' }, 400);
     if (userId === me.user.id) return json({ error: 'No puedes eliminar tu propia cuenta' }, 400);
+    // Reassign this user's rows FIRST (service_role) so deleting the profile can't
+    // violate the assigned_to FK; then delete the auth user. (#16)
+    if (reassignTo) {
+      await admin.from('leads').update({ assigned_to: reassignTo }).eq('assigned_to', userId);
+      await admin.from('tasks').update({ assigned_to: reassignTo }).eq('assigned_to', userId);
+    }
     const { error } = await admin.auth.admin.deleteUser(userId);
     if (error) return json({ error: error.message }, 400);
     return json({ ok: true });

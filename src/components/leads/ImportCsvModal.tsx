@@ -9,25 +9,27 @@ interface ImportCsvModalProps {
   open: boolean;
   onClose: () => void;
   defaultAssignee: string;
-  onImport: (inputs: NewLeadInput[]) => Promise<number>;
+  resolveOwner?: (name: string) => string | undefined;
+  onImport: (inputs: NewLeadInput[]) => Promise<{ ok: number; failed: number }>;
 }
 
-export function ImportCsvModal({ open, onClose, defaultAssignee, onImport }: ImportCsvModalProps) {
+export function ImportCsvModal({ open, onClose, defaultAssignee, resolveOwner, onImport }: ImportCsvModalProps) {
   const [text, setText] = useState('');
   const [importing, setImporting] = useState(false);
-  const [result, setResult] = useState<number | null>(null);
+  const [result, setResult] = useState<{ ok: number; failed: number } | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const inputs = useMemo(() => {
     if (!text.trim()) return [];
     try {
       return parseCSV(text)
-        .map((r) => rowToLeadInput(r, defaultAssignee))
+        .map((r) => rowToLeadInput(r, defaultAssignee, resolveOwner))
         .filter((x): x is NewLeadInput => x !== null);
     } catch {
       return [];
     }
-  }, [text, defaultAssignee]);
+  }, [text, defaultAssignee, resolveOwner]);
 
   function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -43,11 +45,14 @@ export function ImportCsvModal({ open, onClose, defaultAssignee, onImport }: Imp
   async function doImport() {
     if (!inputs.length || importing) return;
     setImporting(true);
+    setError(null);
     try {
-      const n = await onImport(inputs);
-      setResult(n);
+      const res = await onImport(inputs);
+      setResult(res);
       setText('');
       if (fileRef.current) fileRef.current.value = '';
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo importar. Intenta de nuevo.');
     } finally {
       setImporting(false);
     }
@@ -116,9 +121,12 @@ export function ImportCsvModal({ open, onClose, defaultAssignee, onImport }: Imp
         {result !== null && (
           <p className="flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
             <CheckCircle2 className="h-4 w-4" />
-            Se importaron {result} prospecto{result === 1 ? '' : 's'}.
+            Se importaron {result.ok} prospecto{result.ok === 1 ? '' : 's'}
+            {result.failed > 0 && ` · ${result.failed} con errores`}.
           </p>
         )}
+
+        {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
       </div>
     </Modal>
   );

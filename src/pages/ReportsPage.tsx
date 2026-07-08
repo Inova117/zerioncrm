@@ -27,7 +27,10 @@ function Bars({
           <div className="h-6 flex-1 overflow-hidden rounded-lg bg-surface-100">
             <div
               className="flex h-full items-center justify-end rounded-lg px-2 text-[11px] font-semibold text-white transition-all"
-              style={{ width: `${Math.max(6, (r.value / max) * 100)}%`, backgroundColor: r.color }}
+              style={{
+                width: r.value === 0 ? '0%' : `${Math.max(6, (r.value / max) * 100)}%`,
+                backgroundColor: r.color,
+              }}
             >
               {r.value > 0 && r.display}
             </div>
@@ -83,7 +86,7 @@ export function ReportsPage() {
             />
             <StatCard
               label="Tasa de cierre"
-              value={`${wr}%`}
+              value={t.clientes + t.perdidos > 0 ? `${wr}%` : '—'}
               hint={`${t.clientes} ganados · ${t.perdidos} perdidos`}
               icon={<Trophy className="h-4 w-4" />}
             />

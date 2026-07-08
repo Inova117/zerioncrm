@@ -3,6 +3,7 @@ import { table, delay } from './db';
 import { uid, nowISO } from '../lib/utils';
 import { AVATAR_COLORS } from '../lib/constants';
 import { supabase } from '../lib/supabaseClient';
+import { FunctionsHttpError } from '@supabase/supabase-js';
 import { rowToUser } from './mappers';
 
 export interface NewUserInput {
@@ -28,8 +29,13 @@ export interface UsersService {
 async function invokeAdmin(body: Record<string, unknown>): Promise<{ data: any; error: string | null }> {
   const { data, error } = await supabase!.functions.invoke('admin-users', { body });
   if (error) {
-    // Prefer the function's own JSON error message when present.
-    const msg = (data && (data as any).error) || error.message || 'Error del servidor';
+    // On a non-2xx, the function's JSON body lives in error.context (not `data`),
+    // so read it to surface the real message. (#9)
+    let msg = error.message || 'Error del servidor';
+    if (error instanceof FunctionsHttpError) {
+      const b = await error.context.json().catch(() => null);
+      if (b?.error) msg = b.error;
+    }
     return { data: null, error: msg };
   }
   if (data && (data as any).error) return { data: null, error: (data as any).error };
@@ -73,13 +79,9 @@ const supabaseUsersService: UsersService = {
   },
 
   async remove(userId, reassignTo) {
-    // Reassign this user's rows FIRST (single bulk update each) so the FK to
-    // profiles isn't violated when the auth user (and its profile) is deleted.
-    if (reassignTo) {
-      await supabase!.from('leads').update({ assigned_to: reassignTo }).eq('assigned_to', userId);
-      await supabase!.from('tasks').update({ assigned_to: reassignTo }).eq('assigned_to', userId);
-    }
-    const { error } = await invokeAdmin({ action: 'delete', userId });
+    // The Edge Function reassigns (service_role) then deletes atomically, so the FK
+    // to profiles can't be violated regardless of client RLS timing. (#16)
+    const { error } = await invokeAdmin({ action: 'delete', userId, reassignTo });
     if (error) throw new Error(error);
   },
 };
