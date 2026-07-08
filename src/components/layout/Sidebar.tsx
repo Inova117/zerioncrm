@@ -4,6 +4,7 @@ import {
   KanbanSquare,
   Building2,
   CheckSquare,
+  BarChart3,
   Users,
   LogOut,
   X,
@@ -25,6 +26,7 @@ const NAV: NavItem[] = [
   { to: '/leads', label: 'Prospectos', icon: KanbanSquare },
   { to: '/empresas', label: 'Empresas', icon: Building2 },
   { to: '/tareas', label: 'Tareas', icon: CheckSquare },
+  { to: '/reportes', label: 'Reportes', icon: BarChart3 },
   { to: '/equipo', label: 'Equipo', icon: Users, adminOnly: true },
 ];
 

@@ -8,6 +8,7 @@ import { DashboardPage } from './pages/DashboardPage';
 import { LeadsPage } from './pages/LeadsPage';
 import { CompaniesPage } from './pages/CompaniesPage';
 import { TasksPage } from './pages/TasksPage';
+import { ReportsPage } from './pages/ReportsPage';
 import { TeamPage } from './pages/TeamPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 
@@ -30,6 +31,7 @@ export default function App() {
           <Route path="/leads" element={<Private><LeadsPage /></Private>} />
           <Route path="/empresas" element={<Private><CompaniesPage /></Private>} />
           <Route path="/tareas" element={<Private><TasksPage /></Private>} />
+          <Route path="/reportes" element={<Private><ReportsPage /></Private>} />
           <Route path="/equipo" element={<Private adminOnly><TeamPage /></Private>} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>

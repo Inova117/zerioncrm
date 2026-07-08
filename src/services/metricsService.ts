@@ -1,5 +1,6 @@
-import type { Lead, Task, User, EmployeeStats, FunnelStage, Temperature } from '../types';
+import type { Lead, Task, User, EmployeeStats, FunnelStage, Temperature, Service } from '../types';
 import { pct } from '../lib/utils';
+import { SERVICES } from '../lib/constants';
 
 // Ordering used to decide "reached at least this stage" for funnel math.
 const ORDER: Temperature[] = ['nuevo', 'frio', 'tibio', 'caliente', 'reunion', 'cliente'];
@@ -101,4 +102,62 @@ export function bySource(leads: Lead[]): { source: string; count: number }[] {
   const map = new Map<string, number>();
   leads.forEach((l) => map.set(l.source, (map.get(l.source) ?? 0) + 1));
   return [...map.entries()].map(([source, count]) => ({ source, count }));
+}
+
+// ---------------------------------------------------------------------------
+// Agency reporting
+// ---------------------------------------------------------------------------
+export interface ServiceStats {
+  service: Service;
+  label: string;
+  deals: number;
+  won: number;
+  wonValue: number; // one-time revenue closed
+  mrr: number; // recurring revenue closed
+  openValue: number; // value still in pipeline
+}
+
+/** Per-service-line performance, best revenue first. */
+export function byService(leads: Lead[]): ServiceStats[] {
+  const map = new Map<Service, ServiceStats>();
+  SERVICES.forEach((s) =>
+    map.set(s.key, { service: s.key, label: s.label, deals: 0, won: 0, wonValue: 0, mrr: 0, openValue: 0 })
+  );
+  leads.forEach((l) => {
+    const st = map.get(l.service);
+    if (!st) return;
+    st.deals++;
+    if (l.temperature === 'cliente') {
+      st.won++;
+      st.wonValue += l.value;
+      st.mrr += l.mrr;
+    } else if (l.temperature !== 'perdido') {
+      st.openValue += l.value;
+    }
+  });
+  return [...map.values()]
+    .filter((s) => s.deals > 0)
+    .sort((a, b) => b.wonValue - a.wonValue || b.deals - a.deals);
+}
+
+/** % of decided deals that were won (won / (won + lost)). */
+export function winRate(leads: Lead[]): number {
+  const won = leads.filter((l) => l.temperature === 'cliente').length;
+  const lost = leads.filter((l) => l.temperature === 'perdido').length;
+  return pct(won, won + lost);
+}
+
+/** Average one-time value of won deals. */
+export function avgTicket(leads: Lead[]): number {
+  const won = leads.filter((l) => l.temperature === 'cliente');
+  return won.length ? Math.round(won.reduce((s, l) => s + l.value, 0) / won.length) : 0;
+}
+
+/** Open pipeline value per stage (for a value-weighted funnel). */
+export function pipelineByStage(leads: Lead[]): { temperature: Temperature; value: number }[] {
+  const stages: Temperature[] = ['nuevo', 'frio', 'tibio', 'caliente', 'reunion'];
+  return stages.map((temperature) => ({
+    temperature,
+    value: leads.filter((l) => l.temperature === temperature).reduce((s, l) => s + l.value, 0),
+  }));
 }
