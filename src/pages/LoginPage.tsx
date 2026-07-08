@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Navigate, useLocation } from 'react-router-dom';
 import { Lock, Mail, ShieldCheck, Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { USE_SUPABASE } from '../lib/supabaseClient';
 
 export function LoginPage() {
   const { user, signIn } = useAuth();
@@ -126,17 +127,20 @@ export function LoginPage() {
             </button>
           </form>
 
-          <div className="mt-8 rounded-lg border border-surface-200 bg-surface-50 px-4 py-3 text-xs text-surface-500">
-            <p className="font-medium text-surface-600">Cuentas de demostración</p>
-            <p className="mt-1">
-              Admin: <span className="font-mono">admin@zerionstudio.com</span> ·{' '}
-              <span className="font-mono">zerion2026</span>
-            </p>
-            <p>
-              Staff: <span className="font-mono">lucia@zerionstudio.com</span> ·{' '}
-              <span className="font-mono">lucia123</span>
-            </p>
-          </div>
+          {/* Demo credentials only make sense in the local mock — never in production. */}
+          {!USE_SUPABASE && (
+            <div className="mt-8 rounded-lg border border-surface-200 bg-surface-50 px-4 py-3 text-xs text-surface-500">
+              <p className="font-medium text-surface-600">Cuentas de demostración</p>
+              <p className="mt-1">
+                Admin: <span className="font-mono">admin@zerionstudio.com</span> ·{' '}
+                <span className="font-mono">zerion2026</span>
+              </p>
+              <p>
+                Staff: <span className="font-mono">lucia@zerionstudio.com</span> ·{' '}
+                <span className="font-mono">lucia123</span>
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>
