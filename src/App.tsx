@@ -6,6 +6,7 @@ import { ProtectedRoute } from './components/layout/ProtectedRoute';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { LeadsPage } from './pages/LeadsPage';
+import { CompaniesPage } from './pages/CompaniesPage';
 import { TasksPage } from './pages/TasksPage';
 import { TeamPage } from './pages/TeamPage';
 import { NotFoundPage } from './pages/NotFoundPage';
@@ -27,6 +28,7 @@ export default function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/" element={<Private><DashboardPage /></Private>} />
           <Route path="/leads" element={<Private><LeadsPage /></Private>} />
+          <Route path="/empresas" element={<Private><CompaniesPage /></Private>} />
           <Route path="/tareas" element={<Private><TasksPage /></Private>} />
           <Route path="/equipo" element={<Private adminOnly><TeamPage /></Private>} />
           <Route path="*" element={<NotFoundPage />} />

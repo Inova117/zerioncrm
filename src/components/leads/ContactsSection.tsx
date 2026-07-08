@@ -1,36 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Users, Plus, Mail, Phone, MessageCircle, Trash2 } from 'lucide-react';
-import type { Contact } from '../../types';
 import { useData } from '../../context/DataContext';
 import { cn, colorFromString, initials, mailLink, telLink, waLink } from '../../lib/utils';
 
 const emptyForm = { name: '', role: '', email: '', phone: '' };
 
 export function ContactsSection({ leadId }: { leadId: string }) {
-  const { loadContacts, addContact, removeContact } = useData();
-  const [contacts, setContacts] = useState<Contact[]>([]);
-  const [loading, setLoading] = useState(false);
+  const { contacts, addContact, removeContact } = useData();
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setAdding(false);
-    setForm(emptyForm);
-    loadContacts(leadId)
-      .then((c) => !cancelled && setContacts(c))
-      .finally(() => !cancelled && setLoading(false));
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [leadId]);
-
-  async function refresh() {
-    setContacts(await loadContacts(leadId));
-  }
+  const myContacts = useMemo(
+    () => contacts.filter((c) => c.leadId === leadId).sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
+    [contacts, leadId]
+  );
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -40,15 +24,9 @@ export function ContactsSection({ leadId }: { leadId: string }) {
       await addContact({ leadId, ...form, name: form.name.trim() });
       setForm(emptyForm);
       setAdding(false);
-      await refresh();
     } finally {
       setSaving(false);
     }
-  }
-
-  async function remove(id: string) {
-    await removeContact(id);
-    await refresh();
   }
 
   const set = (k: keyof typeof form, v: string) => setForm((f) => ({ ...f, [k]: v }));
@@ -59,7 +37,9 @@ export function ContactsSection({ leadId }: { leadId: string }) {
         <p className="flex items-center gap-2 text-sm font-semibold text-surface-800">
           <Users className="h-4 w-4 text-surface-400" />
           Contactos
-          {contacts.length > 0 && <span className="text-xs font-normal text-surface-400">({contacts.length})</span>}
+          {myContacts.length > 0 && (
+            <span className="text-xs font-normal text-surface-400">({myContacts.length})</span>
+          )}
         </p>
         {!adding && (
           <button className="btn-ghost px-2 py-1 text-xs" onClick={() => setAdding(true)}>
@@ -68,16 +48,14 @@ export function ContactsSection({ leadId }: { leadId: string }) {
         )}
       </div>
 
-      {loading && <p className="text-sm text-surface-400">Cargando…</p>}
-
-      {!loading && contacts.length === 0 && !adding && (
+      {myContacts.length === 0 && !adding && (
         <p className="rounded-lg bg-surface-50 px-3 py-3 text-center text-sm text-surface-400">
           Sin contactos aún. Agrega a las personas de esta cuenta.
         </p>
       )}
 
       <div className="space-y-2">
-        {contacts.map((c) => (
+        {myContacts.map((c) => (
           <div key={c.id} className="group flex items-center gap-2.5 rounded-lg border border-surface-200 p-2">
             <span
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white"
@@ -106,7 +84,7 @@ export function ContactsSection({ leadId }: { leadId: string }) {
                 </a>
               )}
               <button
-                onClick={() => remove(c.id)}
+                onClick={() => removeContact(c.id)}
                 className="rounded p-1.5 text-surface-300 opacity-0 transition-opacity hover:text-caliente group-hover:opacity-100"
                 title="Eliminar contacto"
               >

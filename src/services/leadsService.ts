@@ -31,6 +31,7 @@ export interface LeadsService {
   addActivity(leadId: string, authorId: string, type: ActivityType, body: string): Promise<Comment>;
   removeComment(id: string): Promise<void>;
   // Contacts (stakeholders) on a lead
+  allContacts(): Promise<Contact[]>;
   listContacts(leadId: string): Promise<Contact[]>;
   addContact(input: NewContactInput): Promise<Contact>;
   updateContact(id: string, patch: Partial<Contact>): Promise<void>;
@@ -165,6 +166,15 @@ const supabaseLeadsService: LeadsService = {
   async removeComment(id) {
     const { error } = await supabase!.from('comments').delete().eq('id', id);
     if (error) throw error;
+  },
+
+  async allContacts() {
+    const { data, error } = await supabase!
+      .from('contacts')
+      .select('*')
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    return (data ?? []).map(rowToContact);
   },
 
   async listContacts(leadId) {
@@ -309,6 +319,11 @@ const mockLeadsService: LeadsService = {
   async removeComment(id) {
     await delay(60);
     table.set('comments', table.get('comments').filter((c) => c.id !== id));
+  },
+
+  async allContacts() {
+    await delay(60);
+    return [...table.get('contacts')].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   },
 
   async listContacts(leadId) {

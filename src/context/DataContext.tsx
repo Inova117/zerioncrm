@@ -14,6 +14,7 @@ interface DataContextValue {
   users: User[];
   leads: Lead[];
   tasks: Task[];
+  contacts: Contact[];
   commentCounts: Record<string, number>;
   reload: () => Promise<void>;
 
@@ -30,8 +31,7 @@ interface DataContextValue {
   addComment: (leadId: string, body: string) => Promise<void>;
   removeComment: (id: string) => Promise<void>;
 
-  // Contacts (stakeholders)
-  loadContacts: (leadId: string) => Promise<Contact[]>;
+  // Contacts (stakeholders) — held in global state (contacts above)
   addContact: (input: NewContactInput) => Promise<void>;
   updateContact: (id: string, patch: Partial<Contact>) => Promise<void>;
   removeContact: (id: string) => Promise<void>;
@@ -59,18 +59,21 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [users, setUsers] = useState<User[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>([]);
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
 
   const reload = useCallback(async () => {
-    const [u, l, t, cc] = await Promise.all([
+    const [u, l, t, ct, cc] = await Promise.all([
       usersService.list(),
       leadsService.list(),
       tasksService.list(),
+      leadsService.allContacts(),
       leadsService.commentCounts(),
     ]);
     setUsers(u);
     setLeads(l);
     setTasks(t);
+    setContacts(ct);
     setCommentCounts(cc);
   }, []);
 
@@ -90,6 +93,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     users,
     leads,
     tasks,
+    contacts,
     commentCounts,
     reload,
 
@@ -123,6 +127,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     async removeLead(id) {
       await leadsService.remove(id);
       setLeads((prev) => prev.filter((l) => l.id !== id));
+      setContacts((prev) => prev.filter((c) => c.leadId !== id));
       // detach tasks that pointed at this lead so they don't dangle (bug #17)
       setTasks((prev) => prev.map((t) => (t.leadId === id ? { ...t, leadId: null } : t)));
     },
@@ -141,17 +146,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
       await leadsService.removeComment(id);
     },
 
-    async loadContacts(leadId) {
-      return leadsService.listContacts(leadId);
-    },
     async addContact(input) {
-      await leadsService.addContact(input);
+      const c = await leadsService.addContact(input);
+      setContacts((prev) => [...prev, c]);
     },
     async updateContact(id, patch) {
       await leadsService.updateContact(id, patch);
+      setContacts((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
     },
     async removeContact(id) {
       await leadsService.removeContact(id);
+      setContacts((prev) => prev.filter((c) => c.id !== id));
     },
 
     async createTask(input) {
@@ -191,7 +196,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     },
 
     userById: (id) => users.find((u) => u.id === id),
-  }), [loading, users, leads, tasks, commentCounts, authorId, reload]);
+  }), [loading, users, leads, tasks, contacts, commentCounts, authorId, reload]);
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
 }
