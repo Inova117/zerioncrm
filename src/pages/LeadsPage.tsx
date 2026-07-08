@@ -1,16 +1,20 @@
 import { useMemo, useState } from 'react';
-import { Plus, Search, KanbanSquare, LayoutList, Columns3, Flame, Clock, User as UserIcon } from 'lucide-react';
+import { Plus, Search, KanbanSquare, LayoutList, Columns3, Flame, Clock, User as UserIcon, Upload, Download } from 'lucide-react';
 import { AppLayout } from '../components/layout/AppLayout';
 import { KanbanBoard } from '../components/leads/KanbanBoard';
 import { LeadsTable } from '../components/leads/LeadsTable';
 import { PulseBar } from '../components/leads/PulseBar';
 import { LeadFormModal } from '../components/leads/LeadFormModal';
 import { LeadDetailModal } from '../components/leads/LeadDetailModal';
+import { ImportCsvModal } from '../components/leads/ImportCsvModal';
 import { PageLoader, EmptyState } from '../components/ui/misc';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import type { Lead, Temperature } from '../types';
+import type { NewLeadInput } from '../services/leadsService';
 import { cn, followUpLevel } from '../lib/utils';
+import { toCSV, downloadCSV } from '../lib/csv';
+import { CSV_HEADERS, leadsToRows } from '../lib/leadsCsv';
 
 type View = 'board' | 'list';
 
@@ -35,6 +39,7 @@ export function LeadsPage() {
   const [view, setView] = useState<View>('board');
   const [chips, setChips] = useState<Set<string>>(new Set());
   const [formOpen, setFormOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [editing, setEditing] = useState<Lead | null>(null);
   const [detail, setDetail] = useState<Lead | null>(null);
 
@@ -117,6 +122,20 @@ export function LeadsPage() {
     });
   }
 
+  function handleExport() {
+    const csv = toCSV(CSV_HEADERS, leadsToRows(visibleLeads, usersById));
+    downloadCSV(`prospectos-${new Date().toISOString().slice(0, 10)}.csv`, csv);
+  }
+
+  async function handleImport(list: NewLeadInput[]) {
+    let n = 0;
+    for (const input of list) {
+      await createLead(input);
+      n++;
+    }
+    return n;
+  }
+
   function openCreate() {
     setEditing(null);
     setFormOpen(true);
@@ -141,9 +160,17 @@ export function LeadsPage() {
       subtitle="Arrastra cada empresa entre etapas según su temperatura."
       fullBleed
       actions={
-        <button className="btn-primary" onClick={openCreate}>
-          <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Nuevo prospecto</span>
-        </button>
+        <>
+          <button className="btn-secondary" onClick={handleExport} title="Exportar a CSV">
+            <Download className="h-4 w-4" /> <span className="hidden md:inline">Exportar</span>
+          </button>
+          <button className="btn-secondary" onClick={() => setImportOpen(true)} title="Importar desde CSV">
+            <Upload className="h-4 w-4" /> <span className="hidden md:inline">Importar</span>
+          </button>
+          <button className="btn-primary" onClick={openCreate}>
+            <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Nuevo prospecto</span>
+          </button>
+        </>
       }
     >
       <div className="flex h-full flex-col">
@@ -272,6 +299,14 @@ export function LeadsPage() {
           if (editing) await updateLead(editing.id, input);
           else await createLead(input);
         }}
+      />
+
+      {/* Import CSV */}
+      <ImportCsvModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        defaultAssignee={defaultAssignee}
+        onImport={handleImport}
       />
 
       {/* Detail */}
