@@ -3,7 +3,7 @@
 // camelCase. Keep ALL of that translation here so components/services never see
 // raw rows. (resolves the camelCase↔snake_case gap, audit#1 #12)
 // ============================================================================
-import type { User, Lead, Comment, Task, Role, Temperature, Source, Service, TaskCadence, ActivityType } from '../types';
+import type { User, Lead, Contact, Comment, Task, Role, Temperature, Source, Service, TaskCadence, ActivityType } from '../types';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -64,6 +64,27 @@ export const leadToRow = (l: Partial<Lead>): Record<string, unknown> => {
   if (l.assignedTo !== undefined) row.assigned_to = l.assignedTo;
   if (l.lastContactAt !== undefined) row.last_contact_at = l.lastContactAt;
   if (l.meetingAt !== undefined) row.meeting_at = l.meetingAt;
+  return row;
+};
+
+// ---- contacts ⇆ Contact ----------------------------------------------------
+export const rowToContact = (r: any): Contact => ({
+  id: r.id,
+  leadId: r.lead_id,
+  name: r.name,
+  role: r.role ?? '',
+  email: r.email ?? '',
+  phone: r.phone ?? '',
+  createdAt: r.created_at,
+});
+
+export const contactToRow = (c: Partial<Contact>): Record<string, unknown> => {
+  const row: Record<string, unknown> = {};
+  if (c.leadId !== undefined) row.lead_id = c.leadId;
+  if (c.name !== undefined) row.name = c.name;
+  if (c.role !== undefined) row.role = c.role;
+  if (c.email !== undefined) row.email = c.email;
+  if (c.phone !== undefined) row.phone = c.phone;
   return row;
 };
 

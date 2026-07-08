@@ -113,6 +113,18 @@ exception when others then null; end $$;
 -- deleting them (the app / Edge Function does this), so a delete can never orphan
 -- rows with an invalid owner. (bug #17 companion)
 
+-- Contacts (people/stakeholders at an account) ------------------------------
+create table if not exists public.contacts (
+  id         uuid primary key default gen_random_uuid(),
+  lead_id    uuid not null references public.leads(id) on delete cascade,
+  name       text not null,
+  role       text default '',
+  email      text default '',
+  phone      text default '',
+  created_at timestamptz not null default now()
+);
+create index if not exists contacts_lead_idx on public.contacts(lead_id);
+
 -- Tasks ----------------------------------------------------------------------
 create table if not exists public.tasks (
   id           uuid primary key default gen_random_uuid(),
@@ -143,6 +155,7 @@ $$;
 -- ---------------------------------------------------------------------------
 alter table public.profiles enable row level security;
 alter table public.leads    enable row level security;
+alter table public.contacts enable row level security;
 alter table public.comments enable row level security;
 alter table public.tasks    enable row level security;
 
@@ -166,6 +179,18 @@ create policy "leads update" on public.leads for update
 drop policy if exists "leads delete" on public.leads;
 create policy "leads delete" on public.leads for delete
   using (public.is_admin() or assigned_to = auth.uid());
+
+-- contacts: readable/writable by admin or the owner of the parent lead
+drop policy if exists "contacts read"  on public.contacts;
+create policy "contacts read"  on public.contacts for select
+  using (public.is_admin() or exists (
+    select 1 from public.leads l where l.id = lead_id and l.assigned_to = auth.uid()));
+drop policy if exists "contacts write" on public.contacts;
+create policy "contacts write" on public.contacts for all
+  using (public.is_admin() or exists (
+    select 1 from public.leads l where l.id = lead_id and l.assigned_to = auth.uid()))
+  with check (public.is_admin() or exists (
+    select 1 from public.leads l where l.id = lead_id and l.assigned_to = auth.uid()));
 
 -- comments
 drop policy if exists "comments read"   on public.comments;

@@ -19,6 +19,7 @@ import {
 import type { Comment, Lead, Temperature, User, ActivityType } from '../../types';
 import { Modal } from '../ui/Modal';
 import { Avatar } from '../ui/Avatar';
+import { ContactsSection } from './ContactsSection';
 import { TemperatureBadge } from '../ui/TemperatureBadge';
 import { STAGES, sourceLabel, serviceLabel } from '../../lib/constants';
 import { cn, fmtDateTime, fmtMoney, fromNow, mailLink, telLink, waLink, webLink } from '../../lib/utils';
@@ -261,9 +262,11 @@ export function LeadDetailModal({
           </div>
         </div>
 
-        {/* Right: activity */}
-        <div className="flex min-h-0 flex-col">
-          <p className="mb-2 flex items-center gap-2 text-sm font-semibold text-surface-800">
+        {/* Right: contacts + activity */}
+        <div className="flex min-h-0 flex-col gap-4">
+          <ContactsSection leadId={lead.id} />
+
+          <p className="mb-0 flex items-center gap-2 text-sm font-semibold text-surface-800">
             <MessageSquarePlus className="h-4 w-4 text-surface-400" />
             Comentarios y actividad
           </p>

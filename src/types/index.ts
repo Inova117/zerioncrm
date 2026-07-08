@@ -98,6 +98,19 @@ export interface Lead {
 }
 
 // ---------------------------------------------------------------------------
+// Contacts — the people (stakeholders) at a prospect/account
+// ---------------------------------------------------------------------------
+export interface Contact {
+  id: UUID;
+  leadId: UUID;
+  name: string;
+  role: string; // job title / cargo
+  email: string;
+  phone: string;
+  createdAt: ISODate;
+}
+
+// ---------------------------------------------------------------------------
 // Comments / activity timeline on a lead
 // ---------------------------------------------------------------------------
 export type ActivityType = 'comment' | 'stage_change' | 'contact' | 'meeting';

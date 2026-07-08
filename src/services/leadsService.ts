@@ -1,9 +1,17 @@
-import type { Lead, Comment, Temperature, ActivityType } from '../types';
+import type { Lead, Contact, Comment, Temperature, ActivityType } from '../types';
 import { table, delay } from './db';
 import { uid, nowISO } from '../lib/utils';
 import { stageLabel } from '../lib/constants';
 import { supabase } from '../lib/supabaseClient';
-import { rowToLead, leadToRow, rowToComment } from './mappers';
+import { rowToLead, leadToRow, rowToComment, rowToContact, contactToRow } from './mappers';
+
+export interface NewContactInput {
+  leadId: string;
+  name: string;
+  role: string;
+  email: string;
+  phone: string;
+}
 
 export type NewLeadInput = Omit<
   Lead,
@@ -22,6 +30,11 @@ export interface LeadsService {
   commentCounts(): Promise<Record<string, number>>;
   addActivity(leadId: string, authorId: string, type: ActivityType, body: string): Promise<Comment>;
   removeComment(id: string): Promise<void>;
+  // Contacts (stakeholders) on a lead
+  listContacts(leadId: string): Promise<Contact[]>;
+  addContact(input: NewContactInput): Promise<Contact>;
+  updateContact(id: string, patch: Partial<Contact>): Promise<void>;
+  removeContact(id: string): Promise<void>;
 }
 
 function tally(leadIds: string[]): Record<string, number> {
@@ -153,6 +166,36 @@ const supabaseLeadsService: LeadsService = {
     const { error } = await supabase!.from('comments').delete().eq('id', id);
     if (error) throw error;
   },
+
+  async listContacts(leadId) {
+    const { data, error } = await supabase!
+      .from('contacts')
+      .select('*')
+      .eq('lead_id', leadId)
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    return (data ?? []).map(rowToContact);
+  },
+
+  async addContact(input) {
+    const { data, error } = await supabase!
+      .from('contacts')
+      .insert(contactToRow(input))
+      .select()
+      .single();
+    if (error) throw error;
+    return rowToContact(data);
+  },
+
+  async updateContact(id, patch) {
+    const { error } = await supabase!.from('contacts').update(contactToRow(patch)).eq('id', id);
+    if (error) throw error;
+  },
+
+  async removeContact(id) {
+    const { error } = await supabase!.from('contacts').delete().eq('id', id);
+    if (error) throw error;
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -234,6 +277,7 @@ const mockLeadsService: LeadsService = {
     await delay();
     table.set('leads', table.get('leads').filter((l) => l.id !== id));
     table.set('comments', table.get('comments').filter((c) => c.leadId !== id));
+    table.set('contacts', table.get('contacts').filter((c) => c.leadId !== id));
     table.set('tasks', table.get('tasks').map((t) => (t.leadId === id ? { ...t, leadId: null } : t)));
   },
 
@@ -265,6 +309,31 @@ const mockLeadsService: LeadsService = {
   async removeComment(id) {
     await delay(60);
     table.set('comments', table.get('comments').filter((c) => c.id !== id));
+  },
+
+  async listContacts(leadId) {
+    await delay(60);
+    return table
+      .get('contacts')
+      .filter((c) => c.leadId === leadId)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  },
+
+  async addContact(input) {
+    await delay();
+    const contact: Contact = { ...input, id: uid('ct-'), createdAt: nowISO() };
+    table.set('contacts', [...table.get('contacts'), contact]);
+    return contact;
+  },
+
+  async updateContact(id, patch) {
+    await delay();
+    table.set('contacts', table.get('contacts').map((c) => (c.id === id ? { ...c, ...patch } : c)));
+  },
+
+  async removeContact(id) {
+    await delay(60);
+    table.set('contacts', table.get('contacts').filter((c) => c.id !== id));
   },
 };
 

@@ -1,4 +1,4 @@
-import type { User, Credential, Lead, Comment, Task, Service } from '../types';
+import type { User, Credential, Lead, Contact, Comment, Task, Service } from '../types';
 
 // ============================================================================
 // Seed data for the local/mock backend.
@@ -189,6 +189,20 @@ export const seedLeads: Lead[] = rawLeads.map((l, i) => ({
   service: seedServices[i] ?? 'otro',
   mrr: seedMrr[i] ?? 0,
 }));
+
+// ---- Contacts (stakeholders per account) -----------------------------------
+export const seedContacts: Contact[] = [
+  { id: 'ct1', leadId: 'lead-7', name: 'Roberto Díaz', role: 'Director Comercial',
+    email: 'roberto@nova.com', phone: '+52 81 7890 1234', createdAt: ago(20) },
+  { id: 'ct2', leadId: 'lead-7', name: 'Laura Méndez', role: 'CTO',
+    email: 'laura@nova.com', phone: '+52 81 7890 9999', createdAt: ago(3) },
+  { id: 'ct3', leadId: 'lead-8', name: 'Elena Torres', role: 'Coordinadora',
+    email: 'elena@idiomasglobal.com', phone: '+52 55 8901 2345', createdAt: ago(18) },
+  { id: 'ct4', leadId: 'lead-8', name: 'Marco Ruiz', role: 'Director General',
+    email: 'marco@idiomasglobal.com', phone: '+52 55 8901 0000', createdAt: ago(5) },
+  { id: 'ct5', leadId: 'lead-5', name: 'Dr. Luis Peña', role: 'Director',
+    email: 'luis@sonrisadental.com', phone: '+52 33 5678 9012', createdAt: ago(12) },
+];
 
 // ---- Comments (activity) ---------------------------------------------------
 export const seedComments: Comment[] = [

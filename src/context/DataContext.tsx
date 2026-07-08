@@ -1,8 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { Comment, Lead, Task, Temperature, User } from '../types';
+import type { Comment, Contact, Lead, Task, Temperature, User } from '../types';
 import { leadsService } from '../services/leadsService';
-import type { NewLeadInput } from '../services/leadsService';
+import type { NewLeadInput, NewContactInput } from '../services/leadsService';
 import { tasksService } from '../services/tasksService';
 import type { NewTaskInput } from '../services/tasksService';
 import { usersService } from '../services/usersService';
@@ -29,6 +29,12 @@ interface DataContextValue {
   loadComments: (leadId: string) => Promise<Comment[]>;
   addComment: (leadId: string, body: string) => Promise<void>;
   removeComment: (id: string) => Promise<void>;
+
+  // Contacts (stakeholders)
+  loadContacts: (leadId: string) => Promise<Contact[]>;
+  addContact: (input: NewContactInput) => Promise<void>;
+  updateContact: (id: string, patch: Partial<Contact>) => Promise<void>;
+  removeContact: (id: string) => Promise<void>;
 
   // Tasks
   createTask: (input: NewTaskInput) => Promise<void>;
@@ -133,6 +139,19 @@ export function DataProvider({ children }: { children: ReactNode }) {
     },
     async removeComment(id) {
       await leadsService.removeComment(id);
+    },
+
+    async loadContacts(leadId) {
+      return leadsService.listContacts(leadId);
+    },
+    async addContact(input) {
+      await leadsService.addContact(input);
+    },
+    async updateContact(id, patch) {
+      await leadsService.updateContact(id, patch);
+    },
+    async removeContact(id) {
+      await leadsService.removeContact(id);
     },
 
     async createTask(input) {
