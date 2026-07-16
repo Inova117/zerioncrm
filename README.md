@@ -126,20 +126,19 @@ vive en `services/mappers.ts`.
    (`SERVICE_ROLE`, `URL` y `ANON_KEY` se inyectan solas en las Edge Functions.)
 5. **Local:** `.env` con `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY` (ya creado).
    **Netlify:** Site settings → Environment variables → añade esas dos y redeploy.
-6. **Lead Finder** (buscar leads de Google Maps desde la app) — despliega la función
-   y dale tu token de Apify:
-   ```bash
-   supabase functions deploy find-leads
-   supabase secrets set APIFY_TOKEN=apify_api_xxxxx   # el mismo del ScraperAI
-   ```
-   Requiere las columnas nuevas en `leads`; si ya corriste el SQL del punto 1 con la
-   versión actual, ya están. Si no:
-   ```sql
-   alter type source_t add value if not exists 'scraper';
-   alter table public.leads add column if not exists enrichment jsonb;
-   ```
-   Cada búsqueda ejecuta el scraper de Google Maps (Apify, ~$0.004/lugar) e inserta las
-   empresas como prospectos "nuevo". Sin `APIFY_TOKEN`, la app usa datos de demostración.
+6. **Lead Finder** (buscar leads de Google Maps desde la app):
+   - **Re-corre `supabase/schema.sql`** (idempotente): agrega la fuente `scraper`, la
+     columna `leads.enrichment` y la tabla `lead_searches` (jobs de búsqueda).
+   - Despliega la función y guarda tu token de Apify (server-side):
+     ```bash
+     supabase functions deploy find-leads
+     supabase secrets set APIFY_TOKEN=apify_api_xxxxx   # el mismo del ScraperAI
+     ```
+   Cómo funciona: cada búsqueda arranca un run de Apify (Google Maps, ~$0.004/lugar) y
+   la app hace *polling* del job hasta que termina (nunca se cuelga, aunque el scrape
+   tarde). Deduplica por place_id + teléfono e inserta las empresas como prospectos
+   "nuevo". **Sin `APIFY_TOKEN` la app usa datos de demostración**, así que puedes
+   probar toda la UI sin gastar en Apify.
 
 La seguridad (quién ve/edita qué) la garantizan las **políticas RLS** del `schema.sql`:
 el admin ve todo; cada empleado solo sus propios leads y tareas. La `anon key` es pública

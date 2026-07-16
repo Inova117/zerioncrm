@@ -158,6 +158,28 @@ alter table public.tasks add column if not exists target     numeric not null de
 alter table public.tasks add column if not exists progress   numeric not null default 0;
 alter table public.tasks add column if not exists period_key text;
 
+-- Lead Finder searches (async Apify jobs) ------------------------------------
+-- One row per "Buscar leads". The Edge Function starts an Apify run, records it
+-- here, and the app polls until status=done. Escrituras SOLO por la Edge
+-- Function (service_role); el usuario únicamente lee las suyas.
+create table if not exists public.lead_searches (
+  id            uuid primary key default gen_random_uuid(),
+  apify_run_id  text,
+  requested_by  uuid not null references public.profiles(id),
+  assigned_to   uuid not null references public.profiles(id),
+  business_type text not null,
+  location      text not null,
+  status        text not null default 'running', -- running | ingesting | done | failed
+  error         text,
+  found         int not null default 0,
+  inserted      int not null default 0,
+  duplicates    int not null default 0,
+  no_website    int not null default 0,
+  created_at    timestamptz not null default now(),
+  finished_at   timestamptz
+);
+create index if not exists lead_searches_by_idx on public.lead_searches(requested_by);
+
 -- ---------------------------------------------------------------------------
 -- Helper: ¿el usuario actual es admin?
 -- ---------------------------------------------------------------------------
@@ -176,6 +198,7 @@ alter table public.leads    enable row level security;
 alter table public.contacts enable row level security;
 alter table public.comments enable row level security;
 alter table public.tasks    enable row level security;
+alter table public.lead_searches enable row level security;
 
 -- profiles
 drop policy if exists "profiles read"        on public.profiles;
@@ -242,6 +265,12 @@ create policy "tasks update" on public.tasks for update
 drop policy if exists "tasks delete" on public.tasks;
 create policy "tasks delete" on public.tasks for delete
   using (public.is_admin() or assigned_to = auth.uid());
+
+-- lead_searches: cada quien lee sus búsquedas (admin todas). Escritura solo por
+-- la Edge Function (service_role) — sin policy de write para authenticated.
+drop policy if exists "lead_searches read" on public.lead_searches;
+create policy "lead_searches read" on public.lead_searches for select
+  using (public.is_admin() or requested_by = auth.uid());
 
 -- ---------------------------------------------------------------------------
 -- Mantener updated_at fresco en leads

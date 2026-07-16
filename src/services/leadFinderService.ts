@@ -27,17 +27,11 @@ export interface FindLeadsResult {
   noWebsite: number;
 }
 
-// --- Supabase: invoke the Edge Function ------------------------------------
-async function supabaseFindLeads(params: FindLeadsParams): Promise<FindLeadsResult> {
-  const { data, error } = await supabase!.functions.invoke('find-leads', {
-    body: {
-      businessType: params.businessType,
-      location: params.location,
-      limit: params.limit,
-      assignedTo: params.assignedTo,
-      language: params.language ?? 'es',
-    },
-  });
+// --- Supabase: async job (start → poll) via the Edge Function --------------
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+async function invoke(body: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const { data, error } = await supabase!.functions.invoke('find-leads', { body });
   if (error) {
     // functions.invoke surfaces non-2xx as an error whose context is the
     // Response — dig out the function's JSON { error } for a clear message.
@@ -53,7 +47,39 @@ async function supabaseFindLeads(params: FindLeadsParams): Promise<FindLeadsResu
     }
     throw new Error(message);
   }
-  return data as FindLeadsResult;
+  return (data ?? {}) as Record<string, unknown>;
+}
+
+async function supabaseFindLeads(params: FindLeadsParams): Promise<FindLeadsResult> {
+  const started = await invoke({
+    action: 'start',
+    businessType: params.businessType,
+    location: params.location,
+    limit: params.limit,
+    assignedTo: params.assignedTo,
+    language: params.language ?? 'es',
+  });
+  const searchId = started.searchId as string | undefined;
+  if (!searchId) throw new Error('No se pudo iniciar la búsqueda.');
+
+  // Poll until the scrape finishes (Google Maps can take a couple of minutes).
+  const deadline = Date.now() + 210_000; // ~3.5 min ceiling
+  let wait = 2500;
+  while (Date.now() < deadline) {
+    await sleep(wait);
+    const res = await invoke({ action: 'poll', searchId });
+    if (res.status === 'done') {
+      return {
+        found: Number(res.found ?? 0),
+        inserted: Number(res.inserted ?? 0),
+        duplicates: Number(res.duplicates ?? 0),
+        noWebsite: Number(res.noWebsite ?? 0),
+      };
+    }
+    if (res.status === 'failed') throw new Error(String(res.error ?? 'La búsqueda falló.'));
+    wait = Math.min(wait + 500, 5000); // gentle backoff
+  }
+  throw new Error('La búsqueda tardó demasiado. Intenta con menos resultados.');
 }
 
 // --- Mock: synthesize plausible Google-Maps results ------------------------
