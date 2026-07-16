@@ -15,6 +15,9 @@ import {
   Layers,
   Repeat,
   DollarSign,
+  Star,
+  MapPin,
+  Radar,
 } from 'lucide-react';
 import type { Comment, Lead, Temperature, User, ActivityType } from '../../types';
 import { Modal } from '../ui/Modal';
@@ -233,6 +236,48 @@ export function LeadDetailModal({
               {lead.reason || 'Sin descripción.'}
             </p>
           </div>
+
+          {/* Scraper enrichment (only for Lead Finder leads) */}
+          {lead.enrichment && (
+            <div className="rounded-xl border border-brand-200 bg-brand-50/40 p-4">
+              <p className="mb-2 flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-brand-500">
+                <Radar className="h-3.5 w-3.5" />
+                Datos del scraper
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {!lead.website.trim() && (
+                  <span className="badge bg-brand-100 font-semibold text-brand-700">Sin sitio web</span>
+                )}
+                {lead.enrichment.rating != null && (
+                  <span className="badge bg-white text-surface-600">
+                    <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                    {lead.enrichment.rating}
+                    {lead.enrichment.reviewCount != null && ` · ${lead.enrichment.reviewCount} reseñas`}
+                  </span>
+                )}
+                {lead.enrichment.city && (
+                  <span className="badge bg-white text-surface-600">
+                    <MapPin className="h-3 w-3" />
+                    {lead.enrichment.city}
+                  </span>
+                )}
+                {lead.enrichment.score != null && (
+                  <span className="badge bg-white text-surface-600">Score {lead.enrichment.score}</span>
+                )}
+                {lead.enrichment.whatsapp && (
+                  <a
+                    href={waLink(lead.enrichment.whatsapp)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="badge bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
+                  >
+                    <MessageCircle className="h-3 w-3" />
+                    WhatsApp
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Stage switcher */}
           <div className="rounded-xl border border-surface-200 p-4">

@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard,
+  Radar,
   KanbanSquare,
   Building2,
   CheckSquare,
@@ -23,6 +24,7 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { to: '/', label: 'Panel', icon: LayoutDashboard },
+  { to: '/lead-finder', label: 'Lead Finder', icon: Radar },
   { to: '/leads', label: 'Prospectos', icon: KanbanSquare },
   { to: '/empresas', label: 'Empresas', icon: Building2 },
   { to: '/tareas', label: 'Tareas', icon: CheckSquare },

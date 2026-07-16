@@ -41,6 +41,7 @@ export const rowToLead = (r: any): Lead => ({
   updatedAt: r.updated_at,
   lastContactAt: r.last_contact_at,
   meetingAt: r.meeting_at,
+  enrichment: r.enrichment ?? null,
 });
 
 /** Only the columns we actually write (id/created_at/updated_at are DB-managed). */
@@ -64,6 +65,7 @@ export const leadToRow = (l: Partial<Lead>): Record<string, unknown> => {
   if (l.assignedTo !== undefined) row.assigned_to = l.assignedTo;
   if (l.lastContactAt !== undefined) row.last_contact_at = l.lastContactAt;
   if (l.meetingAt !== undefined) row.meeting_at = l.meetingAt;
+  if (l.enrichment !== undefined) row.enrichment = l.enrichment;
   return row;
 };
 

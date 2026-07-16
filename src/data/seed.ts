@@ -176,14 +176,72 @@ const rawLeads: Omit<Lead, 'service' | 'mrr'>[] = [
     temperature: 'perdido', value: 2500, position: p(), assignedTo: U_DIEGO,
     createdAt: ago(40), updatedAt: ago(18), lastContactAt: ago(18), meetingAt: null,
   },
+
+  // --- Leads del ZerionScraperAI (Google Maps) → alimentan el Lead Finder ---
+  {
+    id: 'lead-s1', company: 'Estética Bella Vida', contactName: '', role: '',
+    email: '', phone: '+52 55 3312 8890', website: '',
+    industry: 'Peluquería', source: 'scraper', channel: 'Scraper · cdmx-peluquerias · run #1',
+    reason: 'Peluquería · CDMX — ⭐ 4.7 (128 reseñas) — Sin sitio web (oportunidad alta)\nQué hacen: Cortes, tinte y tratamientos capilares',
+    temperature: 'nuevo', value: 0, position: p(), assignedTo: U_DIEGO,
+    createdAt: ago(0), updatedAt: ago(0), lastContactAt: null, meetingAt: null,
+    enrichment: { rating: 4.7, reviewCount: 128, city: 'CDMX', segment: 'no_website', whatTheyDo: 'Cortes, tinte y tratamientos capilares', score: 84, profile: 'cdmx-peluquerias', runId: 1 },
+  },
+  {
+    id: 'lead-s2', company: 'Barbería El Navajazo', contactName: '', role: '',
+    email: '', phone: '+52 55 4421 7734', website: '',
+    industry: 'Barbería', source: 'scraper', channel: 'Scraper · cdmx-peluquerias · run #1',
+    reason: 'Barbería · CDMX — ⭐ 4.9 (312 reseñas) — Sin sitio web (oportunidad alta)\nQué hacen: Cortes de caballero, afeitado clásico y diseño de barba',
+    temperature: 'nuevo', value: 0, position: p(), assignedTo: U_LUCIA,
+    createdAt: ago(0), updatedAt: ago(0), lastContactAt: null, meetingAt: null,
+    enrichment: { rating: 4.9, reviewCount: 312, city: 'CDMX', segment: 'no_website', whatTheyDo: 'Cortes de caballero, afeitado clásico y diseño de barba', score: 91, whatsapp: '+52 55 4421 7734', profile: 'cdmx-peluquerias', runId: 1 },
+  },
+  {
+    id: 'lead-s3', company: 'Salón Glamour Studio', contactName: '', role: '',
+    email: '', phone: '+52 55 2298 5510', website: 'glamourstudio.mx',
+    industry: 'Peluquería', source: 'scraper', channel: 'Scraper · cdmx-peluquerias · run #1',
+    reason: 'Peluquería · CDMX — ⭐ 4.5 (86 reseñas) — Con sitio web\nQué hacen: Peinados, uñas y maquillaje para eventos',
+    temperature: 'nuevo', value: 0, position: p(), assignedTo: U_DIEGO,
+    createdAt: ago(0), updatedAt: ago(0), lastContactAt: null, meetingAt: null,
+    enrichment: { rating: 4.5, reviewCount: 86, city: 'CDMX', segment: 'has_website', whatTheyDo: 'Peinados, uñas y maquillaje para eventos', score: 58, profile: 'cdmx-peluquerias', runId: 1 },
+  },
+  {
+    id: 'lead-s4', company: 'Corte & Estilo GDL', contactName: '', role: '',
+    email: '', phone: '+52 33 1567 4420', website: '',
+    industry: 'Peluquería', source: 'scraper', channel: 'Scraper · gdl-peluquerias · run #2',
+    reason: 'Peluquería · Guadalajara — ⭐ 4.8 (204 reseñas) — Sin sitio web (oportunidad alta)\nQué hacen: Coloración, keratina y tratamientos',
+    temperature: 'nuevo', value: 0, position: p(), assignedTo: U_SARA,
+    createdAt: ago(1), updatedAt: ago(1), lastContactAt: null, meetingAt: null,
+    enrichment: { rating: 4.8, reviewCount: 204, city: 'Guadalajara', segment: 'no_website', whatTheyDo: 'Coloración, keratina y tratamientos', score: 88, whatsapp: '+52 33 1567 4420', profile: 'gdl-peluquerias', runId: 2 },
+  },
+  {
+    id: 'lead-s5', company: 'Studio Hair Lounge', contactName: '', role: '',
+    email: '', phone: '+52 33 2044 9981', website: 'studiohairlounge.com',
+    industry: 'Peluquería', source: 'scraper', channel: 'Scraper · gdl-peluquerias · run #2',
+    reason: 'Peluquería · Guadalajara — ⭐ 4.3 (57 reseñas) — Con sitio web\nQué hacen: Corte, color y alaciado',
+    temperature: 'nuevo', value: 0, position: p(), assignedTo: U_SARA,
+    createdAt: ago(1), updatedAt: ago(1), lastContactAt: null, meetingAt: null,
+    enrichment: { rating: 4.3, reviewCount: 57, city: 'Guadalajara', segment: 'has_website', whatTheyDo: 'Corte, color y alaciado', score: 49, profile: 'gdl-peluquerias', runId: 2 },
+  },
+  {
+    id: 'lead-s6', company: 'Peluquería Doña Chuy', contactName: '', role: '',
+    email: '', phone: '+52 33 3390 1122', website: '',
+    industry: 'Peluquería', source: 'scraper', channel: 'Scraper · gdl-peluquerias · run #2',
+    reason: 'Peluquería · Guadalajara — ⭐ 5.0 (41 reseñas) — Sin sitio web (oportunidad alta)\nQué hacen: Corte familiar y tinte',
+    temperature: 'nuevo', value: 0, position: p(), assignedTo: U_LUCIA,
+    createdAt: ago(1), updatedAt: ago(1), lastContactAt: null, meetingAt: null,
+    enrichment: { rating: 5.0, reviewCount: 41, city: 'Guadalajara', segment: 'no_website', whatTheyDo: 'Corte familiar y tinte', score: 79, profile: 'gdl-peluquerias', runId: 2 },
+  },
 ];
 
 // Tag each seed lead with an agency service line + a few retainers (MRR).
+// The 6 scraper leads (indices 13-18) are all "web" opportunities.
 const seedServices: Service[] = [
   'web', 'app', 'ecommerce', 'ecommerce', 'app', 'branding', 'app', 'app',
   'web', 'app', 'ecommerce', 'ecommerce', 'mantenimiento',
+  'web', 'web', 'web', 'web', 'web', 'web',
 ];
-const seedMrr = [0, 0, 0, 0, 1500, 0, 0, 2500, 0, 3000, 1200, 800, 0];
+const seedMrr = [0, 0, 0, 0, 1500, 0, 0, 2500, 0, 3000, 1200, 800, 0, 0, 0, 0, 0, 0, 0];
 
 export const seedLeads: Lead[] = rawLeads.map((l, i) => ({
   ...l,

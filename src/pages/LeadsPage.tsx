@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Plus, Search, KanbanSquare, LayoutList, Columns3, Flame, Clock, User as UserIcon, Upload, Download } from 'lucide-react';
+import { Plus, Search, KanbanSquare, LayoutList, Columns3, Flame, Clock, User as UserIcon, Upload, Download, Bot } from 'lucide-react';
 import { AppLayout } from '../components/layout/AppLayout';
 import { KanbanBoard } from '../components/leads/KanbanBoard';
 import { LeadsTable } from '../components/leads/LeadsTable';
@@ -86,13 +86,15 @@ export function LeadsPage() {
           l.temperature !== 'perdido' &&
           followUpLevel(l.lastContactAt) === 'stale'
       );
+    if (chips.has('scraper')) list = list.filter((l) => l.source === 'scraper');
     if (query.trim()) {
       const q = query.toLowerCase();
       list = list.filter(
         (l) =>
           l.company.toLowerCase().includes(q) ||
           l.contactName.toLowerCase().includes(q) ||
-          l.industry.toLowerCase().includes(q)
+          l.industry.toLowerCase().includes(q) ||
+          l.channel.toLowerCase().includes(q)
       );
     }
     return list;
@@ -153,6 +155,7 @@ export function LeadsPage() {
     { key: 'mine', label: 'Míos', icon: UserIcon, show: isAdmin },
     { key: 'hot', label: 'Calientes', icon: Flame, show: true },
     { key: 'stale', label: 'Sin seguimiento', icon: Clock, show: true },
+    { key: 'scraper', label: 'Scraper AI', icon: Bot, show: true },
   ].filter((c) => c.show);
 
   return (

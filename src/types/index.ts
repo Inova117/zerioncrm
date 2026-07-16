@@ -53,6 +53,7 @@ export type Source =
   | 'web'
   | 'evento'
   | 'llamada'
+  | 'scraper'
   | 'otro';
 
 /** Agency service line the opportunity is about. */
@@ -65,6 +66,23 @@ export type Service =
   | 'mantenimiento'
   | 'consultoria'
   | 'otro';
+
+/**
+ * Structured extras carried from the ZerionScraperAI pipeline (Google Maps).
+ * Present only on scraper-sourced leads; powers the Lead Finder cards.
+ */
+export interface LeadEnrichment {
+  rating?: number; // Google rating (e.g. 4.7)
+  reviewCount?: number;
+  city?: string;
+  segment?: string; // has_website | no_website | social_only | parked
+  whatTheyDo?: string;
+  score?: number;
+  whatsapp?: string;
+  address?: string;
+  runId?: number;
+  profile?: string; // scraper campaign profile name
+}
 
 export interface Lead {
   id: UUID;
@@ -95,6 +113,8 @@ export interface Lead {
   lastContactAt: ISODate | null;
   /** Scheduled meeting date, when the lead reaches "reunion". */
   meetingAt: ISODate | null;
+  /** Google-Maps enrichment from the scraper (null for hand-entered leads). */
+  enrichment?: LeadEnrichment | null;
 }
 
 // ---------------------------------------------------------------------------

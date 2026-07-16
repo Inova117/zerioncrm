@@ -32,8 +32,12 @@ do $$ begin
 exception when duplicate_object then null; end $$;
 
 do $$ begin
-  create type source_t as enum ('linkedin','instagram','email','whatsapp','referido','web','evento','llamada','otro');
+  create type source_t as enum ('linkedin','instagram','email','whatsapp','referido','web','evento','llamada','scraper','otro');
 exception when duplicate_object then null; end $$;
+
+-- Parche idempotente: agrega 'scraper' a source_t en BDs ya creadas sin ese valor
+-- (integración ZerionScraperAI → CRM). ADD VALUE IF NOT EXISTS es no-op si ya existe.
+alter type source_t add value if not exists 'scraper';
 
 do $$ begin
   create type cadence_t as enum ('daily','weekly','monthly');
@@ -80,8 +84,13 @@ create table if not exists public.leads (
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now(),
   last_contact_at timestamptz,
-  meeting_at      timestamptz
+  meeting_at      timestamptz,
+  enrichment      jsonb
 );
+
+-- Enriquecimiento del scraper (rating, ciudad, segmento, whatsapp, score) para
+-- BDs ya creadas. Alimenta las tarjetas del Lead Finder. (integración ScraperAI)
+alter table public.leads add column if not exists enrichment jsonb;
 create index if not exists leads_assigned_idx    on public.leads(assigned_to);
 create index if not exists leads_temperature_idx on public.leads(temperature);
 -- For DBs where the leads table already exists (create-if-not-exists won't alter it):
