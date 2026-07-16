@@ -73,12 +73,22 @@ function normalizePhone(phone: string | null | undefined): string | null {
 
 // --- Apify place → normalized fields (defensive against field-name drift) ---
 interface RawPlace { [k: string]: unknown }
+// Social-profile arrays the actor returns with scrapeContacts=true.
+const SOCIAL_KEYS = ['instagrams', 'facebooks', 'linkedIns', 'twitters', 'youtubes', 'tiktoks', 'pinterests'];
+
 function readPlace(p: RawPlace) {
   const s = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
   const n = (v: unknown) => (typeof v === 'number' && isFinite(v) ? v : null);
+  const arr = (v: unknown) => (Array.isArray(v) ? v.filter((x) => typeof x === 'string' && x.trim()) as string[] : []);
   const cats = p.categories;
+  const placeId = s(p.placeId) ?? s(p.place_id) ?? s(p.cid);
+
+  const socials: string[] = [];
+  for (const k of SOCIAL_KEYS) socials.push(...arr(p[k]));
+  const emails = arr(p.emails);
+
   return {
-    placeId: s(p.placeId) ?? s(p.place_id) ?? s(p.cid),
+    placeId,
     title: s(p.title) ?? s(p.name),
     category: s(p.categoryName) ?? (Array.isArray(cats) ? s(cats[0]) : null),
     address: s(p.address) ?? s(p.street),
@@ -87,6 +97,12 @@ function readPlace(p: RawPlace) {
     website: s(p.website) ?? s(p.webUrl),
     rating: n(p.totalScore) ?? n(p.rating),
     reviews: n(p.reviewsCount) ?? n(p.reviewCount),
+    // Rich fields for the lead detail:
+    googleUrl: s(p.url) ?? (placeId ? `https://www.google.com/maps/place/?q=place_id:${placeId}` : null),
+    image: s(p.imageUrl) ?? s(p.imageUrls) ?? null,
+    price: s(p.price),
+    socials: [...new Set(socials)],
+    email: emails[0] ?? null,
   };
 }
 
@@ -215,6 +231,9 @@ Deno.serve(async (req) => {
       if (target) assignedTo = target.id as string;
     }
 
+    // Deep mode also scrapes each business's website for email + social links
+    // (slower + costlier). Off by default; only businesses WITH a site yield them.
+    const deep = body.deep === true;
     const input = {
       searchStringsArray: [businessType],
       locationQuery: location,
@@ -222,7 +241,7 @@ Deno.serve(async (req) => {
       maxReviews: 0,
       language,
       skipClosedPlaces: true,
-      scrapeContacts: false,
+      scrapeContacts: deep,
     };
     const started = await apifyStart(input);
     if ('error' in started) return json({ error: started.error }, 502);
@@ -326,11 +345,17 @@ Deno.serve(async (req) => {
         if (pl.rating != null) enrichment.rating = pl.rating;
         if (pl.reviews != null) enrichment.reviewCount = pl.reviews;
         if (pl.city) enrichment.city = pl.city;
-        if (pl.address) enrichment.address = pl.address;
+        if (pl.address) { enrichment.address = pl.address; enrichment.fullAddress = pl.address; }
+        if (pl.googleUrl) enrichment.googleUrl = pl.googleUrl;
+        if (pl.image) enrichment.image = pl.image;
+        if (pl.price) enrichment.price = pl.price;
+        if (pl.socials.length) enrichment.socials = pl.socials;
+        if (pl.email) enrichment.email = pl.email;
 
         rows.push({
           company: pl.title,
-          contact_name: '', role: '', email: '',
+          contact_name: '', role: '',
+          email: pl.email ?? '',
           phone: pl.phone ?? '',
           website: pl.website ?? '',
           industry: pl.category ?? s.business_type,

@@ -79,7 +79,15 @@ export interface LeadEnrichment {
   whatTheyDo?: string;
   score?: number;
   whatsapp?: string;
-  address?: string;
+  address?: string; // short address
+  fullAddress?: string; // complete street address
+  googleUrl?: string; // Google Maps / Business listing link (always available)
+  image?: string; // photo of the business
+  price?: string; // $ / $$ / $$$
+  socials?: string[]; // social profile URLs (Instagram, Facebook…)
+  email?: string; // scraped from the site (deep mode)
+  placeId?: string;
+  searchId?: string;
   runId?: number;
   profile?: string; // scraper campaign profile name
 }

@@ -1,7 +1,7 @@
 import { Star, Phone, MessageCircle, Globe, MapPin, ArrowRight } from 'lucide-react';
 import type { Lead } from '../../types';
 import { TemperatureBadge } from '../ui/TemperatureBadge';
-import { cn, colorFromString, initials, telLink, waLink, webLink } from '../../lib/utils';
+import { cn, colorFromString, googleMapsUrl, initials, telLink, waLink, webLink } from '../../lib/utils';
 
 interface LeadFinderCardProps {
   lead: Lead;
@@ -14,6 +14,7 @@ export function LeadFinderCard({ lead, onOpen }: LeadFinderCardProps) {
   const hasWebsite = Boolean(lead.website.trim());
   const city = e?.city;
   const phone = lead.phone || e?.whatsapp || '';
+  const gmaps = googleMapsUrl(e);
 
   return (
     <button
@@ -95,6 +96,11 @@ export function LeadFinderCard({ lead, onOpen }: LeadFinderCardProps) {
           {hasWebsite && (
             <IconLink href={webLink(lead.website)} label="Abrir sitio" external>
               <Globe className="h-3.5 w-3.5" />
+            </IconLink>
+          )}
+          {gmaps && (
+            <IconLink href={gmaps} label="Ver en Google Maps" external>
+              <MapPin className="h-3.5 w-3.5" />
             </IconLink>
           )}
         </div>

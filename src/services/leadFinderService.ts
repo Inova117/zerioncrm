@@ -18,6 +18,8 @@ export interface FindLeadsParams {
   limit: number;
   assignedTo: string;
   language?: string;
+  /** Also scrape each site for email + social links (slower, costlier). */
+  deep?: boolean;
 }
 
 export interface FindLeadsResult {
@@ -58,6 +60,7 @@ async function supabaseFindLeads(params: FindLeadsParams): Promise<FindLeadsResu
     limit: params.limit,
     assignedTo: params.assignedTo,
     language: params.language ?? 'es',
+    deep: params.deep ?? false,
   });
   const searchId = started.searchId as string | undefined;
   if (!searchId) throw new Error('No se pudo iniciar la búsqueda.');
@@ -116,14 +119,18 @@ async function mockFindLeads(params: FindLeadsParams): Promise<FindLeadsResult> 
     const hasWebsite = Math.random() > 0.55; // ~45% without a website
     const rating = Math.round((3.8 + Math.random() * 1.2) * 10) / 10;
     const reviewCount = Math.floor(10 + Math.random() * 400);
-    const website = hasWebsite ? `${key.replace(/[^a-z0-9]+/g, '')}.com` : '';
+    const slug = key.replace(/[^a-z0-9]+/g, '');
+    const website = hasWebsite ? `${slug}.com` : '';
     const segment = hasWebsite ? 'has_website' : 'no_website';
+    const address = `Av. ${pick(ZONES) || 'Central'} ${Math.floor(100 + Math.random() * 900)}, ${params.location}`;
+    const email = params.deep && hasWebsite ? `hola@${website}` : '';
+    const socials = params.deep && hasWebsite ? [`https://instagram.com/${slug}`] : [];
 
     const input: NewLeadInput = {
       company: name,
       contactName: '',
       role: '',
-      email: '',
+      email,
       phone: randPhone(),
       website,
       industry: params.businessType,
@@ -142,9 +149,14 @@ async function mockFindLeads(params: FindLeadsParams): Promise<FindLeadsResult> 
         rating,
         reviewCount,
         city: params.location,
-        address: `Av. ${pick(ZONES) || 'Central'} ${Math.floor(100 + Math.random() * 900)}, ${params.location}`,
+        address,
+        fullAddress: address,
+        googleUrl: `https://www.google.com/maps/search/${encodeURIComponent(`${name} ${params.location}`)}`,
+        price: pick(['$', '$$', '$$$']),
         segment,
         profile: `${params.businessType} · ${params.location}`,
+        ...(email ? { email } : {}),
+        ...(socials.length ? { socials } : {}),
       },
     };
     await leadsService.create(input);

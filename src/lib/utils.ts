@@ -116,3 +116,10 @@ export const telLink = (phone: string) => `tel:${phone.replace(/[^\d+]/g, '')}`;
 export const waLink = (phone: string) => `https://wa.me/${phone.replace(/[^\d]/g, '')}`;
 export const webLink = (site: string) =>
   /^https?:\/\//i.test(site) ? site : `https://${site}`;
+
+/** Google Maps listing link for a scraped lead — from the stored URL, or built
+ * from the place_id (so leads found before we captured the URL still link). */
+export const googleMapsUrl = (
+  e?: { googleUrl?: string; placeId?: string } | null
+): string | null =>
+  e?.googleUrl || (e?.placeId ? `https://www.google.com/maps/place/?q=place_id:${e.placeId}` : null);

@@ -32,6 +32,7 @@ export function LeadFinderPage() {
   const [location, setLocation] = useState('');
   const [count, setCount] = useState(25);
   const [language, setLanguage] = useState<'es' | 'en'>('es');
+  const [deep, setDeep] = useState(false);
   const [assignee, setAssignee] = useState<string>(user?.id ?? '');
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<FindLeadsResult | null>(null);
@@ -96,6 +97,7 @@ export function LeadFinderPage() {
         location: location.trim(),
         limit: count,
         language,
+        deep,
         assignedTo: isAdmin ? assignee || user!.id : user!.id,
       });
       setResult(res);
@@ -164,18 +166,29 @@ export function LeadFinderPage() {
             </button>
           </div>
 
-          {/* Idioma del mercado (para agencias en cualquier país) */}
-          <div className="mt-3 flex items-center gap-2 text-xs text-surface-500">
-            <Languages className="h-3.5 w-3.5" />
-            <span>Idioma</span>
-            <select
-              className="input h-8 w-auto py-1 text-xs"
-              value={language}
-              onChange={(e) => setLanguage(e.target.value as 'es' | 'en')}
-            >
-              <option value="es">Español</option>
-              <option value="en">English</option>
-            </select>
+          {/* Idioma del mercado + modo profundo */}
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-surface-500">
+            <div className="flex items-center gap-2">
+              <Languages className="h-3.5 w-3.5" />
+              <span>Idioma</span>
+              <select
+                className="input h-8 w-auto py-1 text-xs"
+                value={language}
+                onChange={(e) => setLanguage(e.target.value as 'es' | 'en')}
+              >
+                <option value="es">Español</option>
+                <option value="en">English</option>
+              </select>
+            </div>
+            <label className="flex cursor-pointer items-center gap-2" title="Visita el sitio de cada negocio para extraer email y redes. Más completo pero más lento.">
+              <input
+                type="checkbox"
+                checked={deep}
+                onChange={(e) => setDeep(e.target.checked)}
+                className="h-3.5 w-3.5 rounded border-surface-300 text-brand-600 focus:ring-brand-500"
+              />
+              <span>Incluir email y redes <span className="text-surface-400">(más lento)</span></span>
+            </label>
           </div>
 
           {/* Admin: assign the found leads to a staff member */}
