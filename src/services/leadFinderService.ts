@@ -85,6 +85,7 @@ async function supabaseFindLeads(params: FindLeadsParams): Promise<FindLeadsResu
 // --- Mock: synthesize plausible Google-Maps results ------------------------
 const PREFIXES = ['El', 'La', 'Don', 'Doña', 'Casa', 'Grupo', 'Studio', 'Bella', 'Nueva', 'Central'];
 const SUFFIXES = ['Studio', 'Express', 'Center', 'Pro', '& Co', 'Boutique', 'Premium', 'Plaza', 'House', 'VIP'];
+const ZONES = ['Centro', 'Norte', 'Sur', 'Roma', 'Polanco', 'Del Valle', 'Reforma', 'Condesa', 'Providencia', ''];
 
 const pick = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)]!;
 const randPhone = () => {
@@ -96,13 +97,15 @@ async function mockFindLeads(params: FindLeadsParams): Promise<FindLeadsResult> 
   const existing = await leadsService.list();
   const seen = new Set(existing.map((l) => l.company.trim().toLowerCase()));
 
-  const cap = Math.min(Math.max(params.limit, 1), 20);
+  const cap = Math.min(Math.max(params.limit, 1), 50);
   let inserted = 0;
   let duplicates = 0;
   let noWebsite = 0;
 
   for (let i = 0; i < cap; i++) {
-    const name = `${pick(PREFIXES)} ${params.businessType} ${pick(SUFFIXES)}`.replace(/\s+/g, ' ').trim();
+    const name = `${pick(PREFIXES)} ${params.businessType} ${pick(SUFFIXES)} ${pick(ZONES)}`
+      .replace(/\s+/g, ' ')
+      .trim();
     const key = name.toLowerCase();
     if (seen.has(key)) {
       duplicates++;
@@ -139,6 +142,7 @@ async function mockFindLeads(params: FindLeadsParams): Promise<FindLeadsResult> 
         rating,
         reviewCount,
         city: params.location,
+        address: `Av. ${pick(ZONES) || 'Central'} ${Math.floor(100 + Math.random() * 900)}, ${params.location}`,
         segment,
         profile: `${params.businessType} · ${params.location}`,
       },

@@ -28,7 +28,7 @@ const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 const APIFY_TOKEN = Deno.env.get('APIFY_TOKEN') ?? '';
 
 const ACTOR = 'compass~crawler-google-places'; // Google Maps scraper
-const MAX_LIMIT = 30;
+const MAX_LIMIT = 50;
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',

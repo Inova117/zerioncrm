@@ -71,10 +71,10 @@ export function LeadFinderCard({ lead, onOpen }: LeadFinderCardProps) {
             <span>{phone}</span>
           </div>
         )}
-        {city && (
+        {(e?.address || city) && (
           <div className="flex items-center gap-1.5">
             <MapPin className="h-3.5 w-3.5 shrink-0 text-surface-400" />
-            <span className="truncate">{city}</span>
+            <span className="truncate">{e?.address || city}</span>
           </div>
         )}
       </div>

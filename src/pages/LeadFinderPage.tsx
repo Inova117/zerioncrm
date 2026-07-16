@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Radar, Briefcase, MapPin, Download, Globe, Sparkles, Search, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Radar, Briefcase, MapPin, Download, Globe, Sparkles, Search, Loader2, CheckCircle2, AlertCircle, Languages, ArrowDownWideNarrow } from 'lucide-react';
 import { AppLayout } from '../components/layout/AppLayout';
 import { LeadFinderCard } from '../components/leads/LeadFinderCard';
 import { LeadDetailModal } from '../components/leads/LeadDetailModal';
@@ -30,7 +30,8 @@ export function LeadFinderPage() {
   // Search form
   const [bizType, setBizType] = useState('');
   const [location, setLocation] = useState('');
-  const [count, setCount] = useState(15);
+  const [count, setCount] = useState(25);
+  const [language, setLanguage] = useState<'es' | 'en'>('es');
   const [assignee, setAssignee] = useState<string>(user?.id ?? '');
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<FindLeadsResult | null>(null);
@@ -38,6 +39,8 @@ export function LeadFinderPage() {
 
   // Browsing
   const [onlyNoWeb, setOnlyNoWeb] = useState(false);
+  const [minRating, setMinRating] = useState(0);
+  const [sort, setSort] = useState<'noweb' | 'rating' | 'reviews' | 'recent'>('noweb');
   const [detail, setDetail] = useState<Lead | null>(null);
   const [editing, setEditing] = useState<Lead | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -55,10 +58,21 @@ export function LeadFinderPage() {
       .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)); // newest first
   }, [leads, isAdmin, user]);
 
-  const shown = useMemo(
-    () => (onlyNoWeb ? scraperLeads.filter((l) => !l.website.trim()) : scraperLeads),
-    [scraperLeads, onlyNoWeb]
-  );
+  const shown = useMemo(() => {
+    let list = scraperLeads;
+    if (onlyNoWeb) list = list.filter((l) => !l.website.trim());
+    if (minRating > 0) list = list.filter((l) => (l.enrichment?.rating ?? 0) >= minRating);
+
+    const rating = (l: Lead) => l.enrichment?.rating ?? 0;
+    const reviews = (l: Lead) => l.enrichment?.reviewCount ?? 0;
+    const noWeb = (l: Lead) => (l.website.trim() ? 0 : 1);
+    const sorted = [...list];
+    if (sort === 'noweb') sorted.sort((a, b) => noWeb(b) - noWeb(a) || rating(b) - rating(a));
+    else if (sort === 'rating') sorted.sort((a, b) => rating(b) - rating(a));
+    else if (sort === 'reviews') sorted.sort((a, b) => reviews(b) - reviews(a));
+    // 'recent' keeps the newest-first order from scraperLeads
+    return sorted;
+  }, [scraperLeads, onlyNoWeb, minRating, sort]);
   const noWebCount = useMemo(() => scraperLeads.filter((l) => !l.website.trim()).length, [scraperLeads]);
   const detailLead = detail ? leads.find((l) => l.id === detail.id) ?? null : null;
 
@@ -81,6 +95,7 @@ export function LeadFinderPage() {
         businessType: bizType.trim(),
         location: location.trim(),
         limit: count,
+        language,
         assignedTo: isAdmin ? assignee || user!.id : user!.id,
       });
       setResult(res);
@@ -101,7 +116,7 @@ export function LeadFinderPage() {
   return (
     <AppLayout
       title="Lead Finder"
-      subtitle="Encuentra empresas locales en Google Maps y tráelas al CRM. Las que no tienen sitio web son tus clientes más calientes."
+      subtitle="Busca en Google Maps (200M+ negocios) y trae los leads al CRM. Los que no tienen sitio web son tus clientes más calientes."
       actions={
         scraperLeads.length > 0 ? (
           <button className="btn-secondary" onClick={handleExport} title="Exportar a CSV">
@@ -136,7 +151,7 @@ export function LeadFinderPage() {
                 value={count}
                 onChange={(e) => setCount(Number(e.target.value))}
               >
-                {[5, 10, 15, 20].map((n) => (
+                {[10, 25, 50].map((n) => (
                   <option key={n} value={n}>
                     {n}
                   </option>
@@ -147,6 +162,20 @@ export function LeadFinderPage() {
               {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
               {running ? 'Buscando…' : 'Buscar leads'}
             </button>
+          </div>
+
+          {/* Idioma del mercado (para agencias en cualquier país) */}
+          <div className="mt-3 flex items-center gap-2 text-xs text-surface-500">
+            <Languages className="h-3.5 w-3.5" />
+            <span>Idioma</span>
+            <select
+              className="input h-8 w-auto py-1 text-xs"
+              value={language}
+              onChange={(e) => setLanguage(e.target.value as 'es' | 'en')}
+            >
+              <option value="es">Español</option>
+              <option value="en">English</option>
+            </select>
           </div>
 
           {/* Admin: assign the found leads to a staff member */}
@@ -169,8 +198,9 @@ export function LeadFinderPage() {
           )}
 
           {running && (
-            <p className="mt-3 text-xs text-surface-400">
-              Ejecutando el scrape en Google Maps… puede tardar hasta ~1 min.
+            <p className="mt-3 flex items-center gap-1.5 text-xs text-surface-400">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Buscando en Google Maps… puede tardar 1–2 min según la cantidad.
             </p>
           )}
           {error && (
@@ -199,16 +229,43 @@ export function LeadFinderPage() {
           />
         ) : (
           <>
-            <div className="flex flex-wrap items-center gap-3">
-              <p className="text-sm text-surface-500">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="mr-auto text-sm text-surface-500">
                 <span className="font-semibold text-surface-800">{scraperLeads.length}</span> lead
                 {scraperLeads.length === 1 ? '' : 's'} en el CRM {' · '}
                 <span className="font-semibold text-brand-600">{noWebCount}</span> sin sitio web
               </p>
+
+              <div className="flex items-center gap-1.5 text-xs text-surface-500">
+                <ArrowDownWideNarrow className="h-3.5 w-3.5" />
+                <select
+                  className="input h-8 w-auto py-1 text-xs"
+                  value={sort}
+                  onChange={(e) => setSort(e.target.value as typeof sort)}
+                  title="Ordenar"
+                >
+                  <option value="noweb">Sin web primero</option>
+                  <option value="rating">Mejor rating</option>
+                  <option value="reviews">Más reseñas</option>
+                  <option value="recent">Más recientes</option>
+                </select>
+              </div>
+
+              <select
+                className="input h-8 w-auto py-1 text-xs"
+                value={minRating}
+                onChange={(e) => setMinRating(Number(e.target.value))}
+                title="Rating mínimo"
+              >
+                <option value={0}>Todo rating</option>
+                <option value={4}>4.0+ ★</option>
+                <option value={4.5}>4.5+ ★</option>
+              </select>
+
               <button
                 onClick={() => setOnlyNoWeb((v) => !v)}
                 className={cn(
-                  'ml-auto inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+                  'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
                   onlyNoWeb
                     ? 'border-brand-300 bg-brand-50 text-brand-700'
                     : 'border-surface-200 text-surface-500 hover:bg-surface-50'
