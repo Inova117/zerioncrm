@@ -7,7 +7,7 @@
 // service functions, not the components.
 // ============================================================================
 
-import type { User, Credential, Lead, Contact, Comment, Task } from '../types';
+import type { User, Credential, Lead, Contact, Comment, Task, Discovery } from '../types';
 import {
   seedUsers,
   seedCredentials,
@@ -27,6 +27,7 @@ export interface DBShape {
   contacts: Contact[];
   comments: Comment[];
   tasks: Task[];
+  discoveries: Discovery[];
   session: string | null; // logged-in user id
 }
 
@@ -67,8 +68,8 @@ export function ensureSeeded(): void {
 
 /** Wipe everything and re-seed (used by the "restablecer datos" action). */
 export function resetDB(): void {
-  ['users', 'credentials', 'leads', 'contacts', 'comments', 'tasks', 'session', 'seeded'].forEach((n) =>
-    localStorage.removeItem(key(n))
+  ['users', 'credentials', 'leads', 'contacts', 'comments', 'tasks', 'discoveries', 'session', 'seeded'].forEach(
+    (n) => localStorage.removeItem(key(n))
   );
   ensureSeeded();
 }

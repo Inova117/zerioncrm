@@ -175,8 +175,30 @@ function summaryOf(s: SearchRow) {
     found: s.found,
     duplicates: s.duplicates,
     noWebsite: s.no_website,
-    candidates: s.results ?? [],
+    discoveries: s.results ?? [],
     error: s.error,
+  };
+}
+
+// snake_case lead_discoveries row → camelCase Discovery for the client.
+function discoveryFromRow(r: Record<string, unknown>) {
+  return {
+    id: r.id,
+    placeId: r.place_id,
+    company: r.company,
+    contactName: r.contact_name ?? '',
+    role: r.role ?? '',
+    email: r.email ?? '',
+    phone: r.phone ?? '',
+    website: r.website ?? '',
+    industry: r.industry ?? '',
+    channel: r.channel ?? '',
+    reason: r.reason ?? '',
+    service: r.service ?? 'otro',
+    assignedTo: r.assigned_to,
+    discoveredBy: r.discovered_by,
+    createdAt: r.created_at,
+    enrichment: r.enrichment ?? null,
   };
 }
 
@@ -233,8 +255,8 @@ Deno.serve(async (req) => {
     }
 
     // Deep mode also scrapes each business's website for email + social links
-    // (slower + costlier). Off by default; only businesses WITH a site yield them.
-    const deep = body.deep === true;
+    // (slower + costlier). ON by default; pass deep:false to skip it.
+    const deep = body.deep !== false;
     const input = {
       searchStringsArray: [businessType],
       locationQuery: location,
@@ -274,7 +296,6 @@ Deno.serve(async (req) => {
     if (s.requested_by !== caller.id && caller.role !== 'admin') return json({ error: 'No autorizado' }, 403);
 
     if (s.status === 'done' || s.status === 'failed') return json(summaryOf(s));
-    if (s.status === 'ingesting') return json({ status: 'running' });
     if (!s.apify_run_id) return json({ status: 'running' });
 
     // Check the Apify run.
@@ -293,51 +314,57 @@ Deno.serve(async (req) => {
     }
     if (run.status !== TERMINAL_OK) return json({ status: 'running' });
 
-    // SUCCEEDED — claim the ingest so concurrent polls can't double-insert.
-    const { data: claimed } = await admin
-      .from('lead_searches')
-      .update({ status: 'ingesting' })
-      .eq('id', searchId)
-      .eq('status', 'running')
-      .select('id')
-      .maybeSingle();
-    if (!claimed) {
-      const { data: cur } = await admin.from('lead_searches').select('*').eq('id', searchId).single();
-      const c = cur as SearchRow;
-      return json(c.status === 'done' || c.status === 'failed' ? summaryOf(c) : { status: 'running' });
-    }
-
+    // SUCCEEDED. Ingest is idempotent (place_id is UNIQUE + ON CONFLICT DO
+    // NOTHING) and finalized with a CONDITIONAL update, so there is no
+    // 'ingesting' lock to get wedged by a crash, and a concurrent poll can't
+    // corrupt the row.
     try {
       const items = run.datasetId ? await apifyItems(run.datasetId) : [];
+      const parsed = items.map(readPlace).filter((p) => p.placeId && p.title);
 
-      // Dedupe against leads ALREADY in the CRM (placeId + normalized phone) so
-      // businesses the user has already saved don't show up again as candidates.
-      const { data: existing } = await admin.from('leads').select('phone, enrichment');
+      // Batch-scoped dedup: fetch ONLY rows matching this run's businesses, so
+      // the queries never hit PostgREST's max-rows (1000) cap as tables grow.
+      const batchPlaceIds = [...new Set(parsed.map((p) => p.placeId as string))];
+      const batchPhones = [...new Set(parsed.map((p) => p.phone).filter(Boolean) as string[])];
+      const inList = (a: string[]): string[] => (a.length ? a : ['__none__']);
+      const placeIdCsv = batchPlaceIds.length ? batchPlaceIds.join(',') : '__none__';
+
+      const [discByPlace, discByPhone, leadByPhone, leadByPlace] = await Promise.all([
+        admin.from('lead_discoveries').select('place_id').in('place_id', inList(batchPlaceIds)),
+        admin.from('lead_discoveries').select('phone').in('phone', inList(batchPhones)),
+        admin.from('leads').select('phone').in('phone', inList(batchPhones)),
+        admin.from('leads').select('enrichment').filter('enrichment->>placeId', 'in', `(${placeIdCsv})`),
+      ]);
+
       const seenIds = new Set<string>();
       const seenPhones = new Set<string>();
-      for (const r of existing ?? []) {
+      for (const r of discByPlace.data ?? []) {
+        const pid = (r as { place_id?: string }).place_id;
+        if (pid) seenIds.add(pid);
+      }
+      for (const r of leadByPlace.data ?? []) {
         const pid = (r as { enrichment?: { placeId?: string } }).enrichment?.placeId;
         if (pid) seenIds.add(pid);
+      }
+      for (const r of [...(discByPhone.data ?? []), ...(leadByPhone.data ?? [])]) {
         const pk = normalizePhone((r as { phone?: string }).phone);
         if (pk) seenPhones.add(pk);
       }
 
-      // Build CANDIDATES (NewLeadInput-shaped). We do NOT insert — the user picks
-      // which ones to save from the app.
-      const candidates: Record<string, unknown>[] = [];
+      // Build discovery rows for the NEW businesses only.
+      const rows: Record<string, unknown>[] = [];
       let duplicates = 0;
-      for (const raw of items) {
-        const pl = readPlace(raw);
-        if (!pl.placeId || !pl.title) continue;
+      for (const pl of parsed) {
+        const placeId = pl.placeId as string;
         const pk = normalizePhone(pl.phone);
-        if (seenIds.has(pl.placeId) || (pk && seenPhones.has(pk))) { duplicates++; continue; }
-        seenIds.add(pl.placeId);
+        if (seenIds.has(placeId) || (pk && seenPhones.has(pk))) { duplicates++; continue; }
+        seenIds.add(placeId);
         if (pk) seenPhones.add(pk);
 
         const segment = segmentOf(pl.website);
         const hasWebsite = segment === 'has_website';
         const enrichment: Record<string, unknown> = {
-          segment, placeId: pl.placeId, searchId,
+          segment, placeId,
           profile: `${s.business_type} · ${s.location}`,
         };
         if (pl.rating != null) enrichment.rating = pl.rating;
@@ -350,37 +377,59 @@ Deno.serve(async (req) => {
         if (pl.socials.length) enrichment.socials = pl.socials;
         if (pl.email) enrichment.email = pl.email;
 
-        candidates.push({
-          tempId: pl.placeId,
+        rows.push({
+          place_id: placeId,
+          discovered_by: s.requested_by,
+          assigned_to: s.assigned_to,
           company: pl.title,
-          contactName: '', role: '',
+          contact_name: '', role: '',
           email: pl.email ?? '',
           phone: pl.phone ?? '',
           website: pl.website ?? '',
           industry: pl.category ?? s.business_type,
-          source: 'scraper',
           channel: `Lead Finder · ${s.business_type} · ${s.location}`,
           reason: buildReason(pl, segment),
-          temperature: 'nuevo',
           service: hasWebsite ? 'otro' : 'web',
-          value: 0, mrr: 0,
-          assignedTo: s.assigned_to,
           enrichment,
         });
       }
 
-      const noWebsite = candidates.filter((c) => !String(c.website ?? '').trim()).length;
-      await admin.from('lead_searches').update({
-        status: 'done', found: items.length, inserted: 0,
-        duplicates, no_website: noWebsite, results: candidates,
-        finished_at: new Date().toISOString(),
-      }).eq('id', searchId);
+      let discoveries: ReturnType<typeof discoveryFromRow>[] = [];
+      if (rows.length) {
+        const { data: inserted, error: insErr } = await admin
+          .from('lead_discoveries')
+          .upsert(rows, { onConflict: 'place_id', ignoreDuplicates: true })
+          .select();
+        if (insErr) throw new Error(insErr.message);
+        discoveries = (inserted ?? []).map((r: Record<string, unknown>) => discoveryFromRow(r));
+      }
+      // Rows the UNIQUE index dropped (a concurrent run beat us to them) are dups.
+      duplicates += rows.length - discoveries.length;
 
-      return json({ status: 'done', found: items.length, duplicates, noWebsite, candidates });
+      const noWebsite = discoveries.filter((d) => !String(d.website ?? '').trim()).length;
+
+      // Finalize once. Only the first poll to flip status → done writes results;
+      // matching 'ingesting' too recovers any row wedged by an older deploy.
+      const { data: won } = await admin.from('lead_searches')
+        .update({
+          status: 'done', found: items.length, inserted: 0,
+          duplicates, no_website: noWebsite, results: discoveries,
+          finished_at: new Date().toISOString(),
+        })
+        .eq('id', searchId)
+        .in('status', ['running', 'ingesting'])
+        .select('id')
+        .maybeSingle();
+      if (!won) {
+        const { data: cur } = await admin.from('lead_searches').select('*').eq('id', searchId).single();
+        return json(summaryOf(cur as SearchRow));
+      }
+      return json({ status: 'done', found: items.length, duplicates, noWebsite, discoveries });
     } catch (e) {
       await admin.from('lead_searches')
         .update({ status: 'failed', error: String(e), finished_at: new Date().toISOString() })
-        .eq('id', searchId);
+        .eq('id', searchId)
+        .in('status', ['running', 'ingesting']);
       return json({ status: 'failed', error: String(e) });
     }
   }

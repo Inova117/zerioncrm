@@ -3,7 +3,7 @@
 // camelCase. Keep ALL of that translation here so components/services never see
 // raw rows. (resolves the camelCase↔snake_case gap, audit#1 #12)
 // ============================================================================
-import type { User, Lead, Contact, Comment, Task, Role, Temperature, Source, Service, TaskCadence, ActivityType } from '../types';
+import type { User, Lead, Contact, Comment, Task, Discovery, Role, Temperature, Source, Service, TaskCadence, ActivityType } from '../types';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -68,6 +68,26 @@ export const leadToRow = (l: Partial<Lead>): Record<string, unknown> => {
   if (l.enrichment !== undefined) row.enrichment = l.enrichment;
   return row;
 };
+
+// ---- lead_discoveries ⇆ Discovery ------------------------------------------
+export const rowToDiscovery = (r: any): Discovery => ({
+  id: r.id,
+  placeId: r.place_id,
+  company: r.company,
+  contactName: r.contact_name ?? '',
+  role: r.role ?? '',
+  email: r.email ?? '',
+  phone: r.phone ?? '',
+  website: r.website ?? '',
+  industry: r.industry ?? '',
+  channel: r.channel ?? '',
+  reason: r.reason ?? '',
+  service: (r.service ?? 'otro') as Service,
+  assignedTo: r.assigned_to,
+  discoveredBy: r.discovered_by,
+  createdAt: r.created_at,
+  enrichment: r.enrichment ?? null,
+});
 
 // ---- contacts ⇆ Contact ----------------------------------------------------
 export const rowToContact = (r: any): Contact => ({

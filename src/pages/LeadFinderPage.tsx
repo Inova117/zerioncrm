@@ -1,38 +1,55 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Radar, Briefcase, MapPin, Download, Globe, Sparkles, Search, Loader2,
-  AlertCircle, Languages, ArrowDownWideNarrow, Save, CheckSquare, Square,
+  AlertCircle, Languages, ArrowDownWideNarrow, Save, CheckSquare, Square, Compass,
 } from 'lucide-react';
 import { AppLayout } from '../components/layout/AppLayout';
 import { LeadFinderCard } from '../components/leads/LeadFinderCard';
 import { LeadCandidateModal } from '../components/leads/LeadCandidateModal';
-import { EmptyState } from '../components/ui/misc';
+import { EmptyState, PageLoader } from '../components/ui/misc';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
-import { findLeads } from '../services/leadFinderService';
-import type { CandidateLead } from '../services/leadFinderService';
-import type { Lead } from '../types';
-import { cn, nowISO } from '../lib/utils';
+import { findLeads, listDiscoveries, deleteDiscovery, discoveryToInput } from '../services/leadFinderService';
+import type { Discovery, Lead } from '../types';
+import { cn, normalizePhone } from '../lib/utils';
 import { toCSV, downloadCSV } from '../lib/csv';
 import { CSV_HEADERS, leadsToRows } from '../lib/leadsCsv';
 
-/** Wrap a candidate as a pseudo-Lead so the card can render it. */
-function toLead(c: CandidateLead): Lead {
-  const { tempId, ...rest } = c;
+type Tab = 'search' | 'discovered';
+
+/** Wrap a discovery as a pseudo-Lead so the card can render it. */
+function toLead(d: Discovery): Lead {
   return {
-    ...rest,
-    id: tempId,
+    id: d.id,
+    company: d.company,
+    contactName: d.contactName,
+    role: d.role,
+    email: d.email,
+    phone: d.phone,
+    website: d.website,
+    industry: d.industry,
+    source: 'scraper',
+    channel: d.channel,
+    reason: d.reason,
+    temperature: 'nuevo',
+    service: d.service,
+    value: 0,
+    mrr: 0,
     position: 0,
-    createdAt: nowISO(),
-    updatedAt: nowISO(),
-    lastContactAt: rest.lastContactAt ?? null,
-    meetingAt: rest.meetingAt ?? null,
+    assignedTo: d.assignedTo,
+    createdAt: d.createdAt,
+    updatedAt: d.createdAt,
+    lastContactAt: null,
+    meetingAt: null,
+    enrichment: d.enrichment ?? null,
   };
 }
 
 export function LeadFinderPage() {
   const { user, isAdmin } = useAuth();
-  const { users, importLeads } = useData();
+  const { users, leads, importLeads } = useData();
+
+  const [tab, setTab] = useState<Tab>('search');
 
   // Search form
   const [bizType, setBizType] = useState('');
@@ -44,14 +61,13 @@ export function LeadFinderPage() {
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Results (candidates — NOT saved until the user picks them)
-  const [candidates, setCandidates] = useState<CandidateLead[]>([]);
-  const [meta, setMeta] = useState<{ found: number; duplicates: number; noWebsite: number } | null>(null);
+  // Results
+  const [searchResults, setSearchResults] = useState<Discovery[]>([]);
+  const [discovered, setDiscovered] = useState<Discovery[]>([]);
+  const [loadingDisc, setLoadingDisc] = useState(true);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
-  const [preview, setPreview] = useState<CandidateLead | null>(null);
-  const [searched, setSearched] = useState(false);
+  const [preview, setPreview] = useState<Discovery | null>(null);
 
   // Browsing
   const [onlyNoWeb, setOnlyNoWeb] = useState(false);
@@ -59,32 +75,64 @@ export function LeadFinderPage() {
   const [sort, setSort] = useState<'noweb' | 'rating' | 'reviews'>('noweb');
 
   const usersById = useMemo(() => new Map(users.map((u) => [u.id, u])), [users]);
-  const activeEmployees = useMemo(
-    () => users.filter((u) => u.role === 'employee' && u.active),
-    [users]
+  const activeEmployees = useMemo(() => users.filter((u) => u.role === 'employee' && u.active), [users]);
+
+  // A discovery is "saved" when a lead already matches it — by Google place_id
+  // OR by phone (mirrors the Edge Function dedup), so a business saved outside
+  // the Lead Finder (manual entry / CSV import) still shows green, not re-savable.
+  const savedPlaceIds = useMemo(
+    () => new Set(leads.map((l) => l.enrichment?.placeId).filter(Boolean) as string[]),
+    [leads]
+  );
+  const savedPhones = useMemo(
+    () => new Set(leads.map((l) => normalizePhone(l.phone)).filter(Boolean) as string[]),
+    [leads]
+  );
+  const isSaved = useCallback(
+    (d: Discovery) => {
+      if (savedPlaceIds.has(d.placeId)) return true;
+      const pk = normalizePhone(d.phone);
+      return pk ? savedPhones.has(pk) : false;
+    },
+    [savedPlaceIds, savedPhones]
   );
 
+  const loadDiscoveries = useCallback(async () => {
+    setLoadingDisc(true);
+    try {
+      setDiscovered(await listDiscoveries());
+    } catch (e) {
+      console.error('[lead-finder] no se pudieron cargar los descubiertos:', e);
+    } finally {
+      setLoadingDisc(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadDiscoveries();
+  }, [loadDiscoveries]);
+
+  const activeList = tab === 'search' ? searchResults : discovered;
+
   const shown = useMemo(() => {
-    let list = candidates;
-    if (onlyNoWeb) list = list.filter((c) => !c.website.trim());
-    if (minRating > 0) list = list.filter((c) => (c.enrichment?.rating ?? 0) >= minRating);
-    const rating = (c: CandidateLead) => c.enrichment?.rating ?? 0;
-    const reviews = (c: CandidateLead) => c.enrichment?.reviewCount ?? 0;
-    const noWeb = (c: CandidateLead) => (c.website.trim() ? 0 : 1);
+    let list = activeList;
+    if (onlyNoWeb) list = list.filter((d) => !d.website.trim());
+    if (minRating > 0) list = list.filter((d) => (d.enrichment?.rating ?? 0) >= minRating);
+    const rating = (d: Discovery) => d.enrichment?.rating ?? 0;
+    const reviews = (d: Discovery) => d.enrichment?.reviewCount ?? 0;
+    const noWeb = (d: Discovery) => (d.website.trim() ? 0 : 1);
     const sorted = [...list];
     if (sort === 'noweb') sorted.sort((a, b) => noWeb(b) - noWeb(a) || rating(b) - rating(a));
     else if (sort === 'rating') sorted.sort((a, b) => rating(b) - rating(a));
     else if (sort === 'reviews') sorted.sort((a, b) => reviews(b) - reviews(a));
     return sorted;
-  }, [candidates, onlyNoWeb, minRating, sort]);
+  }, [activeList, onlyNoWeb, minRating, sort]);
 
-  const noWebCount = useMemo(() => candidates.filter((c) => !c.website.trim()).length, [candidates]);
-  const selectableIds = useMemo(
-    () => shown.filter((c) => !savedIds.has(c.tempId)).map((c) => c.tempId),
-    [shown, savedIds]
-  );
+  const noWebCount = useMemo(() => activeList.filter((d) => !d.website.trim()).length, [activeList]);
+  const savedCount = useMemo(() => activeList.filter(isSaved).length, [activeList, isSaved]);
+  const selectableIds = useMemo(() => shown.filter((d) => !isSaved(d)).map((d) => d.id), [shown, isSaved]);
   const allSelected = selectableIds.length > 0 && selectableIds.every((id) => selected.has(id));
-  const selectedCount = selected.size;
+  const selectedCount = selectableIds.filter((id) => selected.has(id)).length;
 
   async function runSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -92,29 +140,23 @@ export function LeadFinderPage() {
     setRunning(true);
     setError(null);
     try {
-      const res = await findLeadsGuarded();
-      setCandidates(res.candidates);
-      setMeta({ found: res.found, duplicates: res.duplicates, noWebsite: res.noWebsite });
+      const res = await findLeads({
+        businessType: bizType.trim(),
+        location: location.trim(),
+        limit: count,
+        language,
+        deep,
+        assignedTo: isAdmin ? assignee || user!.id : user!.id,
+      });
+      setSearchResults(res.discoveries);
       setSelected(new Set());
-      setSavedIds(new Set());
-      setSearched(true);
+      setTab('search');
+      await loadDiscoveries(); // the new ones are now persisted
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo completar la búsqueda.');
     } finally {
       setRunning(false);
     }
-  }
-
-  // Split out so the try/catch above stays readable.
-  function findLeadsGuarded() {
-    return findLeads({
-      businessType: bizType.trim(),
-      location: location.trim(),
-      limit: count,
-      language,
-      deep,
-      assignedTo: isAdmin ? assignee || user!.id : user!.id,
-    });
   }
 
   function toggleSelect(id: string) {
@@ -136,21 +178,37 @@ export function LeadFinderPage() {
     });
   }
 
-  async function saveCandidates(cands: CandidateLead[]) {
-    if (!cands.length || saving) return;
+  async function save(ds: Discovery[]) {
+    const unsaved = ds.filter((d) => !isSaved(d));
+    if (!unsaved.length || saving) return;
     setSaving(true);
     try {
-      const inputs = cands.map(({ tempId: _t, ...input }) => input);
-      await importLeads(inputs);
-      setSavedIds((prev) => new Set([...prev, ...cands.map((c) => c.tempId)]));
+      await importLeads(unsaved.map(discoveryToInput)); // reloads context leads → saved recomputes
       setSelected((prev) => {
         const next = new Set(prev);
-        cands.forEach((c) => next.delete(c.tempId));
+        unsaved.forEach((d) => next.delete(d.id));
         return next;
       });
     } finally {
       setSaving(false);
     }
+  }
+
+  async function removeDiscovery(id: string) {
+    try {
+      await deleteDiscovery(id);
+    } catch (e) {
+      console.error('[lead-finder] no se pudo borrar:', e);
+      return;
+    }
+    setDiscovered((prev) => prev.filter((d) => d.id !== id));
+    setSearchResults((prev) => prev.filter((d) => d.id !== id));
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+    if (preview?.id === id) setPreview(null);
   }
 
   function handleExport() {
@@ -160,12 +218,17 @@ export function LeadFinderPage() {
 
   if (!user) return null;
 
+  const emptyForTab =
+    tab === 'search'
+      ? { title: 'Busca y elige tus leads', desc: 'Escribe un tipo de negocio y una ubicación, y dale Buscar. Verás los resultados aquí para elegir cuáles guardar.' }
+      : { title: 'Aún no hay descubiertos', desc: 'Los negocios que encuentres se guardan aquí aunque no los pases a leads. En verde los que ya agregaste.' };
+
   return (
     <AppLayout
       title="Lead Finder"
       subtitle="Busca en Google Maps (200M+ negocios), elige los que te sirven y guárdalos en el CRM."
       actions={
-        candidates.length > 0 ? (
+        activeList.length > 0 ? (
           <button className="btn-secondary" onClick={handleExport} title="Exportar a CSV">
             <Download className="h-4 w-4" /> <span className="hidden md:inline">Exportar</span>
           </button>
@@ -184,9 +247,7 @@ export function LeadFinderPage() {
             </Field>
             <Field label="Cantidad">
               <select className="input" value={count} onChange={(e) => setCount(Number(e.target.value))}>
-                {[10, 25, 50].map((n) => (
-                  <option key={n} value={n}>{n}</option>
-                ))}
+                {[10, 25, 50].map((n) => (<option key={n} value={n}>{n}</option>))}
               </select>
             </Field>
             <button type="submit" className="btn-primary h-[42px] whitespace-nowrap" disabled={running}>
@@ -213,9 +274,7 @@ export function LeadFinderPage() {
                 <span>Asignar a</span>
                 <select className="input h-8 w-auto py-1 text-xs" value={assignee} onChange={(e) => setAssignee(e.target.value)}>
                   <option value={user.id}>Yo ({user.name})</option>
-                  {activeEmployees.map((u) => (
-                    <option key={u.id} value={u.id}>{u.name}</option>
-                  ))}
+                  {activeEmployees.map((u) => (<option key={u.id} value={u.id}>{u.name}</option>))}
                 </select>
               </div>
             )}
@@ -234,32 +293,32 @@ export function LeadFinderPage() {
           )}
         </form>
 
-        {/* Candidates */}
-        {candidates.length === 0 ? (
-          <EmptyState
-            icon={<Radar className="h-10 w-10" />}
-            title={searched ? 'No encontramos negocios nuevos' : 'Busca y elige tus leads'}
-            description={
-              searched
-                ? 'Prueba otra ciudad o categoría. Los que ya tienes en el CRM no se repiten.'
-                : 'Escribe un tipo de negocio y una ubicación arriba, y dale Buscar. Verás los resultados aquí para elegir cuáles guardar.'
-            }
-          />
+        {/* Tabs */}
+        <div className="flex items-center gap-1 border-b border-surface-200">
+          <Tab label="Resultados" icon={Search} active={tab === 'search'} count={searchResults.length} onClick={() => { setTab('search'); setSelected(new Set()); }} />
+          <Tab label="Descubiertos" icon={Compass} active={tab === 'discovered'} count={discovered.length} onClick={() => { setTab('discovered'); setSelected(new Set()); }} />
+        </div>
+
+        {/* Content */}
+        {tab === 'discovered' && loadingDisc ? (
+          <PageLoader />
+        ) : activeList.length === 0 ? (
+          <EmptyState icon={<Radar className="h-10 w-10" />} title={emptyForTab.title} description={emptyForTab.desc} />
         ) : (
           <>
-            {/* Selection bar */}
+            {/* Toolbar */}
             <div className="sticky top-0 z-10 -mx-1 flex flex-wrap items-center gap-2 rounded-xl border border-surface-200 bg-white/90 px-3 py-2 backdrop-blur">
-              <button onClick={toggleAll} className="inline-flex items-center gap-1.5 text-sm font-medium text-surface-700 hover:text-brand-700">
+              <button onClick={toggleAll} className="inline-flex items-center gap-1.5 text-sm font-medium text-surface-700 hover:text-brand-700" disabled={selectableIds.length === 0}>
                 {allSelected ? <CheckSquare className="h-4 w-4 text-brand-600" /> : <Square className="h-4 w-4" />}
                 Seleccionar todos
               </button>
               <span className="text-sm text-surface-400">
-                {selectedCount > 0 ? `${selectedCount} seleccionado${selectedCount === 1 ? '' : 's'}` : `${candidates.length} encontrados`}
-                {meta && ` · ${noWebCount} sin sitio web`}
-                {meta && meta.duplicates > 0 && ` · ${meta.duplicates} ya en el CRM`}
+                {selectedCount > 0 ? `${selectedCount} seleccionado${selectedCount === 1 ? '' : 's'}` : `${activeList.length}`}
+                {` · ${noWebCount} sin web`}
+                {savedCount > 0 && <span className="text-emerald-600"> · {savedCount} en leads</span>}
               </span>
 
-              <div className="ml-auto flex items-center gap-2">
+              <div className="ml-auto flex flex-wrap items-center gap-2">
                 <ArrowDownWideNarrow className="h-3.5 w-3.5 text-surface-400" />
                 <select className="input h-8 w-auto py-1 text-xs" value={sort} onChange={(e) => setSort(e.target.value as typeof sort)} title="Ordenar">
                   <option value="noweb">Sin web primero</option>
@@ -280,11 +339,11 @@ export function LeadFinderPage() {
                 >
                   <Sparkles className="h-3.5 w-3.5" /> Solo sin sitio web
                 </button>
-                <button
-                  className="btn-primary py-1.5"
-                  onClick={() => saveCandidates(shown.filter((c) => selected.has(c.tempId)))}
-                  disabled={selectedCount === 0 || saving}
-                >
+                <button className="btn-secondary py-1.5" onClick={() => save(shown)} disabled={selectableIds.length === 0 || saving} title="Guardar todos los no guardados de esta vista">
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  Guardar todos
+                </button>
+                <button className="btn-primary py-1.5" onClick={() => save(shown.filter((d) => selected.has(d.id)))} disabled={selectedCount === 0 || saving}>
                   {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                   Guardar {selectedCount > 0 ? `(${selectedCount})` : ''}
                 </button>
@@ -295,15 +354,16 @@ export function LeadFinderPage() {
               <EmptyState icon={<Globe className="h-10 w-10" />} title="Sin resultados con esos filtros" description="Ajusta el rating o quita el filtro de sin-web." />
             ) : (
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                {shown.map((c) => (
+                {shown.map((d) => (
                   <LeadFinderCard
-                    key={c.tempId}
-                    lead={toLead(c)}
-                    onOpen={() => setPreview(c)}
+                    key={d.id}
+                    lead={toLead(d)}
+                    onOpen={() => setPreview(d)}
                     selectable
-                    selected={selected.has(c.tempId)}
-                    saved={savedIds.has(c.tempId)}
-                    onToggleSelect={() => toggleSelect(c.tempId)}
+                    selected={selected.has(d.id)}
+                    saved={isSaved(d)}
+                    onToggleSelect={() => toggleSelect(d.id)}
+                    onDelete={tab === 'discovered' ? () => removeDiscovery(d.id) : undefined}
                   />
                 ))}
               </div>
@@ -315,11 +375,31 @@ export function LeadFinderPage() {
       <LeadCandidateModal
         candidate={preview}
         open={Boolean(preview)}
-        saved={preview ? savedIds.has(preview.tempId) : false}
+        saved={preview ? isSaved(preview) : false}
         onClose={() => setPreview(null)}
-        onSave={(c) => saveCandidates([c])}
+        onSave={(d) => save([d])}
       />
     </AppLayout>
+  );
+}
+
+function Tab({ label, icon: Icon, active, count, onClick }: { label: string; icon: typeof Search; active: boolean; count: number; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        '-mb-px flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition-colors',
+        active ? 'border-brand-600 text-brand-700' : 'border-transparent text-surface-500 hover:text-surface-800'
+      )}
+    >
+      <Icon className="h-4 w-4" />
+      {label}
+      {count > 0 && (
+        <span className={cn('rounded-full px-1.5 py-0.5 text-[11px]', active ? 'bg-brand-100 text-brand-700' : 'bg-surface-100 text-surface-500')}>
+          {count}
+        </span>
+      )}
+    </button>
   );
 }
 

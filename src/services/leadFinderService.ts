@@ -5,12 +5,19 @@
 //   • Supabase → invokes the `find-leads` Edge Function (real Apify scrape).
 //   • Mock     → synthesizes plausible local businesses so the flow works
 //                offline / in demos.
-// The search returns CANDIDATES (not saved). The user picks which ones to save
-// (via importLeads), so nothing lands in the CRM until they choose it.
+//
+// A search returns DISCOVERIES (found businesses, persisted). They are NOT saved
+// as leads until the user picks them. Persisting every discovery means:
+//   • past runs never repeat a business, and
+//   • the "Descubiertos" tab keeps them all (green once saved as a lead).
 // ---------------------------------------------------------------------------
 import { leadsService } from './leadsService';
 import type { NewLeadInput } from './leadsService';
 import { supabase } from '../lib/supabaseClient';
+import { table, delay } from './db';
+import { rowToDiscovery } from './mappers';
+import type { Discovery } from '../types';
+import { uid } from '../lib/utils';
 
 export interface FindLeadsParams {
   businessType: string;
@@ -18,28 +25,48 @@ export interface FindLeadsParams {
   limit: number;
   assignedTo: string;
   language?: string;
-  /** Also scrape each site for email + social links (slower, costlier). */
+  /** Also scrape each site for email + social links. Default ON. */
   deep?: boolean;
 }
-
-/** A found business, shaped for saving as a lead, plus a client-side key. */
-export type CandidateLead = NewLeadInput & { tempId: string };
 
 export interface FindLeadsResult {
   found: number;
   duplicates: number;
   noWebsite: number;
-  candidates: CandidateLead[];
+  discoveries: Discovery[];
 }
 
-// --- Supabase: async job (start → poll) via the Edge Function --------------
+/** Turn a found business into a lead input (for saving). */
+export function discoveryToInput(d: Discovery): NewLeadInput {
+  return {
+    company: d.company,
+    contactName: d.contactName,
+    role: d.role,
+    email: d.email,
+    phone: d.phone,
+    website: d.website,
+    industry: d.industry,
+    source: 'scraper',
+    channel: d.channel,
+    reason: d.reason,
+    temperature: 'nuevo',
+    service: d.service,
+    value: 0,
+    mrr: 0,
+    assignedTo: d.assignedTo,
+    lastContactAt: null,
+    enrichment: d.enrichment ?? null,
+  };
+}
+
+// ===========================================================================
+// Supabase
+// ===========================================================================
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 async function invoke(body: Record<string, unknown>): Promise<Record<string, unknown>> {
   const { data, error } = await supabase!.functions.invoke('find-leads', { body });
   if (error) {
-    // functions.invoke surfaces non-2xx as an error whose context is the
-    // Response — dig out the function's JSON { error } for a clear message.
     let message = error.message;
     const ctx = (error as { context?: { json?: () => Promise<{ error?: string }> } }).context;
     if (ctx?.json) {
@@ -63,12 +90,11 @@ async function supabaseFindLeads(params: FindLeadsParams): Promise<FindLeadsResu
     limit: params.limit,
     assignedTo: params.assignedTo,
     language: params.language ?? 'es',
-    deep: params.deep ?? false,
+    deep: params.deep ?? true,
   });
   const searchId = started.searchId as string | undefined;
   if (!searchId) throw new Error('No se pudo iniciar la búsqueda.');
 
-  // Poll until the scrape finishes (Google Maps can take a couple of minutes).
   const deadline = Date.now() + 210_000; // ~3.5 min ceiling
   let wait = 2500;
   while (Date.now() < deadline) {
@@ -79,16 +105,32 @@ async function supabaseFindLeads(params: FindLeadsParams): Promise<FindLeadsResu
         found: Number(res.found ?? 0),
         duplicates: Number(res.duplicates ?? 0),
         noWebsite: Number(res.noWebsite ?? 0),
-        candidates: (res.candidates as CandidateLead[]) ?? [],
+        discoveries: (res.discoveries as Discovery[]) ?? [],
       };
     }
     if (res.status === 'failed') throw new Error(String(res.error ?? 'La búsqueda falló.'));
-    wait = Math.min(wait + 500, 5000); // gentle backoff
+    wait = Math.min(wait + 500, 5000);
   }
   throw new Error('La búsqueda tardó demasiado. Intenta con menos resultados.');
 }
 
-// --- Mock: synthesize plausible Google-Maps results ------------------------
+async function supabaseListDiscoveries(): Promise<Discovery[]> {
+  const { data, error } = await supabase!
+    .from('lead_discoveries')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map(rowToDiscovery);
+}
+
+async function supabaseDeleteDiscovery(id: string): Promise<void> {
+  const { error } = await supabase!.from('lead_discoveries').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// ===========================================================================
+// Mock
+// ===========================================================================
 const PREFIXES = ['El', 'La', 'Don', 'Doña', 'Casa', 'Grupo', 'Studio', 'Bella', 'Nueva', 'Central'];
 const SUFFIXES = ['Studio', 'Express', 'Center', 'Pro', '& Co', 'Boutique', 'Premium', 'Plaza', 'House', 'VIP'];
 const ZONES = ['Centro', 'Norte', 'Sur', 'Roma', 'Polanco', 'Del Valle', 'Reforma', 'Condesa', 'Providencia', ''];
@@ -100,11 +142,21 @@ const randPhone = () => {
 };
 
 async function mockFindLeads(params: FindLeadsParams): Promise<FindLeadsResult> {
-  const existing = await leadsService.list();
-  const seen = new Set(existing.map((l) => l.company.trim().toLowerCase()));
+  const leads = await leadsService.list();
+  const existing = table.get('discoveries');
+  // Dedupe against BOTH leads and prior discoveries (so past runs don't repeat):
+  // by company name AND by placeId — mirroring the Edge Function's placeId dedup.
+  const seenNames = new Set([
+    ...leads.map((l) => l.company.trim().toLowerCase()),
+    ...existing.map((d) => d.company.trim().toLowerCase()),
+  ]);
+  const seenPlace = new Set([
+    ...existing.map((d) => d.placeId),
+    ...(leads.map((l) => l.enrichment?.placeId).filter(Boolean) as string[]),
+  ]);
 
   const cap = Math.min(Math.max(params.limit, 1), 50);
-  const candidates: CandidateLead[] = [];
+  const fresh: Discovery[] = [];
   let duplicates = 0;
   let noWebsite = 0;
 
@@ -113,25 +165,28 @@ async function mockFindLeads(params: FindLeadsParams): Promise<FindLeadsResult> 
       .replace(/\s+/g, ' ')
       .trim();
     const key = name.toLowerCase();
-    if (seen.has(key)) {
+    const slug = key.replace(/[^a-z0-9]+/g, '');
+    const placeId = `mock-${slug}`;
+    if (seenNames.has(key) || seenPlace.has(placeId)) {
       duplicates++;
       continue;
     }
-    seen.add(key);
+    seenNames.add(key);
+    seenPlace.add(placeId);
 
-    const hasWebsite = Math.random() > 0.55; // ~45% without a website
+    const hasWebsite = Math.random() > 0.55;
     const rating = Math.round((3.8 + Math.random() * 1.2) * 10) / 10;
     const reviewCount = Math.floor(10 + Math.random() * 400);
-    const slug = key.replace(/[^a-z0-9]+/g, '');
     const website = hasWebsite ? `${slug}.com` : '';
     const segment = hasWebsite ? 'has_website' : 'no_website';
     const address = `Av. ${pick(ZONES) || 'Central'} ${Math.floor(100 + Math.random() * 900)}, ${params.location}`;
-    const email = params.deep && hasWebsite ? `hola@${website}` : '';
-    const socials = params.deep && hasWebsite ? [`https://instagram.com/${slug}`] : [];
-    const tempId = `mock-${slug}-${i}`;
+    const email = params.deep !== false && hasWebsite ? `hola@${website}` : '';
+    const socials = params.deep !== false && hasWebsite ? [`https://instagram.com/${slug}`] : [];
+    if (!hasWebsite) noWebsite++;
 
-    candidates.push({
-      tempId,
+    fresh.push({
+      id: uid('disc-'),
+      placeId,
       company: name,
       contactName: '',
       role: '',
@@ -139,17 +194,14 @@ async function mockFindLeads(params: FindLeadsParams): Promise<FindLeadsResult> 
       phone: randPhone(),
       website,
       industry: params.businessType,
-      source: 'scraper',
       channel: `Lead Finder · ${params.businessType} · ${params.location}`,
       reason: `${params.businessType} · ${params.location} — ⭐ ${rating} (${reviewCount} reseñas) — ${
         hasWebsite ? 'Con sitio web' : 'Sin sitio web (oportunidad alta)'
       }`,
-      temperature: 'nuevo',
       service: hasWebsite ? 'otro' : 'web',
-      value: 0,
-      mrr: 0,
       assignedTo: params.assignedTo,
-      lastContactAt: null, // fresh — never contacted
+      discoveredBy: params.assignedTo,
+      createdAt: new Date().toISOString(),
       enrichment: {
         rating,
         reviewCount,
@@ -159,17 +211,33 @@ async function mockFindLeads(params: FindLeadsParams): Promise<FindLeadsResult> 
         googleUrl: `https://www.google.com/maps/search/${encodeURIComponent(`${name} ${params.location}`)}`,
         price: pick(['$', '$$', '$$$']),
         segment,
-        placeId: tempId,
+        placeId,
         profile: `${params.businessType} · ${params.location}`,
         ...(email ? { email } : {}),
         ...(socials.length ? { socials } : {}),
       },
     });
-    if (!hasWebsite) noWebsite++;
   }
 
-  await new Promise((r) => setTimeout(r, 700)); // simulate agent latency
-  return { found: cap, duplicates, noWebsite, candidates };
+  table.set('discoveries', [...existing, ...fresh]);
+  await sleep(700); // simulate agent latency
+  return { found: cap, duplicates, noWebsite, discoveries: fresh };
 }
 
+async function mockListDiscoveries(): Promise<Discovery[]> {
+  await delay();
+  return [...table.get('discoveries')].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+}
+
+async function mockDeleteDiscovery(id: string): Promise<void> {
+  await delay();
+  table.set(
+    'discoveries',
+    table.get('discoveries').filter((d) => d.id !== id)
+  );
+}
+
+// ===========================================================================
 export const findLeads = supabase ? supabaseFindLeads : mockFindLeads;
+export const listDiscoveries = supabase ? supabaseListDiscoveries : mockListDiscoveries;
+export const deleteDiscovery = supabase ? supabaseDeleteDiscovery : mockDeleteDiscovery;

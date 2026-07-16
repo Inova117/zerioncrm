@@ -1,16 +1,16 @@
 import { useState } from 'react';
 import { Phone, MessageCircle, Globe, Mail, Save, Check, Loader2 } from 'lucide-react';
-import type { CandidateLead } from '../../services/leadFinderService';
+import type { Discovery } from '../../types';
 import { Modal } from '../ui/Modal';
 import { ScraperInfo } from './ScraperInfo';
 import { colorFromString, initials, mailLink, telLink, waLink, webLink } from '../../lib/utils';
 
 interface LeadCandidateModalProps {
-  candidate: CandidateLead | null;
+  candidate: Discovery | null;
   open: boolean;
   saved: boolean;
   onClose: () => void;
-  onSave: (candidate: CandidateLead) => Promise<void>;
+  onSave: (candidate: Discovery) => Promise<void>;
 }
 
 /** Preview of a found business (not yet saved) with a Save-to-CRM button. */

@@ -126,6 +126,30 @@ export interface Lead {
 }
 
 // ---------------------------------------------------------------------------
+// Lead Finder — a business FOUND by the scraper (persisted across runs).
+// Kept even if not saved as a lead, so past runs never repeat and the user can
+// come back to decide. "Saved" is derived by matching placeId against leads.
+// ---------------------------------------------------------------------------
+export interface Discovery {
+  id: UUID;
+  placeId: string;
+  company: string;
+  contactName: string;
+  role: string;
+  email: string;
+  phone: string;
+  website: string;
+  industry: string;
+  channel: string;
+  reason: string;
+  service: Service;
+  assignedTo: UUID; // staff the found business is earmarked for
+  discoveredBy: UUID; // who ran the search
+  createdAt: ISODate;
+  enrichment?: LeadEnrichment | null;
+}
+
+// ---------------------------------------------------------------------------
 // Contacts — the people (stakeholders) at a prospect/account
 // ---------------------------------------------------------------------------
 export interface Contact {

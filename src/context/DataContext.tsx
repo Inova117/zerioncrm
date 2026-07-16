@@ -3,8 +3,6 @@ import type { ReactNode } from 'react';
 import type { Comment, Contact, Lead, Task, Temperature, User } from '../types';
 import { leadsService } from '../services/leadsService';
 import type { NewLeadInput, NewContactInput } from '../services/leadsService';
-import { findLeads as findLeadsService } from '../services/leadFinderService';
-import type { FindLeadsParams, FindLeadsResult } from '../services/leadFinderService';
 import { tasksService } from '../services/tasksService';
 import type { NewTaskInput } from '../services/tasksService';
 import { usersService } from '../services/usersService';
@@ -25,8 +23,6 @@ interface DataContextValue {
   createLead: (input: NewLeadInput) => Promise<Lead>;
   /** Bulk import: create many, one reload at the end, returns {ok, failed}. */
   importLeads: (inputs: NewLeadInput[]) => Promise<{ ok: number; failed: number }>;
-  /** Lead Finder: run the Google-Maps scrape (Apify) and reload with the results. */
-  findLeads: (params: FindLeadsParams) => Promise<FindLeadsResult>;
   updateLead: (id: string, patch: Partial<Lead>) => Promise<void>;
   moveLead: (id: string, temperature: Temperature) => Promise<void>;
   /** Atomic drag commit: change stage (if needed) + reorder the target column. */
@@ -130,11 +126,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
       }
       await reload();
       return { ok, failed };
-    },
-    async findLeads(params) {
-      const result = await findLeadsService(params);
-      await reload(); // pull in the freshly-scraped prospectos
-      return result;
     },
     async updateLead(id, patch) {
       const updated = await leadsService.update(id, patch);

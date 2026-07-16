@@ -1,4 +1,4 @@
-import { Star, Phone, MessageCircle, Globe, MapPin, ArrowRight, Check } from 'lucide-react';
+import { Star, Phone, MessageCircle, Globe, MapPin, ArrowRight, Check, Trash2 } from 'lucide-react';
 import type { Lead } from '../../types';
 import { TemperatureBadge } from '../ui/TemperatureBadge';
 import { cn, colorFromString, googleMapsUrl, initials, telLink, waLink, webLink } from '../../lib/utils';
@@ -9,8 +9,11 @@ interface LeadFinderCardProps {
   /** When true, the card shows a selection checkbox instead of the stage badge. */
   selectable?: boolean;
   selected?: boolean;
+  /** Already saved to leads → green. */
   saved?: boolean;
   onToggleSelect?: () => void;
+  /** Optional delete (used in the "Descubiertos" tab). */
+  onDelete?: () => void;
 }
 
 /** sitedrop-style lead box: name, rating, phone, and a prominent "no website" flag. */
@@ -21,6 +24,7 @@ export function LeadFinderCard({
   selected = false,
   saved = false,
   onToggleSelect,
+  onDelete,
 }: LeadFinderCardProps) {
   const e = lead.enrichment ?? null;
   const hasWebsite = Boolean(lead.website.trim());
@@ -37,7 +41,7 @@ export function LeadFinderCard({
       className={cn(
         'group card flex cursor-pointer flex-col p-4 text-left transition-shadow hover:shadow-card-hover',
         selected && 'ring-2 ring-brand-400',
-        saved && 'opacity-75'
+        saved && 'bg-emerald-50/40 ring-1 ring-emerald-200'
       )}
     >
       {/* Header */}
@@ -137,6 +141,20 @@ export function LeadFinderCard({
             <IconLink href={gmaps} label="Ver en Google Maps" external>
               <MapPin className="h-3.5 w-3.5" />
             </IconLink>
+          )}
+          {onDelete && (
+            <button
+              type="button"
+              onClick={(ev) => {
+                ev.stopPropagation();
+                onDelete();
+              }}
+              title="Quitar de descubiertos"
+              aria-label="Quitar de descubiertos"
+              className="flex h-7 w-7 items-center justify-center rounded-md text-surface-400 hover:bg-red-50 hover:text-red-600"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
           )}
         </div>
         <span className="inline-flex items-center gap-1 text-xs font-medium text-brand-600 opacity-0 transition-opacity group-hover:opacity-100">

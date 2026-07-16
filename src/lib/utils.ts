@@ -123,3 +123,12 @@ export const googleMapsUrl = (
   e?: { googleUrl?: string; placeId?: string } | null
 ): string | null =>
   e?.googleUrl || (e?.placeId ? `https://www.google.com/maps/place/?q=place_id:${e.placeId}` : null);
+
+/** Digits-only phone key for dedupe. Mirrors the scraper/Edge Function:
+ * US 10-digit numbers get a leading 1 so formats collide; <7 digits → null. */
+export const normalizePhone = (phone: string | null | undefined): string | null => {
+  if (!phone) return null;
+  const d = String(phone).replace(/\D/g, '');
+  if (d.length < 7) return null;
+  return d.length === 10 ? `1${d}` : d;
+};

@@ -176,6 +176,27 @@ create table if not exists public.lead_searches (
 create index if not exists lead_searches_by_idx on public.lead_searches(requested_by);
 alter table public.lead_searches add column if not exists results jsonb;
 
+-- Lead Finder discoveries (persistentes) -------------------------------------
+create table if not exists public.lead_discoveries (
+  id            uuid primary key default gen_random_uuid(),
+  place_id      text not null unique,
+  discovered_by uuid not null references public.profiles(id),
+  assigned_to   uuid not null references public.profiles(id),
+  company       text not null,
+  contact_name  text default '',
+  role          text default '',
+  email         text default '',
+  phone         text default '',
+  website       text default '',
+  industry      text default '',
+  channel       text default '',
+  reason        text default '',
+  service       service_t not null default 'otro',
+  enrichment    jsonb,
+  created_at    timestamptz not null default now()
+);
+create index if not exists lead_discoveries_assigned_idx on public.lead_discoveries(assigned_to);
+
 -- ---------------------------------------------------------------------------
 -- Helper: ¿el usuario actual es admin?
 -- ---------------------------------------------------------------------------
@@ -195,6 +216,7 @@ alter table public.contacts enable row level security;
 alter table public.comments enable row level security;
 alter table public.tasks    enable row level security;
 alter table public.lead_searches enable row level security;
+alter table public.lead_discoveries enable row level security;
 
 -- profiles
 drop policy if exists "profiles read"        on public.profiles;
@@ -265,6 +287,13 @@ create policy "tasks delete" on public.tasks for delete
 drop policy if exists "lead_searches read" on public.lead_searches;
 create policy "lead_searches read" on public.lead_searches for select
   using (public.is_admin() or requested_by = auth.uid());
+
+drop policy if exists "discoveries read" on public.lead_discoveries;
+create policy "discoveries read" on public.lead_discoveries for select
+  using (public.is_admin() or assigned_to = auth.uid());
+drop policy if exists "discoveries delete" on public.lead_discoveries;
+create policy "discoveries delete" on public.lead_discoveries for delete
+  using (public.is_admin() or assigned_to = auth.uid());
 
 -- ---------------------------------------------------------------------------
 -- Mantener updated_at fresco en leads
