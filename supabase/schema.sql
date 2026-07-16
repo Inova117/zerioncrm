@@ -297,6 +297,17 @@ alter default privileges in schema public grant all on tables to authenticated;
 alter default privileges in schema public grant all on sequences to authenticated;
 alter default privileges in schema public grant execute on functions to authenticated;
 
+-- service_role: lo usan las Edge Functions (find-leads, admin-users) para
+-- escribir saltando RLS. Salta las POLÍTICAS, pero NO el GRANT de tabla, así que
+-- hay que dárselo explícito — incluidas las tablas nuevas (p. ej. lead_searches).
+grant usage on schema public to service_role;
+grant all on all tables in schema public to service_role;
+grant all on all sequences in schema public to service_role;
+grant execute on all functions in schema public to service_role;
+alter default privileges in schema public grant all on tables to service_role;
+alter default privileges in schema public grant all on sequences to service_role;
+alter default privileges in schema public grant execute on functions to service_role;
+
 -- ---------------------------------------------------------------------------
 -- Al crear un usuario en Auth (dashboard o Edge Function) se crea su perfil
 -- automáticamente. El rol/nombre/color salen de user_metadata. (Cuentas SOLO por
