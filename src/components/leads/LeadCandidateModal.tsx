@@ -90,13 +90,16 @@ export function LeadCandidateModal({ candidate, open, saved, onClose, onSave }: 
       <ScraperInfo enrichment={e} website={candidate.website} company={candidate.company} />
 
       {/* Save */}
-      <div className="mt-5 flex justify-end">
+      <div className="mt-5 flex items-center justify-between gap-3">
+        <p className="text-xs text-surface-400">
+          Guárdalo para agregar comentarios, contactos y moverlo por el pipeline.
+        </p>
         {saved ? (
-          <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-600">
+          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-600">
             <Check className="h-4 w-4" /> Guardado en el CRM
           </span>
         ) : (
-          <button className="btn-primary" onClick={save} disabled={saving}>
+          <button className="btn-primary shrink-0" onClick={save} disabled={saving}>
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             {saving ? 'Guardando…' : 'Guardar en el CRM'}
           </button>

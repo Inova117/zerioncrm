@@ -6,11 +6,13 @@ import {
 import { AppLayout } from '../components/layout/AppLayout';
 import { LeadFinderCard } from '../components/leads/LeadFinderCard';
 import { LeadCandidateModal } from '../components/leads/LeadCandidateModal';
+import { LeadDetailModal } from '../components/leads/LeadDetailModal';
+import { LeadFormModal } from '../components/leads/LeadFormModal';
 import { EmptyState, PageLoader } from '../components/ui/misc';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { findLeads, listDiscoveries, deleteDiscovery, discoveryToInput } from '../services/leadFinderService';
-import type { Discovery, Lead } from '../types';
+import type { Discovery, Lead, Temperature } from '../types';
 import { cn, normalizePhone } from '../lib/utils';
 import { toCSV, downloadCSV } from '../lib/csv';
 import { CSV_HEADERS, leadsToRows } from '../lib/leadsCsv';
@@ -47,7 +49,7 @@ function toLead(d: Discovery): Lead {
 
 export function LeadFinderPage() {
   const { user, isAdmin } = useAuth();
-  const { users, leads, importLeads } = useData();
+  const { users, leads, importLeads, updateLead, moveLead, removeLead, loadComments, addComment } = useData();
 
   const [tab, setTab] = useState<Tab>('search');
 
@@ -68,6 +70,10 @@ export function LeadFinderPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
   const [preview, setPreview] = useState<Discovery | null>(null);
+  // Saved discoveries open the FULL lead modal (comments/contacts/stage/redes).
+  const [detailLeadId, setDetailLeadId] = useState<string | null>(null);
+  const [editing, setEditing] = useState<Lead | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
 
   // Browsing
   const [onlyNoWeb, setOnlyNoWeb] = useState(false);
@@ -96,6 +102,35 @@ export function LeadFinderPage() {
     },
     [savedPlaceIds, savedPhones]
   );
+
+  // The saved lead behind a discovery (matched by place_id or phone).
+  const savedLeadFor = useCallback(
+    (d: Discovery): Lead | undefined => {
+      const pk = normalizePhone(d.phone);
+      return leads.find(
+        (l) =>
+          (!!l.enrichment?.placeId && l.enrichment.placeId === d.placeId) ||
+          (!!pk && normalizePhone(l.phone) === pk)
+      );
+    },
+    [leads]
+  );
+  const detailLead = detailLeadId ? leads.find((l) => l.id === detailLeadId) ?? null : null;
+
+  const assignableEmployees = useMemo(() => {
+    let list = activeEmployees;
+    const owner = editing ? usersById.get(editing.assignedTo) : undefined;
+    if (owner && !list.some((u) => u.id === owner.id)) list = [...list, owner];
+    if (list.length === 0 && user) list = [user];
+    return list;
+  }, [activeEmployees, editing, usersById, user]);
+
+  // Saved → full lead modal (comments/contacts/stage). Unsaved → curate preview.
+  function openDiscovery(d: Discovery) {
+    const lead = savedLeadFor(d);
+    if (lead) setDetailLeadId(lead.id);
+    else setPreview(d);
+  }
 
   const loadDiscoveries = useCallback(async () => {
     setLoadingDisc(true);
@@ -358,7 +393,7 @@ export function LeadFinderPage() {
                   <LeadFinderCard
                     key={d.id}
                     lead={toLead(d)}
-                    onOpen={() => setPreview(d)}
+                    onOpen={() => openDiscovery(d)}
                     selectable
                     selected={selected.has(d.id)}
                     saved={isSaved(d)}
@@ -372,12 +407,49 @@ export function LeadFinderPage() {
         )}
       </div>
 
+      {/* Unsaved → curate preview */}
       <LeadCandidateModal
         candidate={preview}
         open={Boolean(preview)}
         saved={preview ? isSaved(preview) : false}
         onClose={() => setPreview(null)}
         onSave={(d) => save([d])}
+      />
+
+      {/* Saved → full lead modal (comentarios, contactos, etapa, redes) */}
+      <LeadDetailModal
+        lead={detailLead}
+        open={Boolean(detailLead)}
+        onClose={() => setDetailLeadId(null)}
+        owner={detailLead ? usersById.get(detailLead.assignedTo) : undefined}
+        usersById={usersById}
+        onEdit={(lead) => {
+          setDetailLeadId(null);
+          setEditing(lead);
+          setFormOpen(true);
+        }}
+        onMove={async (leadId: string, to: Temperature) => {
+          await moveLead(leadId, to);
+        }}
+        onDelete={removeLead}
+        loadComments={loadComments}
+        addComment={addComment}
+      />
+
+      <LeadFormModal
+        key={`${formOpen}-${editing?.id ?? 'none'}`}
+        open={formOpen}
+        onClose={() => {
+          setFormOpen(false);
+          setEditing(null);
+        }}
+        employees={assignableEmployees}
+        currentUserId={user.id}
+        isAdmin={isAdmin}
+        initial={editing}
+        onSubmit={async (input) => {
+          if (editing) await updateLead(editing.id, input);
+        }}
       />
     </AppLayout>
   );
