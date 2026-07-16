@@ -27,7 +27,9 @@ const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 const APIFY_TOKEN = Deno.env.get('APIFY_TOKEN') ?? '';
 
-const ACTOR = 'compass~crawler-google-places'; // Google Maps scraper
+// Google Maps scraper (compass/crawler-google-places). Pinned by actor ID so a
+// rename of the public actor can't break us. Slug form: compass~crawler-google-places.
+const ACTOR = 'nwua9Gu5YrADL7ZDj';
 const MAX_LIMIT = 50;
 
 const CORS = {
