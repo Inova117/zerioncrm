@@ -15,11 +15,6 @@ import {
   Layers,
   Repeat,
   DollarSign,
-  Star,
-  MapPin,
-  Radar,
-  ExternalLink,
-  Share2,
 } from 'lucide-react';
 import type { Comment, Lead, Temperature, User, ActivityType } from '../../types';
 import { Modal } from '../ui/Modal';
@@ -27,19 +22,8 @@ import { Avatar } from '../ui/Avatar';
 import { ContactsSection } from './ContactsSection';
 import { TemperatureBadge } from '../ui/TemperatureBadge';
 import { STAGES, sourceLabel, serviceLabel } from '../../lib/constants';
-import { cn, fmtDateTime, fmtMoney, fromNow, googleMapsUrl, mailLink, telLink, waLink, webLink } from '../../lib/utils';
-
-/** Human label for a social-profile URL (scraped from the business). */
-function socialLabel(url: string): string {
-  const u = url.toLowerCase();
-  if (u.includes('instagram')) return 'Instagram';
-  if (u.includes('facebook')) return 'Facebook';
-  if (u.includes('linkedin')) return 'LinkedIn';
-  if (u.includes('youtube')) return 'YouTube';
-  if (u.includes('tiktok')) return 'TikTok';
-  if (u.includes('twitter') || u.includes('x.com')) return 'X';
-  return 'Red social';
-}
+import { cn, fmtDateTime, fmtMoney, fromNow, mailLink, telLink, waLink, webLink } from '../../lib/utils';
+import { ScraperInfo } from './ScraperInfo';
 
 interface LeadDetailModalProps {
   lead: Lead | null;
@@ -253,94 +237,7 @@ export function LeadDetailModal({
 
           {/* Scraper enrichment (only for Lead Finder leads) */}
           {lead.enrichment && (
-            <div className="rounded-xl border border-brand-200 bg-brand-50/40 p-4">
-              <p className="mb-2.5 flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-brand-500">
-                <Radar className="h-3.5 w-3.5" />
-                Datos del scraper
-              </p>
-
-              {/* Photo + "ver la empresa" en Google Maps */}
-              <div className="mb-2.5 flex items-center gap-2.5">
-                {lead.enrichment.image && (
-                  <img
-                    src={lead.enrichment.image}
-                    alt={lead.company}
-                    referrerPolicy="no-referrer"
-                    onError={(ev) => (ev.currentTarget.style.display = 'none')}
-                    className="h-12 w-12 shrink-0 rounded-lg object-cover ring-1 ring-surface-200"
-                  />
-                )}
-                {googleMapsUrl(lead.enrichment) && (
-                  <a
-                    href={googleMapsUrl(lead.enrichment)!}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="btn-secondary px-2.5 py-1.5 text-xs"
-                  >
-                    <MapPin className="h-3.5 w-3.5" /> Ver en Google Maps
-                    <ExternalLink className="h-3 w-3 opacity-60" />
-                  </a>
-                )}
-              </div>
-
-              {(lead.enrichment.fullAddress || lead.enrichment.address) && (
-                <p className="mb-2.5 text-xs leading-snug text-surface-500">
-                  {lead.enrichment.fullAddress || lead.enrichment.address}
-                </p>
-              )}
-
-              <div className="flex flex-wrap gap-1.5">
-                {!lead.website.trim() && (
-                  <span className="badge bg-brand-100 font-semibold text-brand-700">Sin sitio web</span>
-                )}
-                {lead.enrichment.rating != null && (
-                  <span className="badge bg-white text-surface-600">
-                    <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-                    {lead.enrichment.rating}
-                    {lead.enrichment.reviewCount != null && ` · ${lead.enrichment.reviewCount} reseñas`}
-                  </span>
-                )}
-                {lead.enrichment.price && (
-                  <span className="badge bg-white text-surface-600">{lead.enrichment.price}</span>
-                )}
-                {lead.enrichment.city && !lead.enrichment.fullAddress && (
-                  <span className="badge bg-white text-surface-600">
-                    <MapPin className="h-3 w-3" />
-                    {lead.enrichment.city}
-                  </span>
-                )}
-                {lead.enrichment.score != null && (
-                  <span className="badge bg-white text-surface-600">Score {lead.enrichment.score}</span>
-                )}
-                {lead.enrichment.email && (
-                  <a href={mailLink(lead.enrichment.email)} className="badge bg-white text-surface-600 hover:bg-surface-100">
-                    <Mail className="h-3 w-3" /> {lead.enrichment.email}
-                  </a>
-                )}
-                {lead.enrichment.whatsapp && (
-                  <a
-                    href={waLink(lead.enrichment.whatsapp)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="badge bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
-                  >
-                    <MessageCircle className="h-3 w-3" />
-                    WhatsApp
-                  </a>
-                )}
-                {(lead.enrichment.socials ?? []).map((url) => (
-                  <a
-                    key={url}
-                    href={url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="badge bg-white text-surface-600 hover:bg-surface-100"
-                  >
-                    <Share2 className="h-3 w-3" /> {socialLabel(url)}
-                  </a>
-                ))}
-              </div>
-            </div>
+            <ScraperInfo enrichment={lead.enrichment} website={lead.website} company={lead.company} />
           )}
 
           {/* Stage switcher */}

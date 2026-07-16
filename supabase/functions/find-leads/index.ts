@@ -166,15 +166,16 @@ interface SearchRow {
   inserted: number;
   duplicates: number;
   no_website: number;
+  results: unknown[] | null;
 }
 
 function summaryOf(s: SearchRow) {
   return {
     status: s.status,
     found: s.found,
-    inserted: s.inserted,
     duplicates: s.duplicates,
     noWebsite: s.no_website,
+    candidates: s.results ?? [],
     error: s.error,
   };
 }
@@ -309,7 +310,8 @@ Deno.serve(async (req) => {
     try {
       const items = run.datasetId ? await apifyItems(run.datasetId) : [];
 
-      // Dedupe against existing leads (placeId + normalized phone).
+      // Dedupe against leads ALREADY in the CRM (placeId + normalized phone) so
+      // businesses the user has already saved don't show up again as candidates.
       const { data: existing } = await admin.from('leads').select('phone, enrichment');
       const seenIds = new Set<string>();
       const seenPhones = new Set<string>();
@@ -320,13 +322,9 @@ Deno.serve(async (req) => {
         if (pk) seenPhones.add(pk);
       }
 
-      const { data: maxRow } = await admin
-        .from('leads').select('position')
-        .eq('assigned_to', s.assigned_to).eq('temperature', 'nuevo')
-        .order('position', { ascending: false }).limit(1).maybeSingle();
-      let position = ((maxRow as { position?: number } | null)?.position ?? -1) + 1;
-
-      const rows: Record<string, unknown>[] = [];
+      // Build CANDIDATES (NewLeadInput-shaped). We do NOT insert — the user picks
+      // which ones to save from the app.
+      const candidates: Record<string, unknown>[] = [];
       let duplicates = 0;
       for (const raw of items) {
         const pl = readPlace(raw);
@@ -352,9 +350,10 @@ Deno.serve(async (req) => {
         if (pl.socials.length) enrichment.socials = pl.socials;
         if (pl.email) enrichment.email = pl.email;
 
-        rows.push({
+        candidates.push({
+          tempId: pl.placeId,
           company: pl.title,
-          contact_name: '', role: '',
+          contactName: '', role: '',
           email: pl.email ?? '',
           phone: pl.phone ?? '',
           website: pl.website ?? '',
@@ -365,24 +364,19 @@ Deno.serve(async (req) => {
           temperature: 'nuevo',
           service: hasWebsite ? 'otro' : 'web',
           value: 0, mrr: 0,
-          position: position++,
-          assigned_to: s.assigned_to,
+          assignedTo: s.assigned_to,
           enrichment,
         });
       }
 
-      if (rows.length) {
-        const { error: insErr } = await admin.from('leads').insert(rows);
-        if (insErr) throw new Error(insErr.message);
-      }
-
-      const noWebsite = rows.filter((r) => !String(r.website ?? '').trim()).length;
+      const noWebsite = candidates.filter((c) => !String(c.website ?? '').trim()).length;
       await admin.from('lead_searches').update({
-        status: 'done', found: items.length, inserted: rows.length,
-        duplicates, no_website: noWebsite, finished_at: new Date().toISOString(),
+        status: 'done', found: items.length, inserted: 0,
+        duplicates, no_website: noWebsite, results: candidates,
+        finished_at: new Date().toISOString(),
       }).eq('id', searchId);
 
-      return json({ status: 'done', found: items.length, inserted: rows.length, duplicates, noWebsite });
+      return json({ status: 'done', found: items.length, duplicates, noWebsite, candidates });
     } catch (e) {
       await admin.from('lead_searches')
         .update({ status: 'failed', error: String(e), finished_at: new Date().toISOString() })

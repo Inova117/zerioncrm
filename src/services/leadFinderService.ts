@@ -5,8 +5,8 @@
 //   • Supabase → invokes the `find-leads` Edge Function (real Apify scrape).
 //   • Mock     → synthesizes plausible local businesses so the flow works
 //                offline / in demos.
-// Either way the leads land in the leads store as "nuevo" prospectos and the
-// caller reloads to see them in the Lead Finder.
+// The search returns CANDIDATES (not saved). The user picks which ones to save
+// (via importLeads), so nothing lands in the CRM until they choose it.
 // ---------------------------------------------------------------------------
 import { leadsService } from './leadsService';
 import type { NewLeadInput } from './leadsService';
@@ -22,11 +22,14 @@ export interface FindLeadsParams {
   deep?: boolean;
 }
 
+/** A found business, shaped for saving as a lead, plus a client-side key. */
+export type CandidateLead = NewLeadInput & { tempId: string };
+
 export interface FindLeadsResult {
   found: number;
-  inserted: number;
   duplicates: number;
   noWebsite: number;
+  candidates: CandidateLead[];
 }
 
 // --- Supabase: async job (start → poll) via the Edge Function --------------
@@ -74,9 +77,9 @@ async function supabaseFindLeads(params: FindLeadsParams): Promise<FindLeadsResu
     if (res.status === 'done') {
       return {
         found: Number(res.found ?? 0),
-        inserted: Number(res.inserted ?? 0),
         duplicates: Number(res.duplicates ?? 0),
         noWebsite: Number(res.noWebsite ?? 0),
+        candidates: (res.candidates as CandidateLead[]) ?? [],
       };
     }
     if (res.status === 'failed') throw new Error(String(res.error ?? 'La búsqueda falló.'));
@@ -101,7 +104,7 @@ async function mockFindLeads(params: FindLeadsParams): Promise<FindLeadsResult> 
   const seen = new Set(existing.map((l) => l.company.trim().toLowerCase()));
 
   const cap = Math.min(Math.max(params.limit, 1), 50);
-  let inserted = 0;
+  const candidates: CandidateLead[] = [];
   let duplicates = 0;
   let noWebsite = 0;
 
@@ -125,8 +128,10 @@ async function mockFindLeads(params: FindLeadsParams): Promise<FindLeadsResult> 
     const address = `Av. ${pick(ZONES) || 'Central'} ${Math.floor(100 + Math.random() * 900)}, ${params.location}`;
     const email = params.deep && hasWebsite ? `hola@${website}` : '';
     const socials = params.deep && hasWebsite ? [`https://instagram.com/${slug}`] : [];
+    const tempId = `mock-${slug}-${i}`;
 
-    const input: NewLeadInput = {
+    candidates.push({
+      tempId,
       company: name,
       contactName: '',
       role: '',
@@ -154,18 +159,17 @@ async function mockFindLeads(params: FindLeadsParams): Promise<FindLeadsResult> 
         googleUrl: `https://www.google.com/maps/search/${encodeURIComponent(`${name} ${params.location}`)}`,
         price: pick(['$', '$$', '$$$']),
         segment,
+        placeId: tempId,
         profile: `${params.businessType} · ${params.location}`,
         ...(email ? { email } : {}),
         ...(socials.length ? { socials } : {}),
       },
-    };
-    await leadsService.create(input);
-    inserted++;
+    });
     if (!hasWebsite) noWebsite++;
   }
 
   await new Promise((r) => setTimeout(r, 700)); // simulate agent latency
-  return { found: cap, inserted, duplicates, noWebsite };
+  return { found: cap, duplicates, noWebsite, candidates };
 }
 
 export const findLeads = supabase ? supabaseFindLeads : mockFindLeads;

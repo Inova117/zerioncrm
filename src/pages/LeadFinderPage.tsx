@@ -1,50 +1,62 @@
 import { useMemo, useState } from 'react';
-import { Radar, Briefcase, MapPin, Download, Globe, Sparkles, Search, Loader2, CheckCircle2, AlertCircle, Languages, ArrowDownWideNarrow } from 'lucide-react';
+import {
+  Radar, Briefcase, MapPin, Download, Globe, Sparkles, Search, Loader2,
+  AlertCircle, Languages, ArrowDownWideNarrow, Save, CheckSquare, Square,
+} from 'lucide-react';
 import { AppLayout } from '../components/layout/AppLayout';
 import { LeadFinderCard } from '../components/leads/LeadFinderCard';
-import { LeadDetailModal } from '../components/leads/LeadDetailModal';
-import { LeadFormModal } from '../components/leads/LeadFormModal';
-import { PageLoader, EmptyState } from '../components/ui/misc';
+import { LeadCandidateModal } from '../components/leads/LeadCandidateModal';
+import { EmptyState } from '../components/ui/misc';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
-import type { FindLeadsResult } from '../services/leadFinderService';
-import type { Lead, Temperature } from '../types';
-import { cn } from '../lib/utils';
+import { findLeads } from '../services/leadFinderService';
+import type { CandidateLead } from '../services/leadFinderService';
+import type { Lead } from '../types';
+import { cn, nowISO } from '../lib/utils';
 import { toCSV, downloadCSV } from '../lib/csv';
 import { CSV_HEADERS, leadsToRows } from '../lib/leadsCsv';
 
+/** Wrap a candidate as a pseudo-Lead so the card can render it. */
+function toLead(c: CandidateLead): Lead {
+  const { tempId, ...rest } = c;
+  return {
+    ...rest,
+    id: tempId,
+    position: 0,
+    createdAt: nowISO(),
+    updatedAt: nowISO(),
+    lastContactAt: rest.lastContactAt ?? null,
+    meetingAt: rest.meetingAt ?? null,
+  };
+}
+
 export function LeadFinderPage() {
   const { user, isAdmin } = useAuth();
-  const {
-    loading,
-    leads,
-    users,
-    findLeads,
-    updateLead,
-    moveLead,
-    removeLead,
-    loadComments,
-    addComment,
-  } = useData();
+  const { users, importLeads } = useData();
 
   // Search form
   const [bizType, setBizType] = useState('');
   const [location, setLocation] = useState('');
   const [count, setCount] = useState(25);
   const [language, setLanguage] = useState<'es' | 'en'>('es');
-  const [deep, setDeep] = useState(false);
+  const [deep, setDeep] = useState(true); // rich (email + redes) por defecto
   const [assignee, setAssignee] = useState<string>(user?.id ?? '');
   const [running, setRunning] = useState(false);
-  const [result, setResult] = useState<FindLeadsResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Results (candidates — NOT saved until the user picks them)
+  const [candidates, setCandidates] = useState<CandidateLead[]>([]);
+  const [meta, setMeta] = useState<{ found: number; duplicates: number; noWebsite: number } | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  const [saving, setSaving] = useState(false);
+  const [preview, setPreview] = useState<CandidateLead | null>(null);
+  const [searched, setSearched] = useState(false);
 
   // Browsing
   const [onlyNoWeb, setOnlyNoWeb] = useState(false);
   const [minRating, setMinRating] = useState(0);
-  const [sort, setSort] = useState<'noweb' | 'rating' | 'reviews' | 'recent'>('noweb');
-  const [detail, setDetail] = useState<Lead | null>(null);
-  const [editing, setEditing] = useState<Lead | null>(null);
-  const [formOpen, setFormOpen] = useState(false);
+  const [sort, setSort] = useState<'noweb' | 'rating' | 'reviews'>('noweb');
 
   const usersById = useMemo(() => new Map(users.map((u) => [u.id, u])), [users]);
   const activeEmployees = useMemo(
@@ -52,55 +64,40 @@ export function LeadFinderPage() {
     [users]
   );
 
-  const scraperLeads = useMemo(() => {
-    const mine = isAdmin ? leads : leads.filter((l) => l.assignedTo === user?.id);
-    return mine
-      .filter((l) => l.source === 'scraper')
-      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)); // newest first
-  }, [leads, isAdmin, user]);
-
   const shown = useMemo(() => {
-    let list = scraperLeads;
-    if (onlyNoWeb) list = list.filter((l) => !l.website.trim());
-    if (minRating > 0) list = list.filter((l) => (l.enrichment?.rating ?? 0) >= minRating);
-
-    const rating = (l: Lead) => l.enrichment?.rating ?? 0;
-    const reviews = (l: Lead) => l.enrichment?.reviewCount ?? 0;
-    const noWeb = (l: Lead) => (l.website.trim() ? 0 : 1);
+    let list = candidates;
+    if (onlyNoWeb) list = list.filter((c) => !c.website.trim());
+    if (minRating > 0) list = list.filter((c) => (c.enrichment?.rating ?? 0) >= minRating);
+    const rating = (c: CandidateLead) => c.enrichment?.rating ?? 0;
+    const reviews = (c: CandidateLead) => c.enrichment?.reviewCount ?? 0;
+    const noWeb = (c: CandidateLead) => (c.website.trim() ? 0 : 1);
     const sorted = [...list];
     if (sort === 'noweb') sorted.sort((a, b) => noWeb(b) - noWeb(a) || rating(b) - rating(a));
     else if (sort === 'rating') sorted.sort((a, b) => rating(b) - rating(a));
     else if (sort === 'reviews') sorted.sort((a, b) => reviews(b) - reviews(a));
-    // 'recent' keeps the newest-first order from scraperLeads
     return sorted;
-  }, [scraperLeads, onlyNoWeb, minRating, sort]);
-  const noWebCount = useMemo(() => scraperLeads.filter((l) => !l.website.trim()).length, [scraperLeads]);
-  const detailLead = detail ? leads.find((l) => l.id === detail.id) ?? null : null;
+  }, [candidates, onlyNoWeb, minRating, sort]);
 
-  const assignableEmployees = useMemo(() => {
-    let list = activeEmployees;
-    const owner = editing ? usersById.get(editing.assignedTo) : undefined;
-    if (owner && !list.some((u) => u.id === owner.id)) list = [...list, owner];
-    if (list.length === 0 && user) list = [user];
-    return list;
-  }, [activeEmployees, editing, usersById, user]);
+  const noWebCount = useMemo(() => candidates.filter((c) => !c.website.trim()).length, [candidates]);
+  const selectableIds = useMemo(
+    () => shown.filter((c) => !savedIds.has(c.tempId)).map((c) => c.tempId),
+    [shown, savedIds]
+  );
+  const allSelected = selectableIds.length > 0 && selectableIds.every((id) => selected.has(id));
+  const selectedCount = selected.size;
 
   async function runSearch(e: React.FormEvent) {
     e.preventDefault();
     if (!bizType.trim() || !location.trim() || running) return;
     setRunning(true);
     setError(null);
-    setResult(null);
     try {
-      const res = await findLeads({
-        businessType: bizType.trim(),
-        location: location.trim(),
-        limit: count,
-        language,
-        deep,
-        assignedTo: isAdmin ? assignee || user!.id : user!.id,
-      });
-      setResult(res);
+      const res = await findLeadsGuarded();
+      setCandidates(res.candidates);
+      setMeta({ found: res.found, duplicates: res.duplicates, noWebsite: res.noWebsite });
+      setSelected(new Set());
+      setSavedIds(new Set());
+      setSearched(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo completar la búsqueda.');
     } finally {
@@ -108,8 +105,56 @@ export function LeadFinderPage() {
     }
   }
 
+  // Split out so the try/catch above stays readable.
+  function findLeadsGuarded() {
+    return findLeads({
+      businessType: bizType.trim(),
+      location: location.trim(),
+      limit: count,
+      language,
+      deep,
+      assignedTo: isAdmin ? assignee || user!.id : user!.id,
+    });
+  }
+
+  function toggleSelect(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+  function toggleAll() {
+    setSelected((prev) => {
+      if (allSelected) {
+        const next = new Set(prev);
+        selectableIds.forEach((id) => next.delete(id));
+        return next;
+      }
+      return new Set([...prev, ...selectableIds]);
+    });
+  }
+
+  async function saveCandidates(cands: CandidateLead[]) {
+    if (!cands.length || saving) return;
+    setSaving(true);
+    try {
+      const inputs = cands.map(({ tempId: _t, ...input }) => input);
+      await importLeads(inputs);
+      setSavedIds((prev) => new Set([...prev, ...cands.map((c) => c.tempId)]));
+      setSelected((prev) => {
+        const next = new Set(prev);
+        cands.forEach((c) => next.delete(c.tempId));
+        return next;
+      });
+    } finally {
+      setSaving(false);
+    }
+  }
+
   function handleExport() {
-    const csv = toCSV(CSV_HEADERS, leadsToRows(shown, usersById));
+    const csv = toCSV(CSV_HEADERS, leadsToRows(shown.map(toLead), usersById));
     downloadCSV(`lead-finder-${new Date().toISOString().slice(0, 10)}.csv`, csv);
   }
 
@@ -118,9 +163,9 @@ export function LeadFinderPage() {
   return (
     <AppLayout
       title="Lead Finder"
-      subtitle="Busca en Google Maps (200M+ negocios) y trae los leads al CRM. Los que no tienen sitio web son tus clientes más calientes."
+      subtitle="Busca en Google Maps (200M+ negocios), elige los que te sirven y guárdalos en el CRM."
       actions={
-        scraperLeads.length > 0 ? (
+        candidates.length > 0 ? (
           <button className="btn-secondary" onClick={handleExport} title="Exportar a CSV">
             <Download className="h-4 w-4" /> <span className="hidden md:inline">Exportar</span>
           </button>
@@ -132,31 +177,15 @@ export function LeadFinderPage() {
         <form onSubmit={runSearch} className="card p-4">
           <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto_auto] md:items-end">
             <Field icon={<Briefcase className="h-3.5 w-3.5" />} label="Tipo de negocio">
-              <input
-                className="input"
-                placeholder="Peluquerías, restaurantes, dentistas…"
-                value={bizType}
-                onChange={(e) => setBizType(e.target.value)}
-              />
+              <input className="input" placeholder="Peluquerías, restaurantes, dentistas…" value={bizType} onChange={(e) => setBizType(e.target.value)} />
             </Field>
             <Field icon={<MapPin className="h-3.5 w-3.5" />} label="Ubicación">
-              <input
-                className="input"
-                placeholder="Ciudad, TX / CDMX / Guadalajara"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-              />
+              <input className="input" placeholder="Ciudad, TX / CDMX / Guadalajara" value={location} onChange={(e) => setLocation(e.target.value)} />
             </Field>
             <Field label="Cantidad">
-              <select
-                className="input"
-                value={count}
-                onChange={(e) => setCount(Number(e.target.value))}
-              >
+              <select className="input" value={count} onChange={(e) => setCount(Number(e.target.value))}>
                 {[10, 25, 50].map((n) => (
-                  <option key={n} value={n}>
-                    {n}
-                  </option>
+                  <option key={n} value={n}>{n}</option>
                 ))}
               </select>
             </Field>
@@ -166,49 +195,31 @@ export function LeadFinderPage() {
             </button>
           </div>
 
-          {/* Idioma del mercado + modo profundo */}
           <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-surface-500">
             <div className="flex items-center gap-2">
               <Languages className="h-3.5 w-3.5" />
               <span>Idioma</span>
-              <select
-                className="input h-8 w-auto py-1 text-xs"
-                value={language}
-                onChange={(e) => setLanguage(e.target.value as 'es' | 'en')}
-              >
+              <select className="input h-8 w-auto py-1 text-xs" value={language} onChange={(e) => setLanguage(e.target.value as 'es' | 'en')}>
                 <option value="es">Español</option>
                 <option value="en">English</option>
               </select>
             </div>
             <label className="flex cursor-pointer items-center gap-2" title="Visita el sitio de cada negocio para extraer email y redes. Más completo pero más lento.">
-              <input
-                type="checkbox"
-                checked={deep}
-                onChange={(e) => setDeep(e.target.checked)}
-                className="h-3.5 w-3.5 rounded border-surface-300 text-brand-600 focus:ring-brand-500"
-              />
+              <input type="checkbox" checked={deep} onChange={(e) => setDeep(e.target.checked)} className="h-3.5 w-3.5 rounded border-surface-300 text-brand-600 focus:ring-brand-500" />
               <span>Incluir email y redes <span className="text-surface-400">(más lento)</span></span>
             </label>
+            {isAdmin && activeEmployees.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span>Asignar a</span>
+                <select className="input h-8 w-auto py-1 text-xs" value={assignee} onChange={(e) => setAssignee(e.target.value)}>
+                  <option value={user.id}>Yo ({user.name})</option>
+                  {activeEmployees.map((u) => (
+                    <option key={u.id} value={u.id}>{u.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
-
-          {/* Admin: assign the found leads to a staff member */}
-          {isAdmin && activeEmployees.length > 0 && (
-            <div className="mt-3 flex items-center gap-2 text-xs text-surface-500">
-              <span>Asignar a</span>
-              <select
-                className="input h-8 w-auto py-1 text-xs"
-                value={assignee}
-                onChange={(e) => setAssignee(e.target.value)}
-              >
-                <option value={user.id}>Yo ({user.name})</option>
-                {activeEmployees.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
 
           {running && (
             <p className="mt-3 flex items-center gap-1.5 text-xs text-surface-400">
@@ -221,84 +232,79 @@ export function LeadFinderPage() {
               <AlertCircle className="h-4 w-4 shrink-0" /> {error}
             </p>
           )}
-          {result && !error && (
-            <p className="mt-3 flex flex-wrap items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-              <CheckCircle2 className="h-4 w-4 shrink-0" />
-              {result.inserted} lead{result.inserted === 1 ? '' : 's'} nuevo{result.inserted === 1 ? '' : 's'}
-              {result.noWebsite > 0 && ` · ${result.noWebsite} sin sitio web`}
-              {result.duplicates > 0 && ` · ${result.duplicates} ya existían`}
-            </p>
-          )}
         </form>
 
-        {/* Results */}
-        {loading ? (
-          <PageLoader />
-        ) : scraperLeads.length === 0 ? (
+        {/* Candidates */}
+        {candidates.length === 0 ? (
           <EmptyState
             icon={<Radar className="h-10 w-10" />}
-            title="Aún no hay leads"
-            description="Escribe un tipo de negocio y una ubicación arriba, y dale Buscar. El agente traerá las empresas de Google Maps al CRM."
+            title={searched ? 'No encontramos negocios nuevos' : 'Busca y elige tus leads'}
+            description={
+              searched
+                ? 'Prueba otra ciudad o categoría. Los que ya tienes en el CRM no se repiten.'
+                : 'Escribe un tipo de negocio y una ubicación arriba, y dale Buscar. Verás los resultados aquí para elegir cuáles guardar.'
+            }
           />
         ) : (
           <>
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="mr-auto text-sm text-surface-500">
-                <span className="font-semibold text-surface-800">{scraperLeads.length}</span> lead
-                {scraperLeads.length === 1 ? '' : 's'} en el CRM {' · '}
-                <span className="font-semibold text-brand-600">{noWebCount}</span> sin sitio web
-              </p>
+            {/* Selection bar */}
+            <div className="sticky top-0 z-10 -mx-1 flex flex-wrap items-center gap-2 rounded-xl border border-surface-200 bg-white/90 px-3 py-2 backdrop-blur">
+              <button onClick={toggleAll} className="inline-flex items-center gap-1.5 text-sm font-medium text-surface-700 hover:text-brand-700">
+                {allSelected ? <CheckSquare className="h-4 w-4 text-brand-600" /> : <Square className="h-4 w-4" />}
+                Seleccionar todos
+              </button>
+              <span className="text-sm text-surface-400">
+                {selectedCount > 0 ? `${selectedCount} seleccionado${selectedCount === 1 ? '' : 's'}` : `${candidates.length} encontrados`}
+                {meta && ` · ${noWebCount} sin sitio web`}
+                {meta && meta.duplicates > 0 && ` · ${meta.duplicates} ya en el CRM`}
+              </span>
 
-              <div className="flex items-center gap-1.5 text-xs text-surface-500">
-                <ArrowDownWideNarrow className="h-3.5 w-3.5" />
-                <select
-                  className="input h-8 w-auto py-1 text-xs"
-                  value={sort}
-                  onChange={(e) => setSort(e.target.value as typeof sort)}
-                  title="Ordenar"
-                >
+              <div className="ml-auto flex items-center gap-2">
+                <ArrowDownWideNarrow className="h-3.5 w-3.5 text-surface-400" />
+                <select className="input h-8 w-auto py-1 text-xs" value={sort} onChange={(e) => setSort(e.target.value as typeof sort)} title="Ordenar">
                   <option value="noweb">Sin web primero</option>
                   <option value="rating">Mejor rating</option>
                   <option value="reviews">Más reseñas</option>
-                  <option value="recent">Más recientes</option>
                 </select>
+                <select className="input h-8 w-auto py-1 text-xs" value={minRating} onChange={(e) => setMinRating(Number(e.target.value))} title="Rating mínimo">
+                  <option value={0}>Todo rating</option>
+                  <option value={4}>4.0+ ★</option>
+                  <option value={4.5}>4.5+ ★</option>
+                </select>
+                <button
+                  onClick={() => setOnlyNoWeb((v) => !v)}
+                  className={cn(
+                    'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+                    onlyNoWeb ? 'border-brand-300 bg-brand-50 text-brand-700' : 'border-surface-200 text-surface-500 hover:bg-surface-50'
+                  )}
+                >
+                  <Sparkles className="h-3.5 w-3.5" /> Solo sin sitio web
+                </button>
+                <button
+                  className="btn-primary py-1.5"
+                  onClick={() => saveCandidates(shown.filter((c) => selected.has(c.tempId)))}
+                  disabled={selectedCount === 0 || saving}
+                >
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  Guardar {selectedCount > 0 ? `(${selectedCount})` : ''}
+                </button>
               </div>
-
-              <select
-                className="input h-8 w-auto py-1 text-xs"
-                value={minRating}
-                onChange={(e) => setMinRating(Number(e.target.value))}
-                title="Rating mínimo"
-              >
-                <option value={0}>Todo rating</option>
-                <option value={4}>4.0+ ★</option>
-                <option value={4.5}>4.5+ ★</option>
-              </select>
-
-              <button
-                onClick={() => setOnlyNoWeb((v) => !v)}
-                className={cn(
-                  'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
-                  onlyNoWeb
-                    ? 'border-brand-300 bg-brand-50 text-brand-700'
-                    : 'border-surface-200 text-surface-500 hover:bg-surface-50'
-                )}
-              >
-                <Sparkles className="h-3.5 w-3.5" />
-                Solo sin sitio web
-              </button>
             </div>
 
             {shown.length === 0 ? (
-              <EmptyState
-                icon={<Globe className="h-10 w-10" />}
-                title="Todos tienen sitio web"
-                description="Quita el filtro para ver todos los leads."
-              />
+              <EmptyState icon={<Globe className="h-10 w-10" />} title="Sin resultados con esos filtros" description="Ajusta el rating o quita el filtro de sin-web." />
             ) : (
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                {shown.map((lead) => (
-                  <LeadFinderCard key={lead.id} lead={lead} onOpen={setDetail} />
+                {shown.map((c) => (
+                  <LeadFinderCard
+                    key={c.tempId}
+                    lead={toLead(c)}
+                    onOpen={() => setPreview(c)}
+                    selectable
+                    selected={selected.has(c.tempId)}
+                    saved={savedIds.has(c.tempId)}
+                    onToggleSelect={() => toggleSelect(c.tempId)}
+                  />
                 ))}
               </div>
             )}
@@ -306,53 +312,18 @@ export function LeadFinderPage() {
         )}
       </div>
 
-      <LeadDetailModal
-        lead={detailLead}
-        open={Boolean(detailLead)}
-        onClose={() => setDetail(null)}
-        owner={detailLead ? usersById.get(detailLead.assignedTo) : undefined}
-        usersById={usersById}
-        onEdit={(lead) => {
-          setDetail(null);
-          setEditing(lead);
-          setFormOpen(true);
-        }}
-        onMove={async (leadId: string, to: Temperature) => {
-          await moveLead(leadId, to);
-        }}
-        onDelete={removeLead}
-        loadComments={loadComments}
-        addComment={addComment}
-      />
-
-      <LeadFormModal
-        key={`${formOpen}-${editing?.id ?? 'none'}`}
-        open={formOpen}
-        onClose={() => {
-          setFormOpen(false);
-          setEditing(null);
-        }}
-        employees={assignableEmployees}
-        currentUserId={user.id}
-        isAdmin={isAdmin}
-        initial={editing}
-        onSubmit={async (input) => {
-          if (editing) await updateLead(editing.id, input);
-        }}
+      <LeadCandidateModal
+        candidate={preview}
+        open={Boolean(preview)}
+        saved={preview ? savedIds.has(preview.tempId) : false}
+        onClose={() => setPreview(null)}
+        onSave={(c) => saveCandidates([c])}
       />
     </AppLayout>
   );
 }
 
-function Field({
-  icon,
-  label,
-  children,
-}: {
-  icon?: React.ReactNode;
-  label: string;
-  children: React.ReactNode;
-}) {
+function Field({ icon, label, children }: { icon?: React.ReactNode; label: string; children: React.ReactNode }) {
   return (
     <label className="block">
       <span className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-surface-400">

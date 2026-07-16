@@ -169,10 +169,12 @@ create table if not exists public.lead_searches (
   inserted      int not null default 0,
   duplicates    int not null default 0,
   no_website    int not null default 0,
+  results       jsonb,
   created_at    timestamptz not null default now(),
   finished_at   timestamptz
 );
 create index if not exists lead_searches_by_idx on public.lead_searches(requested_by);
+alter table public.lead_searches add column if not exists results jsonb;
 
 -- ---------------------------------------------------------------------------
 -- Helper: ¿el usuario actual es admin?

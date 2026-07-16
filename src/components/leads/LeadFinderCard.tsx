@@ -1,4 +1,4 @@
-import { Star, Phone, MessageCircle, Globe, MapPin, ArrowRight } from 'lucide-react';
+import { Star, Phone, MessageCircle, Globe, MapPin, ArrowRight, Check } from 'lucide-react';
 import type { Lead } from '../../types';
 import { TemperatureBadge } from '../ui/TemperatureBadge';
 import { cn, colorFromString, googleMapsUrl, initials, telLink, waLink, webLink } from '../../lib/utils';
@@ -6,10 +6,22 @@ import { cn, colorFromString, googleMapsUrl, initials, telLink, waLink, webLink 
 interface LeadFinderCardProps {
   lead: Lead;
   onOpen: (lead: Lead) => void;
+  /** When true, the card shows a selection checkbox instead of the stage badge. */
+  selectable?: boolean;
+  selected?: boolean;
+  saved?: boolean;
+  onToggleSelect?: () => void;
 }
 
 /** sitedrop-style lead box: name, rating, phone, and a prominent "no website" flag. */
-export function LeadFinderCard({ lead, onOpen }: LeadFinderCardProps) {
+export function LeadFinderCard({
+  lead,
+  onOpen,
+  selectable = false,
+  selected = false,
+  saved = false,
+  onToggleSelect,
+}: LeadFinderCardProps) {
   const e = lead.enrichment ?? null;
   const hasWebsite = Boolean(lead.website.trim());
   const city = e?.city;
@@ -17,10 +29,16 @@ export function LeadFinderCard({ lead, onOpen }: LeadFinderCardProps) {
   const gmaps = googleMapsUrl(e);
 
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={() => onOpen(lead)}
-      className="group card flex flex-col p-4 text-left transition-shadow hover:shadow-card-hover"
+      onKeyDown={(ev) => (ev.key === 'Enter' || ev.key === ' ') && onOpen(lead)}
+      className={cn(
+        'group card flex cursor-pointer flex-col p-4 text-left transition-shadow hover:shadow-card-hover',
+        selected && 'ring-2 ring-brand-400',
+        saved && 'opacity-75'
+      )}
     >
       {/* Header */}
       <div className="flex items-start justify-between gap-2">
@@ -46,7 +64,24 @@ export function LeadFinderCard({ lead, onOpen }: LeadFinderCardProps) {
             </div>
           </div>
         </div>
-        <TemperatureBadge temperature={lead.temperature} />
+        {selectable ? (
+          saved ? (
+            <span className="badge shrink-0 bg-emerald-50 font-medium text-emerald-600">
+              <Check className="h-3 w-3" /> Guardado
+            </span>
+          ) : (
+            <input
+              type="checkbox"
+              checked={selected}
+              onChange={() => onToggleSelect?.()}
+              onClick={(ev) => ev.stopPropagation()}
+              aria-label={`Seleccionar ${lead.company}`}
+              className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-surface-300 text-brand-600 focus:ring-brand-500"
+            />
+          )
+        ) : (
+          <TemperatureBadge temperature={lead.temperature} />
+        )}
       </div>
 
       {/* Website flag — the money signal for a web-dev agency */}
@@ -108,7 +143,7 @@ export function LeadFinderCard({ lead, onOpen }: LeadFinderCardProps) {
           Ver <ArrowRight className="h-3.5 w-3.5" />
         </span>
       </div>
-    </button>
+    </div>
   );
 }
 
