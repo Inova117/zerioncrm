@@ -166,19 +166,33 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
   // Authenticated, active caller.
+  const authHeader = req.headers.get('Authorization') ?? '';
   const asCaller = createClient(SUPABASE_URL, ANON_KEY, {
-    global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } },
+    global: { headers: { Authorization: authHeader } },
   });
-  const { data: auth } = await asCaller.auth.getUser();
-  if (!auth?.user) return json({ error: 'No autenticado' }, 401);
+  const { data: auth, error: authErr } = await asCaller.auth.getUser();
+  if (authErr || !auth?.user) {
+    console.error('find-leads auth failed:', authErr?.message ?? 'no user');
+    return json({ error: 'No autenticado — vuelve a iniciar sesión' }, 401);
+  }
 
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
-  const { data: caller } = await admin
+  // Read the caller's profile with their OWN session (RLS lets any authenticated
+  // user read profiles). service_role is used only for the writes below.
+  const { data: caller, error: profErr } = await asCaller
     .from('profiles')
     .select('id, role, active')
     .eq('id', auth.user.id)
-    .single();
-  if (!caller || caller.active === false) return json({ error: 'Cuenta inactiva' }, 403);
+    .maybeSingle();
+  if (profErr) {
+    console.error('find-leads profile lookup error:', profErr.message);
+    return json({ error: `No se pudo leer tu perfil: ${profErr.message}` }, 403);
+  }
+  if (!caller) {
+    console.error('find-leads: no profile row for user', auth.user.id);
+    return json({ error: 'Tu usuario no tiene perfil en el CRM (tabla profiles).' }, 403);
+  }
+  if (caller.active === false) return json({ error: 'Tu cuenta está inactiva' }, 403);
 
   if (!APIFY_TOKEN) return json({ error: 'APIFY_TOKEN no configurado en la Edge Function' }, 500);
 
