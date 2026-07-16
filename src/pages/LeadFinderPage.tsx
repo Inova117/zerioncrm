@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Radar, Briefcase, MapPin, Download, Globe, Sparkles } from 'lucide-react';
+import { Radar, Briefcase, MapPin, Download, Globe, Sparkles, Search, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { AppLayout } from '../components/layout/AppLayout';
 import { LeadFinderCard } from '../components/leads/LeadFinderCard';
 import { LeadDetailModal } from '../components/leads/LeadDetailModal';
@@ -7,12 +7,11 @@ import { LeadFormModal } from '../components/leads/LeadFormModal';
 import { PageLoader, EmptyState } from '../components/ui/misc';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
+import type { FindLeadsResult } from '../services/leadFinderService';
 import type { Lead, Temperature } from '../types';
 import { cn } from '../lib/utils';
 import { toCSV, downloadCSV } from '../lib/csv';
 import { CSV_HEADERS, leadsToRows } from '../lib/leadsCsv';
-
-const norm = (s: string) => s.trim().toLowerCase();
 
 export function LeadFinderPage() {
   const { user, isAdmin } = useAuth();
@@ -20,6 +19,7 @@ export function LeadFinderPage() {
     loading,
     leads,
     users,
+    findLeads,
     updateLead,
     moveLead,
     removeLead,
@@ -27,8 +27,16 @@ export function LeadFinderPage() {
     addComment,
   } = useData();
 
+  // Search form
   const [bizType, setBizType] = useState('');
   const [location, setLocation] = useState('');
+  const [count, setCount] = useState(15);
+  const [assignee, setAssignee] = useState<string>(user?.id ?? '');
+  const [running, setRunning] = useState(false);
+  const [result, setResult] = useState<FindLeadsResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // Browsing
   const [onlyNoWeb, setOnlyNoWeb] = useState(false);
   const [detail, setDetail] = useState<Lead | null>(null);
   const [editing, setEditing] = useState<Lead | null>(null);
@@ -40,33 +48,18 @@ export function LeadFinderPage() {
     [users]
   );
 
-  // Only scraper-sourced leads live in the Lead Finder; scope by role.
   const scraperLeads = useMemo(() => {
     const mine = isAdmin ? leads : leads.filter((l) => l.assignedTo === user?.id);
-    return mine.filter((l) => l.source === 'scraper');
+    return mine
+      .filter((l) => l.source === 'scraper')
+      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)); // newest first
   }, [leads, isAdmin, user]);
 
-  // Suggestions for the two filter boxes.
-  const bizOptions = useMemo(
-    () => [...new Set(scraperLeads.map((l) => l.industry).filter(Boolean))].sort(),
-    [scraperLeads]
+  const shown = useMemo(
+    () => (onlyNoWeb ? scraperLeads.filter((l) => !l.website.trim()) : scraperLeads),
+    [scraperLeads, onlyNoWeb]
   );
-  const cityOptions = useMemo(
-    () =>
-      [...new Set(scraperLeads.map((l) => l.enrichment?.city).filter(Boolean) as string[])].sort(),
-    [scraperLeads]
-  );
-
-  const results = useMemo(() => {
-    let list = scraperLeads;
-    if (bizType.trim()) list = list.filter((l) => norm(l.industry).includes(norm(bizType)));
-    if (location.trim())
-      list = list.filter((l) => norm(l.enrichment?.city ?? '').includes(norm(location)));
-    if (onlyNoWeb) list = list.filter((l) => !l.website.trim());
-    return list;
-  }, [scraperLeads, bizType, location, onlyNoWeb]);
-
-  const noWebCount = useMemo(() => results.filter((l) => !l.website.trim()).length, [results]);
+  const noWebCount = useMemo(() => scraperLeads.filter((l) => !l.website.trim()).length, [scraperLeads]);
   const detailLead = detail ? leads.find((l) => l.id === detail.id) ?? null : null;
 
   const assignableEmployees = useMemo(() => {
@@ -77,99 +70,172 @@ export function LeadFinderPage() {
     return list;
   }, [activeEmployees, editing, usersById, user]);
 
+  async function runSearch(e: React.FormEvent) {
+    e.preventDefault();
+    if (!bizType.trim() || !location.trim() || running) return;
+    setRunning(true);
+    setError(null);
+    setResult(null);
+    try {
+      const res = await findLeads({
+        businessType: bizType.trim(),
+        location: location.trim(),
+        limit: count,
+        assignedTo: isAdmin ? assignee || user!.id : user!.id,
+      });
+      setResult(res);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo completar la búsqueda.');
+    } finally {
+      setRunning(false);
+    }
+  }
+
   function handleExport() {
-    const csv = toCSV(CSV_HEADERS, leadsToRows(results, usersById));
+    const csv = toCSV(CSV_HEADERS, leadsToRows(shown, usersById));
     downloadCSV(`lead-finder-${new Date().toISOString().slice(0, 10)}.csv`, csv);
   }
 
   if (!user) return null;
 
-  const hasAny = scraperLeads.length > 0;
-
   return (
     <AppLayout
       title="Lead Finder"
-      subtitle="Empresas locales que trae el scraper de Google Maps. Las que no tienen sitio web son tus clientes más calientes."
+      subtitle="Encuentra empresas locales en Google Maps y tráelas al CRM. Las que no tienen sitio web son tus clientes más calientes."
       actions={
-        hasAny ? (
+        scraperLeads.length > 0 ? (
           <button className="btn-secondary" onClick={handleExport} title="Exportar a CSV">
             <Download className="h-4 w-4" /> <span className="hidden md:inline">Exportar</span>
           </button>
         ) : undefined
       }
     >
-      {loading ? (
-        <PageLoader />
-      ) : !hasAny ? (
-        <EmptyState
-          icon={<Radar className="h-10 w-10" />}
-          title="Aún no llegan leads del scraper"
-          description="Corre el ZerionScraperAI (p. ej. peluquerías en tu ciudad). Cada run empuja las empresas encontradas aquí, listas para llamar."
-        />
-      ) : (
-        <div className="space-y-4">
-          {/* Search boxes — business type + location */}
-          <div className="grid gap-3 sm:grid-cols-2 lg:max-w-2xl">
-            <FilterBox
-              icon={<Briefcase className="h-3.5 w-3.5" />}
-              label="Tipo de negocio"
-              placeholder="Peluquerías, restaurantes…"
-              value={bizType}
-              onChange={setBizType}
-              listId="biz-options"
-              options={bizOptions}
-            />
-            <FilterBox
-              icon={<MapPin className="h-3.5 w-3.5" />}
-              label="Ubicación"
-              placeholder="Ciudad"
-              value={location}
-              onChange={setLocation}
-              listId="city-options"
-              options={cityOptions}
-            />
-          </div>
-
-          {/* Counters + no-website toggle */}
-          <div className="flex flex-wrap items-center gap-3">
-            <p className="text-sm text-surface-500">
-              <span className="font-semibold text-surface-800">{results.length}</span> resultado
-              {results.length === 1 ? '' : 's'}
-              {' · '}
-              <span className="font-semibold text-brand-600">{noWebCount}</span> sin sitio web
-            </p>
-            <button
-              onClick={() => setOnlyNoWeb((v) => !v)}
-              className={cn(
-                'ml-auto inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
-                onlyNoWeb
-                  ? 'border-brand-300 bg-brand-50 text-brand-700'
-                  : 'border-surface-200 text-surface-500 hover:bg-surface-50'
-              )}
-            >
-              <Sparkles className="h-3.5 w-3.5" />
-              Solo sin sitio web
+      <div className="space-y-5">
+        {/* Search agent */}
+        <form onSubmit={runSearch} className="card p-4">
+          <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto_auto] md:items-end">
+            <Field icon={<Briefcase className="h-3.5 w-3.5" />} label="Tipo de negocio">
+              <input
+                className="input"
+                placeholder="Peluquerías, restaurantes, dentistas…"
+                value={bizType}
+                onChange={(e) => setBizType(e.target.value)}
+              />
+            </Field>
+            <Field icon={<MapPin className="h-3.5 w-3.5" />} label="Ubicación">
+              <input
+                className="input"
+                placeholder="Ciudad, TX / CDMX / Guadalajara"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+              />
+            </Field>
+            <Field label="Cantidad">
+              <select
+                className="input"
+                value={count}
+                onChange={(e) => setCount(Number(e.target.value))}
+              >
+                {[5, 10, 15, 20].map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <button type="submit" className="btn-primary h-[42px] whitespace-nowrap" disabled={running}>
+              {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+              {running ? 'Buscando…' : 'Buscar leads'}
             </button>
           </div>
 
-          {/* Cards */}
-          {results.length === 0 ? (
-            <EmptyState
-              icon={<Globe className="h-10 w-10" />}
-              title="Sin resultados"
-              description="Ajusta el tipo de negocio o la ubicación."
-            />
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {results.map((lead) => (
-                <LeadFinderCard key={lead.id} lead={lead} onOpen={setDetail} />
-              ))}
+          {/* Admin: assign the found leads to a staff member */}
+          {isAdmin && activeEmployees.length > 0 && (
+            <div className="mt-3 flex items-center gap-2 text-xs text-surface-500">
+              <span>Asignar a</span>
+              <select
+                className="input h-8 w-auto py-1 text-xs"
+                value={assignee}
+                onChange={(e) => setAssignee(e.target.value)}
+              >
+                <option value={user.id}>Yo ({user.name})</option>
+                {activeEmployees.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name}
+                  </option>
+                ))}
+              </select>
             </div>
           )}
-        </div>
-      )}
 
-      {/* Detail modal (reused from Prospectos) */}
+          {running && (
+            <p className="mt-3 text-xs text-surface-400">
+              Ejecutando el scrape en Google Maps… puede tardar hasta ~1 min.
+            </p>
+          )}
+          {error && (
+            <p className="mt-3 flex items-center gap-1.5 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
+              <AlertCircle className="h-4 w-4 shrink-0" /> {error}
+            </p>
+          )}
+          {result && !error && (
+            <p className="mt-3 flex flex-wrap items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+              <CheckCircle2 className="h-4 w-4 shrink-0" />
+              {result.inserted} lead{result.inserted === 1 ? '' : 's'} nuevo{result.inserted === 1 ? '' : 's'}
+              {result.noWebsite > 0 && ` · ${result.noWebsite} sin sitio web`}
+              {result.duplicates > 0 && ` · ${result.duplicates} ya existían`}
+            </p>
+          )}
+        </form>
+
+        {/* Results */}
+        {loading ? (
+          <PageLoader />
+        ) : scraperLeads.length === 0 ? (
+          <EmptyState
+            icon={<Radar className="h-10 w-10" />}
+            title="Aún no hay leads"
+            description="Escribe un tipo de negocio y una ubicación arriba, y dale Buscar. El agente traerá las empresas de Google Maps al CRM."
+          />
+        ) : (
+          <>
+            <div className="flex flex-wrap items-center gap-3">
+              <p className="text-sm text-surface-500">
+                <span className="font-semibold text-surface-800">{scraperLeads.length}</span> lead
+                {scraperLeads.length === 1 ? '' : 's'} en el CRM {' · '}
+                <span className="font-semibold text-brand-600">{noWebCount}</span> sin sitio web
+              </p>
+              <button
+                onClick={() => setOnlyNoWeb((v) => !v)}
+                className={cn(
+                  'ml-auto inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+                  onlyNoWeb
+                    ? 'border-brand-300 bg-brand-50 text-brand-700'
+                    : 'border-surface-200 text-surface-500 hover:bg-surface-50'
+                )}
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                Solo sin sitio web
+              </button>
+            </div>
+
+            {shown.length === 0 ? (
+              <EmptyState
+                icon={<Globe className="h-10 w-10" />}
+                title="Todos tienen sitio web"
+                description="Quita el filtro para ver todos los leads."
+              />
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {shown.map((lead) => (
+                  <LeadFinderCard key={lead.id} lead={lead} onOpen={setDetail} />
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
       <LeadDetailModal
         lead={detailLead}
         open={Boolean(detailLead)}
@@ -189,7 +255,6 @@ export function LeadFinderPage() {
         addComment={addComment}
       />
 
-      {/* Edit form */}
       <LeadFormModal
         key={`${formOpen}-${editing?.id ?? 'none'}`}
         open={formOpen}
@@ -209,41 +274,22 @@ export function LeadFinderPage() {
   );
 }
 
-function FilterBox({
+function Field({
   icon,
   label,
-  placeholder,
-  value,
-  onChange,
-  listId,
-  options,
+  children,
 }: {
-  icon: React.ReactNode;
+  icon?: React.ReactNode;
   label: string;
-  placeholder: string;
-  value: string;
-  onChange: (v: string) => void;
-  listId: string;
-  options: string[];
+  children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-surface-200 bg-white px-3.5 py-2.5 shadow-card focus-within:border-brand-300 focus-within:ring-2 focus-within:ring-brand-100">
-      <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-surface-400">
+    <label className="block">
+      <span className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-surface-400">
         {icon}
         {label}
-      </div>
-      <input
-        className="mt-0.5 w-full border-0 bg-transparent p-0 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-0"
-        placeholder={placeholder}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        list={listId}
-      />
-      <datalist id={listId}>
-        {options.map((o) => (
-          <option key={o} value={o} />
-        ))}
-      </datalist>
-    </div>
+      </span>
+      {children}
+    </label>
   );
 }
