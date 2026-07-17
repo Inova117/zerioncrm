@@ -139,6 +139,21 @@ vive en `services/mappers.ts`.
    tarde). Deduplica por place_id + teléfono e inserta las empresas como prospectos
    "nuevo". **Sin `APIFY_TOKEN` la app usa datos de demostración**, así que puedes
    probar toda la UI sin gastar en Apify.
+7. **Sales Copilot** (coach de ventas en tiempo real durante la llamada):
+   - Despliega la función y dale tu key de Anthropic (server-side):
+     ```bash
+     supabase functions deploy copilot
+     supabase secrets set ANTHROPIC_API_KEY=sk-ant-xxxxx
+     # opcional, más barato/rápido: supabase secrets set COPILOT_MODEL=claude-haiku-4-5
+     ```
+   Cómo funciona: pon el celular en **altavoz** junto a la laptop; el navegador
+   transcribe la llamada (Web Speech API, gratis, **solo Chrome/Edge de escritorio**)
+   y la función consulta a Claude con el **playbook de ventas** (`src/data/salesPlaybook.ts`:
+   Belfort/Cardone/SPIN/Challenger + objeciones en español) para soplarte qué decir en
+   streaming (<2s). Las objeciones se detectan **al instante en el cliente** (battlecard
+   sin esperar al LLM). Al colgar, genera resumen → comentario en el prospecto + temperatura
+   sugerida + tarea de seguimiento. **Sin `ANTHROPIC_API_KEY` usa el playbook local**
+   (mock), así que toda la UI se prueba sin gastar en el API.
 
 La seguridad (quién ve/edita qué) la garantizan las **políticas RLS** del `schema.sql`:
 el admin ve todo; cada empleado solo sus propios leads y tareas. La `anon key` es pública

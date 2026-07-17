@@ -15,7 +15,9 @@ import {
   Layers,
   Repeat,
   DollarSign,
+  Sparkles,
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import type { Comment, Lead, Temperature, User, ActivityType } from '../../types';
 import { Modal } from '../ui/Modal';
 import { Avatar } from '../ui/Avatar';
@@ -172,13 +174,15 @@ export function LeadDetailModal({
       </div>
 
       {/* Quick contact actions — open the user's mail / phone / WhatsApp app. */}
-      {(lead.email || lead.phone || lead.website) && (
-        <div className="mb-4 flex flex-wrap gap-2">
-          {lead.email && (
-            <a href={mailLink(lead.email)} className="btn-secondary" onClick={(e) => e.stopPropagation()}>
-              <Mail className="h-4 w-4" /> Email
-            </a>
-          )}
+      <div className="mb-4 flex flex-wrap gap-2">
+        <Link to={`/copilot?lead=${lead.id}`} className="btn-primary" onClick={(e) => e.stopPropagation()}>
+          <Sparkles className="h-4 w-4" /> Llamar con Copilot
+        </Link>
+        {lead.email && (
+          <a href={mailLink(lead.email)} className="btn-secondary" onClick={(e) => e.stopPropagation()}>
+            <Mail className="h-4 w-4" /> Email
+          </a>
+        )}
           {lead.phone && (
             <a
               href={waLink(lead.phone)}
@@ -194,13 +198,12 @@ export function LeadDetailModal({
               <Phone className="h-4 w-4" /> Llamar
             </a>
           )}
-          {lead.website && (
-            <a href={webLink(lead.website)} target="_blank" rel="noreferrer" className="btn-secondary">
-              <Globe className="h-4 w-4" /> Sitio web
-            </a>
-          )}
-        </div>
-      )}
+        {lead.website && (
+          <a href={webLink(lead.website)} target="_blank" rel="noreferrer" className="btn-secondary">
+            <Globe className="h-4 w-4" /> Sitio web
+          </a>
+        )}
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Left: details */}
