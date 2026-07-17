@@ -144,11 +144,11 @@ vive en `services/mappers.ts`.
      ```bash
      supabase functions deploy copilot
      supabase secrets set ANTHROPIC_API_KEY=sk-ant-xxxxx
-     # Modelos: briefing/resumen usan COPILOT_MODEL (default claude-opus-4-8).
-     # Las sugerencias EN VIVO usan COPILOT_MODEL_SUGGEST (default claude-haiku-4-5:
-     # TTFT ~0.9s vs ~2s de Opus y 5x más barato — el conocimiento vive en el
-     # playbook cacheado, así que el modelo chico rinde casi igual en vivo).
-     # supabase secrets set COPILOT_MODEL_SUGGEST=claude-opus-4-8   # para volver a Opus en vivo
+     # Modelos: briefing/resumen/coaching usan COPILOT_MODEL (default claude-sonnet-5:
+     # calidad casi-Opus en análisis a menos de la mitad del precio — la inteligencia
+     # vive en el playbook, el modelo la aplica). Las sugerencias EN VIVO usan
+     # COPILOT_MODEL_SUGGEST (default claude-haiku-4-5: el más rápido).
+     # supabase secrets set COPILOT_MODEL=claude-opus-4-8   # subir el análisis a Opus
      # Proveedor alterno (A/B testing, ej. Kimi K3 de Moonshot — OpenAI-compatible):
      # supabase secrets set COPILOT_PROVIDER=kimi KIMI_API_KEY=sk-... KIMI_MODEL=kimi-k3
      ```

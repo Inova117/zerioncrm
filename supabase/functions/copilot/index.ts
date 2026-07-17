@@ -26,9 +26,11 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY') ?? '';
-// Opus 4.8 por defecto (calidad máxima de venta). Cambiable sin redeploy:
-//   supabase secrets set COPILOT_MODEL=claude-haiku-4-5   (más barato/rápido)
-const MODEL = Deno.env.get('COPILOT_MODEL') ?? 'claude-opus-4-8';
+// Sonnet 5 por defecto para briefing/resumen/coaching: calidad casi-Opus en
+// análisis a <1/2 del precio ($3/$15 vs $5/$25) — la inteligencia profunda
+// vive en el playbook, el modelo solo la aplica. Cambiable sin redeploy:
+//   supabase secrets set COPILOT_MODEL=claude-opus-4-8   (volver a Opus)
+const MODEL = Deno.env.get('COPILOT_MODEL') ?? 'claude-sonnet-5';
 // Modelo SOLO para las sugerencias en vivo (lo más sensible a latencia).
 // Default: Haiku 4.5 — TTFT ~0.9s vs ~2s de Opus y 5x más barato; el
 // conocimiento vive en el playbook (15k tokens cacheados), así que la tarea
@@ -101,6 +103,7 @@ interface AnthropicRequest {
   system: Array<{ type: 'text'; text: string; cache_control?: { type: 'ephemeral' } }>;
   messages: Array<{ role: 'user'; content: string }>;
   output_config?: Record<string, unknown>;
+  thinking?: Record<string, unknown>;
 }
 
 // `output_config.effort` solo existe en Opus 4.5+ / Sonnet 4.6+ / Fable.
@@ -108,6 +111,12 @@ interface AnthropicRequest {
 const supportsEffort = (model: string): boolean => !/haiku|sonnet-4-5/.test(model);
 const effortFor = (model: string): Record<string, unknown> =>
   supportsEffort(model) ? { output_config: { effort: 'low' } } : {};
+
+// Sonnet 5 corre thinking ADAPTATIVO por defecto si no se manda el parámetro
+// (Opus 4.8 y Haiku no) — eso sumaría latencia + tokens de razonamiento que
+// este caso no necesita (el conocimiento vive en el playbook). Se desactiva.
+const thinkingFor = (model: string): Record<string, unknown> =>
+  /sonnet-5/.test(model) ? { thinking: { type: 'disabled' } } : {};
 
 async function anthropicFetch(req: AnthropicRequest): Promise<Response> {
   return await fetch('https://api.anthropic.com/v1/messages', {
@@ -301,6 +310,7 @@ Deno.serve(async (req) => {
     const res = await anthropicFetch({
       model: MODEL_SUGGEST,
       max_tokens: 1,
+      ...thinkingFor(MODEL_SUGGEST),
       system: buildSystem('', playbook, '', '', ''),
       messages: [{ role: 'user', content: 'ok' }],
     });
@@ -334,6 +344,7 @@ Deno.serve(async (req) => {
       stream: true,
       system: sys,
       ...effortFor(MODEL),
+      ...thinkingFor(MODEL),
       messages: [{ role: 'user', content: userMsg }],
     });
     if (!upstream.ok || !upstream.body) {
@@ -380,6 +391,7 @@ Deno.serve(async (req) => {
       stream: true,
       system: sys,
       ...effortFor(MODEL_SUGGEST),
+      ...thinkingFor(MODEL_SUGGEST),
       messages: [{ role: 'user', content: userMsg }],
     });
     if (!upstream.ok || !upstream.body) {
@@ -423,6 +435,7 @@ Deno.serve(async (req) => {
     const res = await anthropicFetch({
       model: MODEL,
       max_tokens: 1500,
+      ...thinkingFor(MODEL),
       system: [{ type: 'text', text: debriefSystem }],
       output_config: {
         ...(supportsEffort(MODEL) ? { effort: 'low' } : {}),
@@ -487,6 +500,7 @@ Deno.serve(async (req) => {
     const res = await anthropicFetch({
       model: MODEL,
       max_tokens: 700,
+      ...thinkingFor(MODEL),
       system: [
         {
           type: 'text',
