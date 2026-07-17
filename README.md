@@ -146,14 +146,31 @@ vive en `services/mappers.ts`.
      supabase secrets set ANTHROPIC_API_KEY=sk-ant-xxxxx
      # opcional, más barato/rápido: supabase secrets set COPILOT_MODEL=claude-haiku-4-5
      ```
+   - **Transcripción premium (opcional, recomendada para llamadas):** despliega la
+     función de token y dale tu master key de Deepgram. La app pide un **token temporal**
+     (~60s) y abre el WebSocket de Deepgram `nova-2` en español; tu master key **nunca**
+     sale del servidor:
+     ```bash
+     supabase functions deploy deepgram-token
+     supabase secrets set DEEPGRAM_API_KEY=<tu master key de Deepgram>
+     ```
+     **Sin `DEEPGRAM_API_KEY` la app cae sola a la Web Speech API** del navegador (gratis).
+     El badge en la transcripción indica qué motor está activo (`Deepgram · premium` /
+     `Navegador`), y si Deepgram se cae en plena llamada, sigue con Web Speech sin cortar.
    Cómo funciona: pon el celular en **altavoz** junto a la laptop; el navegador
-   transcribe la llamada (Web Speech API, gratis, **solo Chrome/Edge de escritorio**)
-   y la función consulta a Claude con el **playbook de ventas** (`src/data/salesPlaybook.ts`:
-   Belfort/Cardone/SPIN/Challenger + objeciones en español) para soplarte qué decir en
-   streaming (<2s). Las objeciones se detectan **al instante en el cliente** (battlecard
-   sin esperar al LLM). Al colgar, genera resumen → comentario en el prospecto + temperatura
-   sugerida + tarea de seguimiento. **Sin `ANTHROPIC_API_KEY` usa el playbook local**
-   (mock), así que toda la UI se prueba sin gastar en el API.
+   transcribe la llamada (Deepgram si está configurado; si no, Web Speech, **solo
+   Chrome/Edge de escritorio**) y la función consulta a Claude con el **playbook de
+   ventas** (`src/data/salesPlaybook.ts`: Belfort/Cardone/SPIN/Challenger + objeciones en
+   español) para soplarte qué decir en streaming (<2s). Las objeciones se detectan **al
+   instante en el cliente** (battlecard sin esperar al LLM). Al colgar, genera resumen →
+   comentario en el prospecto + temperatura sugerida + tarea de seguimiento.
+   **Sin `ANTHROPIC_API_KEY` usa el playbook local** (mock), así que toda la UI se prueba
+   sin gastar en el API.
+   - **Ajustes del Copilot** (botón ⚙️ arriba a la derecha): enséñale al coach *tu* oferta,
+     precios, tono y frases que te funcionan. El coach los usa **por encima** del playbook
+     para dejar de sonar genérico. Se guardan en tu navegador y viajan en cada consulta.
+     El coach también **reconoce al prospecto**: carga su historial (notas/llamadas previas,
+     etapa, último contacto) y retoma la conversación en vez de arrancar de cero.
 
 La seguridad (quién ve/edita qué) la garantizan las **políticas RLS** del `schema.sql`:
 el admin ve todo; cada empleado solo sus propios leads y tareas. La `anon key` es pública

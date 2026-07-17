@@ -2,14 +2,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Sparkles, Mic, MicOff, Phone, PhoneOff, LifeBuoy, Search as SearchIcon,
-  Star, Globe, MapPin, Loader2, AlertTriangle, Save, ArrowRight, Radar,
+  Star, Globe, MapPin, Loader2, AlertTriangle, Save, ArrowRight, Radar, SlidersHorizontal,
 } from 'lucide-react';
 import { AppLayout } from '../components/layout/AppLayout';
+import { CopilotSettingsModal } from '../components/copilot/CopilotSettingsModal';
+import { hasCopilotSettings } from '../lib/copilotSettings';
 import { EmptyState } from '../components/ui/misc';
 import { TemperatureBadge } from '../components/ui/TemperatureBadge';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { useSpeech } from '../hooks/useSpeech';
+import { useDeepgram } from '../hooks/useDeepgram';
 import { copilotBriefing, copilotSuggest, copilotSummary, type CallSummary } from '../services/copilotService';
 import { detectObjection, type Battlecard } from '../data/salesPlaybook';
 import type { Lead } from '../types';
@@ -44,6 +47,8 @@ export function CopilotPage() {
   const [phase, setPhase] = useState<Phase>('pick');
   const [lead, setLead] = useState<Lead | null>(null);
   const [query, setQuery] = useState('');
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [hasSettings, setHasSettings] = useState(() => hasCopilotSettings());
 
   // Pre-call
   const [briefing, setBriefing] = useState('');
@@ -121,11 +126,34 @@ export function CopilotPage() {
     [lead, runSuggest]
   );
 
-  const speech = useSpeech({ lang: 'es-EC', onFinal });
+  // Dos motores de transcripción; misma interfaz. Deepgram (premium) si está
+  // configurado y disponible; si no, Web Speech del navegador (gratis).
+  const dg = useDeepgram({ lang: 'es-EC', onFinal });
+  const ws = useSpeech({ lang: 'es-EC', onFinal });
+  const [engineName, setEngineName] = useState<'deepgram' | 'web'>('web');
+  const engine = engineName === 'deepgram' ? dg : ws;
+
+  // Elegimos motor cuando resuelve el probe de Deepgram (fuera de la llamada).
+  useEffect(() => {
+    if (phase === 'pick' || phase === 'brief') {
+      setEngineName(dg.available === true && dg.supported ? 'deepgram' : 'web');
+    }
+  }, [dg.available, dg.supported, phase]);
+
+  // Degradación en caliente: si Deepgram cae durante la llamada, seguimos con
+  // Web Speech sin cortar la sesión.
+  const degradedRef = useRef(false);
+  useEffect(() => {
+    if (phase === 'live' && engineName === 'deepgram' && dg.available === false && !degradedRef.current) {
+      degradedRef.current = true;
+      setEngineName('web');
+      ws.start();
+    }
+  }, [phase, engineName, dg.available, ws.start]);
 
   useEffect(() => {
     linesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [lines, speech.interim]);
+  }, [lines, engine.interim]);
 
   // --- Flujo -----------------------------------------------------------------
   async function startBriefing(l: Lead) {
@@ -147,21 +175,23 @@ export function CopilotPage() {
   }
 
   function startListening() {
-    if (!speech.supported) {
-      setError('Tu navegador no soporta reconocimiento de voz. Usa Chrome o Edge de escritorio.');
+    if (!engine.supported) {
+      setError('Tu navegador no soporta captura de micrófono. Usa Chrome o Edge de escritorio.');
       return;
     }
+    degradedRef.current = false;
     setPhase('live');
     setLines([]);
     setSuggestion('');
     setCard(null);
     transcriptRef.current = '';
     lastSuggestRef.current = Date.now();
-    speech.start();
+    engine.start();
   }
 
   async function hangUp() {
-    speech.stop();
+    dg.stop();
+    ws.stop();
     setPhase('wrap');
     if (!lead) return;
     setSummarizing(true);
@@ -198,7 +228,9 @@ export function CopilotPage() {
   }
 
   function reset() {
-    speech.stop();
+    dg.stop();
+    ws.stop();
+    degradedRef.current = false;
     setPhase('pick');
     setLead(null);
     setBriefing('');
@@ -220,6 +252,16 @@ export function CopilotPage() {
       title="Sales Copilot"
       subtitle="Pon el celular en altavoz, dale a escuchar y el AI te sopla qué decir en tiempo real."
       fullBleed
+      actions={
+        <button
+          className={cn('btn-secondary', !hasSettings && 'ring-1 ring-brand-300')}
+          onClick={() => setSettingsOpen(true)}
+          title="Enséñale al coach tu oferta, precios y tono"
+        >
+          <SlidersHorizontal className="h-4 w-4" />
+          <span className="hidden sm:inline">{hasSettings ? 'Ajustes' : 'Configura tu oferta'}</span>
+        </button>
+      }
     >
       <div className="flex h-full flex-col px-4 py-4 sm:px-6">
         {error && (
@@ -287,17 +329,31 @@ export function CopilotPage() {
               {phase === 'live' && (
                 <div className="card flex min-h-0 flex-1 flex-col p-3">
                   <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-surface-400">
-                    <Mic className={cn('h-3.5 w-3.5', speech.listening ? 'text-red-500' : 'text-surface-400')} />
-                    Transcripción {speech.listening && <span className="ml-auto flex items-center gap-1 text-red-500">● en vivo</span>}
+                    <Mic className={cn('h-3.5 w-3.5', engine.listening ? 'text-red-500' : 'text-surface-400')} />
+                    Transcripción
+                    <span
+                      className={cn(
+                        'rounded-full px-1.5 py-0.5 text-[9px] font-bold normal-case tracking-normal',
+                        engineName === 'deepgram'
+                          ? 'bg-brand-100 text-brand-700'
+                          : 'bg-surface-100 text-surface-500'
+                      )}
+                      title={engineName === 'deepgram'
+                        ? 'Deepgram nova-2: transcripción premium, mejor con audio de llamada'
+                        : 'Web Speech del navegador (gratis). Configura DEEPGRAM_API_KEY para la versión premium.'}
+                    >
+                      {engineName === 'deepgram' ? 'Deepgram · premium' : 'Navegador'}
+                    </span>
+                    {engine.listening && <span className="ml-auto flex items-center gap-1 text-red-500">● en vivo</span>}
                   </div>
                   <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1 text-sm text-surface-700">
-                    {lines.length === 0 && !speech.interim && (
+                    {lines.length === 0 && !engine.interim && (
                       <p className="text-surface-400">Escuchando… habla o pon el celular en altavoz.</p>
                     )}
                     {lines.map((l, i) => (
                       <p key={i}>{l}</p>
                     ))}
-                    {speech.interim && <p className="text-surface-400">{speech.interim}</p>}
+                    {engine.interim && <p className="text-surface-400">{engine.interim}</p>}
                     <div ref={linesEndRef} />
                   </div>
                 </div>
@@ -358,9 +414,9 @@ export function CopilotPage() {
                   </div>
                   <button
                     className="text-center text-xs text-surface-400 hover:text-surface-600"
-                    onClick={() => (speech.listening ? speech.stop() : speech.start())}
+                    onClick={() => (engine.listening ? engine.stop() : engine.start())}
                   >
-                    {speech.listening ? (
+                    {engine.listening ? (
                       <span className="inline-flex items-center gap-1"><MicOff className="h-3 w-3" /> pausar micrófono</span>
                     ) : (
                       <span className="inline-flex items-center gap-1"><Mic className="h-3 w-3" /> reanudar micrófono</span>
@@ -414,6 +470,12 @@ export function CopilotPage() {
           </div>
         )}
       </div>
+
+      <CopilotSettingsModal
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        onSaved={() => setHasSettings(hasCopilotSettings())}
+      />
     </AppLayout>
   );
 }

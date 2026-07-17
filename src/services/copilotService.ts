@@ -12,6 +12,7 @@
 import type { Lead, Temperature } from '../types';
 import { supabase } from '../lib/supabaseClient';
 import { detectObjection, playbookForPrompt } from '../data/salesPlaybook';
+import { settingsForPrompt } from '../lib/copilotSettings';
 
 export interface SuggestArgs {
   lead: Lead;
@@ -92,7 +93,7 @@ async function callFn(
 
 const supaBriefing = (lead: Lead, history: string, onDelta?: (t: string) => void) =>
   callFn(
-    { mode: 'briefing', lead: leadBrief(lead), playbook: playbookForPrompt(), history },
+    { mode: 'briefing', lead: leadBrief(lead), playbook: playbookForPrompt(), history, settings: settingsForPrompt() },
     onDelta
   );
 
@@ -105,6 +106,7 @@ const supaSuggest = (args: SuggestArgs, onDelta: (t: string) => void) =>
       transcript: args.transcript,
       trigger: args.trigger ?? '',
       history: args.history ?? '',
+      settings: settingsForPrompt(),
     },
     onDelta
   );
@@ -141,10 +143,13 @@ const streamOut = async (text: string, onDelta?: (t: string) => void): Promise<s
 async function mockBriefing(lead: Lead, history: string, onDelta?: (t: string) => void): Promise<string> {
   const e = lead.enrichment;
   const noWeb = !lead.website.trim();
+  const settings = settingsForPrompt();
   const histLine = history.trim()
     ? [`**Ya tienes historia con este prospecto:** ${history.trim()}`, 'Retómala: no arranques de cero, referénciala ("La vez pasada quedamos en…").', '']
     : [];
+  const settingsLine = settings ? [`**Tu oferta (úsala tal cual):** ${settings.split('\n')[0]}`, ''] : [];
   const text = [
+    ...settingsLine,
     ...histLine,
     `**Ángulo de apertura:** "${lead.contactName || 'Hola'}, los encontré en Google Maps — ${
       e?.rating != null ? `tienen ${e.rating}⭐ con ${e.reviewCount} reseñas, se nota que trabajan bien` : 'vi su negocio y me llamó la atención'
