@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Link as RouterLink, useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  Sparkles, Mic, MicOff, Phone, PhoneOff, LifeBuoy, Search as SearchIcon,
-  Star, Globe, MapPin, Loader2, AlertTriangle, Save, ArrowRight, Radar, SlidersHorizontal,
+  Sparkles, Mic, MicOff, Phone, PhoneOff, LifeBuoy,
+  Star, Globe, MapPin, Loader2, AlertTriangle, Save, ArrowRight, SlidersHorizontal,
 } from 'lucide-react';
 import { AppLayout } from '../components/layout/AppLayout';
 import { CopilotSettingsModal } from '../components/copilot/CopilotSettingsModal';
@@ -80,13 +80,13 @@ function buildHistory(
 }
 
 export function CopilotPage() {
-  const { user, isAdmin } = useAuth();
+  const { user } = useAuth();
   const { leads, addComment, moveLead, createTask, loadComments } = useData();
   const [params, setParams] = useSearchParams();
+  const navigate = useNavigate();
 
   const [phase, setPhase] = useState<Phase>('pick');
   const [lead, setLead] = useState<Lead | null>(null);
-  const [query, setQuery] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [hasSettings, setHasSettings] = useState(() => hasCopilotSettings());
 
@@ -173,15 +173,6 @@ export function CopilotPage() {
     if (nums.length) parts.push(`Números del prospecto (úsalos EXACTOS): ${nums.join(' · ')}`);
     return parts.join('. ');
   }, []);
-
-  const myLeads = useMemo(() => {
-    const scoped = isAdmin ? leads : leads.filter((l) => l.assignedTo === user?.id);
-    const q = query.trim().toLowerCase();
-    const list = q
-      ? scoped.filter((l) => l.company.toLowerCase().includes(q) || l.industry.toLowerCase().includes(q))
-      : scoped;
-    return [...list].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
-  }, [leads, isAdmin, user, query]);
 
   // Lanzamiento con ?lead=<id> desde el detalle del prospecto.
   useEffect(() => {
@@ -506,6 +497,8 @@ export function CopilotPage() {
     transcriptRef.current = '';
     historyRef.current = '';
     if (params.get('lead')) setParams({}, { replace: true });
+    // El copilot vive DENTRO del flujo de prospectos: al terminar, de vuelta.
+    navigate('/leads');
   }
 
   if (!user) return null;
@@ -533,52 +526,19 @@ export function CopilotPage() {
           </p>
         )}
 
-        {/* ------------------------------------------------------ PICK */}
+        {/* Sin prospecto: el copilot se abre DESDE el popup del prospecto */}
         {phase === 'pick' && (
-          <div className="mx-auto w-full max-w-2xl">
-            <div className="relative mb-3">
-              <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-surface-400" />
-              <input
-                className="input pl-9"
-                placeholder="Busca el prospecto a llamar…"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-              />
-            </div>
-            {myLeads.length === 0 ? (
-              <EmptyState
-                icon={<Radar className="h-10 w-10" />}
-                title="No hay prospectos para llamar"
-                description="Encuentra negocios en el Lead Finder y guárdalos; luego llámalos desde aquí con el copiloto."
-              />
-            ) : (
-              <div className="space-y-1.5">
-                {myLeads.slice(0, 40).map((l) => (
-                  <button
-                    key={l.id}
-                    onClick={() => startBriefing(l)}
-                    className="card flex w-full items-center gap-3 p-3 text-left transition-shadow hover:shadow-card-hover"
-                  >
-                    <span
-                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-xs font-bold text-white"
-                      style={{ backgroundColor: colorFromString(l.company) }}
-                    >
-                      {initials(l.company) || '?'}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-surface-900">{l.company}</p>
-                      <p className="truncate text-xs text-surface-500">
-                        {l.phone || 'sin teléfono'}
-                        {!l.website.trim() && ' · sin sitio web'}
-                        {l.enrichment?.city ? ` · ${l.enrichment.city}` : ''}
-                      </p>
-                    </div>
-                    <TemperatureBadge temperature={l.temperature} />
-                    <Phone className="h-4 w-4 text-brand-600" />
-                  </button>
-                ))}
-              </div>
-            )}
+          <div className="mx-auto flex w-full max-w-md flex-1 items-center">
+            <EmptyState
+              icon={<Sparkles className="h-10 w-10" />}
+              title="El copilot se abre desde un prospecto"
+              description='Ve a Prospectos, abre el negocio que vas a contactar y pulsa "Sales Copilot". Ahí llamas o escribes por WhatsApp y activas la escucha cuando arranque la conversación.'
+              action={
+                <RouterLink to="/leads" className="btn-primary">
+                  Ir a Prospectos <ArrowRight className="h-4 w-4" />
+                </RouterLink>
+              }
+            />
           </div>
         )}
 
@@ -671,6 +631,10 @@ export function CopilotPage() {
                   <button className="btn-primary w-full py-3 text-base" onClick={startListening}>
                     <Mic className="h-5 w-5" /> Empezar a escuchar la llamada
                   </button>
+                  <p className="text-center text-xs text-surface-400">
+                    Llama o escribe por WhatsApp desde la ficha de arriba — y activa la escucha cuando
+                    arranque la conversación (celular en altavoz).
+                  </p>
                 </>
               )}
 
@@ -835,7 +799,7 @@ export function CopilotPage() {
                       </button>
                     )}
                     <button className="btn-secondary py-3" onClick={reset}>
-                      Otra llamada <ArrowRight className="h-4 w-4" />
+                      Volver a Prospectos <ArrowRight className="h-4 w-4" />
                     </button>
                   </div>
                 </div>

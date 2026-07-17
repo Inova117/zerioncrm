@@ -2,9 +2,7 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard,
   Radar,
-  Sparkles,
   KanbanSquare,
-  Building2,
   CheckSquare,
   BarChart3,
   Users,
@@ -24,11 +22,11 @@ interface NavItem {
 }
 
 const NAV: NavItem[] = [
+  // Sales Copilot no tiene tab propio: se abre desde el popup del prospecto
+  // (botón "Sales Copilot"). /empresas sigue viva por URL, pero fuera del menú.
   { to: '/', label: 'Panel', icon: LayoutDashboard },
   { to: '/lead-finder', label: 'Lead Finder', icon: Radar },
-  { to: '/copilot', label: 'Sales Copilot', icon: Sparkles },
   { to: '/leads', label: 'Prospectos', icon: KanbanSquare },
-  { to: '/empresas', label: 'Empresas', icon: Building2 },
   { to: '/tareas', label: 'Tareas', icon: CheckSquare },
   { to: '/reportes', label: 'Reportes', icon: BarChart3 },
   { to: '/equipo', label: 'Equipo', icon: Users, adminOnly: true },

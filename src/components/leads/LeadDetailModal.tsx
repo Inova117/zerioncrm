@@ -176,7 +176,7 @@ export function LeadDetailModal({
       {/* Quick contact actions — open the user's mail / phone / WhatsApp app. */}
       <div className="mb-4 flex flex-wrap gap-2">
         <Link to={`/copilot?lead=${lead.id}`} className="btn-primary" onClick={(e) => e.stopPropagation()}>
-          <Sparkles className="h-4 w-4" /> Llamar con Copilot
+          <Sparkles className="h-4 w-4" /> Sales Copilot
         </Link>
         {lead.email && (
           <a href={mailLink(lead.email)} className="btn-secondary" onClick={(e) => e.stopPropagation()}>
