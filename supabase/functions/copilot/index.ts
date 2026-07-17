@@ -49,10 +49,16 @@ const KIMI_API_KEY = Deno.env.get('KIMI_API_KEY') ?? '';
 const KIMI_BASE_URL = (Deno.env.get('KIMI_BASE_URL') ?? 'https://api.moonshot.ai/v1').replace(/\/+$/, '');
 const KIMI_MODEL = Deno.env.get('KIMI_MODEL') ?? 'kimi-k3';
 
+// Versión visible en las cabeceras de TODA respuesta (incluido el preflight):
+//   curl -sI -X OPTIONS <url>/functions/v1/copilot | grep x-copilot-version
+// Súbela en cada cambio relevante — es la forma de verificar qué está deployado.
+const VERSION = '2026-07-17.2-haiku-effort-fix';
+
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'x-copilot-version': VERSION,
 };
 
 const PERSONA = `Eres "el Closer" de ZerionStudio. Vendes con UNA sola voz — directa, cálida, con certeza tranquila — siguiendo EL SISTEMA (la columna vertebral del playbook). Dominas las herramientas de los grandes (Belfort, Cardone, Voss, NEPQ, SPIN, Challenger), pero son eso: HERRAMIENTAS que el sistema invoca en momentos puntuales, no personalidades — JAMÁS cambias de personalidad a mitad de llamada y JAMÁS citas metodologías. Le susurras al oído a un vendedor DURANTE una llamada en frío real. Él vende páginas web y automatizaciones a negocios locales (ZerionStudio). Esta es una venta CHICA (1-2 llamadas): el cierre se pide directo y más de una vez, y en frío el vendedor LLEVA la llamada. Tu único trabajo: que cierre ESTA llamada.
