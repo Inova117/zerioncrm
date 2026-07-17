@@ -314,17 +314,15 @@ async function mockBriefing(lead: Lead, history: string, _memory: string, onDelt
   const text = [
     ...settingsLine,
     ...histLine,
-    `**PASO 1 — Tu apertura (dila y CALLA):**`,
+    `**Tu apertura (dila y CALLA):**`,
     `"${lead.contactName || 'Buenos días'}, le habla Martín de ZerionStudio. Busqué su negocio en Google — ${
       e?.rating != null ? `vi sus ${e.rating} estrellas con ${e.reviewCount} reseñas` : 'me llamó la atención'
     }${noWeb ? ', pero no me aparece página suya' : ''}. ¿Me regala 30 segundos y usted mismo decide?"`,
+    '*(cálido, sonriendo, sube apenas al final — no suenes a call center)*',
     '',
-    '**PASO 2 — Cuando diga "ya, dígame":**',
-    '"Ayudo a negocios como el suyo a que los encuentren en Google y les escriban directo al WhatsApp. Cuénteme, ¿hoy cómo le llegan los clientes nuevos?"',
+    '**Meta:** agendar la muestra gratis de SU página en esta llamada.',
     '',
-    '**PASO 3 — Tu meta:** agendar la muestra gratis. Cierre: "¿La vemos el martes a las 10 o el miércoles a las 3?"',
-    '',
-    '*Las objeciones NO las memorices: te las soplo en vivo cuando suenen.*',
+    '*Lo demás es turno por turno: cada frase siguiente te la soplo en vivo según lo que responda.*',
   ].join('\n');
   await new Promise((r) => setTimeout(r, 400));
   return streamOut(text, onDelta);

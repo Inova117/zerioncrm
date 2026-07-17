@@ -28,7 +28,9 @@ type Phase = 'pick' | 'brief' | 'live' | 'wrap';
 // mínimo para no ametrallar el API cuando la conversación fluye normal.
 // Los momentos urgentes y las objeciones se saltan el colchón.
 const SUGGEST_GAP_MS = 5000;
-const URGENT_MOMENTS = ['senal-compra', 'peligro', 'gatekeeper', 'precio', 'cierre'];
+// 'pitch' es urgente: "ya, dígame" / "¿de qué se trata?" es TU turno — el
+// coach debe soplar el pitch al instante, no en el próximo ciclo.
+const URGENT_MOMENTS = ['senal-compra', 'peligro', 'gatekeeper', 'precio', 'cierre', 'pitch'];
 
 // Filtro de eco: si una línea del transcript comparte una ventana de N palabras
 // con la sugerencia actual, casi seguro es el VENDEDOR leyendo el consejo en
@@ -48,6 +50,10 @@ function sharesWindow(a: string, b: string, n = 5): boolean {
   }
   return false;
 }
+
+// La apertura sembrada en el panel del coach al empezar a escuchar.
+const openerSeed = (o: string): string =>
+  `🎯 **Tu apertura — dila y CALLA:**\n"${o}"\n\n*Cuando el prospecto responda, te soplo la siguiente jugada.*`;
 
 // Qué jugada toca según cuántas veces sonó la MISMA objeción (disciplina del Árbitro).
 function loopPlay(n: number): string {
@@ -133,6 +139,7 @@ export function CopilotPage() {
   const callStartRef = useRef(0);
   const memoryRef = useRef(''); // memoria del nicho (lecciones acumuladas)
   const openerRef = useRef(''); // la apertura del briefing (se siembra en vivo)
+  const wantOpenerSeedRef = useRef(false); // escucha activada antes de extraerla
 
   useEffect(() => {
     suggestionRef.current = suggestion;
@@ -195,6 +202,7 @@ export function CopilotPage() {
       const ctrl = new AbortController();
       suggestAbortRef.current = ctrl;
       lastSuggestRef.current = Date.now();
+      wantOpenerSeedRef.current = false; // el coach ya tomó el panel
       suggestingRef.current = true;
       setSuggesting(true);
       const t0 = Date.now();
@@ -383,7 +391,14 @@ export function CopilotPage() {
         setBriefing((s) => s + chunk);
         if (!openerRef.current) {
           const m = /"([^"\n]{40,320})"/.exec(acc);
-          if (m) openerRef.current = m[1]!;
+          if (m) {
+            openerRef.current = m[1]!;
+            // Si la escucha ya está activa (usuario rápido), siembra ahora.
+            if (wantOpenerSeedRef.current) {
+              wantOpenerSeedRef.current = false;
+              setSuggestion(openerSeed(openerRef.current));
+            }
+          }
         }
       });
     } catch (e) {
@@ -414,13 +429,16 @@ export function CopilotPage() {
     ticketRef.current = null;
     perdidosRef.current = null;
     callStartRef.current = Date.now();
-    lastSuggestRef.current = Date.now();
+    // lastSuggest en 0: la PRIMERA respuesta del prospecto siempre dispara al
+    // coach de una (tu lectura de la apertura no cuenta — la filtra el eco).
+    lastSuggestRef.current = 0;
     // La primera jugada YA está en pantalla: tu apertura. La dices, callas,
-    // y cuando el prospecto responda el coach sopla la siguiente.
+    // y cuando el prospecto responda el coach sopla la siguiente. Si el stream
+    // del briefing aún no llegó a la frase, se siembra apenas aparezca.
     if (openerRef.current) {
-      setSuggestion(
-        `🎯 **Tu apertura — dila y CALLA:**\n"${openerRef.current}"\n\n*Cuando el prospecto responda, te soplo la siguiente jugada.*`
-      );
+      setSuggestion(openerSeed(openerRef.current));
+    } else {
+      wantOpenerSeedRef.current = true;
     }
     copilotWarm(); // re-toque al cache por si el briefing tomó >5 min
     engine.start();
@@ -610,7 +628,7 @@ export function CopilotPage() {
                 <>
                   <div className="card flex min-h-0 flex-1 flex-col p-4">
                     <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-brand-500">
-                      <Sparkles className="h-3.5 w-3.5" /> Briefing pre-llamada
+                      <Sparkles className="h-3.5 w-3.5" /> Tu apertura
                     </p>
                     <div className="min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap pr-1 text-sm leading-relaxed text-surface-700">
                       {briefing || (briefLoading ? '' : 'Preparando…')}

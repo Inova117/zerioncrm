@@ -304,14 +304,14 @@ Deno.serve(async (req) => {
   // ---------------------------------------------------------------- briefing
   if (mode === 'briefing') {
     const sys = buildSystem(lead, playbook, history, settings, memory);
-    // Guion SECUENCIAL de turnos, no hoja de estudio: la llamada es yo hablo →
-    // él responde → yo hablo. Las objeciones NO van aquí (se soplan en vivo).
+    // SOLO la apertura: la llamada es turno por turno y cada frase siguiente
+    // la sopla el coach EN VIVO según lo que el prospecto responda de verdad.
     const userMsg =
-      'Prepárame el ARRANQUE de la llamada como guion SECUENCIAL de turnos (yo hablo → el prospecto responde → yo hablo). Formato EXACTO y compacto:\n\n**PASO 1 — Tu apertura (dila y CALLA):** la frase exacta entre comillas, personalizada con sus datos — 4 segundos: su nombre + un dato SUYO + micro-permiso.\n\n**PASO 2 — Cuando diga "ya, dígame" (o parecido):** el pitch de UNA frase sin tecnicismos + tu primera pregunta de descubrimiento, entre comillas.\n\n**PASO 3 — Tu meta:** qué cita vas a agendar y el cierre alternativo exacto entre comillas.\n\nNO listes objeciones ni respuestas a objeciones: esas me las soplas EN VIVO cuando suenen. Todo listo para decirse en voz alta.';
+      'Dame SOLO el arranque de la llamada. Formato EXACTO:\n\n**Tu apertura (dila y CALLA):**\nLA frase exacta entre comillas, personalizada con sus datos — su nombre + un dato SUYO + micro-permiso, decible en 8-10 segundos.\nUna nota de tonalidad en cursiva, de una sola línea.\n\n**Meta:** una línea — qué cita vas a agendar en esta llamada.\n\nNADA MÁS. Ni pasos siguientes, ni objeciones, ni el resto del guion: cada frase siguiente me la soplas EN VIVO según lo que el prospecto responda.';
 
     if (PROVIDER === 'kimi') {
       const upstream = await openaiFetch({
-        model: KIMI_MODEL, max_tokens: 700, stream: true, system: systemToText(sys), user: userMsg,
+        model: KIMI_MODEL, max_tokens: 300, stream: true, system: systemToText(sys), user: userMsg,
       });
       if (!upstream.ok || !upstream.body) {
         const detail = await upstream.text().catch(() => '');
@@ -324,7 +324,7 @@ Deno.serve(async (req) => {
 
     const upstream = await anthropicFetch({
       model: MODEL,
-      max_tokens: 700,
+      max_tokens: 300,
       stream: true,
       system: sys,
       output_config: { effort: 'low' },

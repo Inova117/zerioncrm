@@ -108,6 +108,8 @@ const MOM_CASES: MomCase[] = [
   ['se puede pagar en cuotas', 'precio'],
   ['y ustedes que hacen exactamente', 'pitch'],
   ['a ver expliqueme como funciona eso', 'pitch'],
+  ['ya pues digame de que se trata', 'pitch'],
+  ['ya digame rapidito que necesita', 'pitch'],
   ['puro boca a boca me llegan los clientes', 'descubrimiento'],
   ['el whatsapp lo contesto yo cuando puedo', 'descubrimiento'],
   ['quien habla', 'apertura'],

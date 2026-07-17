@@ -55,7 +55,7 @@ export const MOMENTS: MomentInfo[] = [
     label: 'Ya compró — CÁLLATE y agenda',
     emoji: '🤝',
     priority: 97,
-    cues: /cuando (empezamos|empezariamos|podriamos empezar|arrancamos)|como le pago|como seria el pago|que necesitan? de mi|mandeme los datos|para el deposito|hagamoslo|hagamos eso|de una,? pues|dale pues|ya pues|listo,? (hagamos|mandame|de una)|(?<!no )(?<!no le )me interesa|esta bien,? (hagamos|mandame|veamos)|de acuerdo|me parece bien|ahi nos vemos|venga y conversamos|el (lunes|martes|miercoles|jueves|viernes|sabado) (si )?puedo|mi pagina|cuando tenga la pagina/,
+    cues: /cuando (empezamos|empezariamos|podriamos empezar|arrancamos)|como le pago|como seria el pago|que necesitan? de mi|mandeme los datos|para el deposito|hagamoslo|hagamos eso|de una,? pues|dale pues|ya,? pues(?!,? ?(digame|cuenteme|hable))|listo,? (hagamos|mandame|de una)|(?<!no )(?<!no le )me interesa|esta bien,? (hagamos|mandame|veamos)|de acuerdo|me parece bien|ahi nos vemos|venga y conversamos|el (lunes|martes|miercoles|jueves|viernes|sabado) (si )?puedo|mi pagina|cuando tenga la pagina/,
     bestMove:
       'YA COMPRÓ mentalmente: cada palabra de venta extra solo puede reabrir dudas. Confirma TODO en una frase y corta en menos de 60 segundos: "Perfecto, entonces lo dejamos así: nos vemos el jueves a las 3 y arrancamos. Le mando el detalle por WhatsApp ahorita, ¿a este número?" Único agregado permitido — y SOLO si el sí es al PROYECTO (anticipo), no a la cita de la muestra: el second money ("la mayoría agrega el mantenimiento con WhatsApp automático, ¿se lo dejo incluido?"). NUNCA menciones otro plan, otra feature ni vuelvas a tocar el precio.',
   },
@@ -100,7 +100,7 @@ export const MOMENTS: MomentInfo[] = [
     label: 'Pidió el pitch',
     emoji: '🎯',
     priority: 60,
-    cues: /que (es lo que )?hacen (ustedes)?|y ustedes que hacen|como funciona( eso)?|como trabajan|explique(me)?|a ver,? expliqueme|que me ofrece|que ofrece exactamente|para que me sirve( eso)?|eso de las paginas como es|que harian con mi negocio|de que se trata/,
+    cues: /que (es lo que )?hacen (ustedes)?|y ustedes que hacen|como funciona( eso)?|como trabajan|explique(me)?|a ver,? expliqueme|que me ofrece|que ofrece exactamente|para que me sirve( eso)?|eso de las paginas como es|que harian con mi negocio|de que se trata|ya,? (pues,? )?digame|a ver,? digame|cuenteme( rapidito| pues)?|tiene un minuto,? hable/,
     bestMove:
       'Pitch de 20 segundos, anclado al dolor que ÉL ya dijo, CERO tecnicismos, y remata con pregunta: "Es simple: le hacemos una página donde lo encuentran en Google, ven sus [servicios/menú] y le escriben directo a su WhatsApp. Usted no toca nada, nosotros hacemos todo. ¿Le cuadra para su negocio?" PROHIBIDO: listar features técnicos, dar precio antes de mostrar valor, hablar mal de la competencia.',
   },
