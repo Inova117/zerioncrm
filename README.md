@@ -144,7 +144,13 @@ vive en `services/mappers.ts`.
      ```bash
      supabase functions deploy copilot
      supabase secrets set ANTHROPIC_API_KEY=sk-ant-xxxxx
-     # opcional, más barato/rápido: supabase secrets set COPILOT_MODEL=claude-haiku-4-5
+     # Modelos: briefing/resumen usan COPILOT_MODEL (default claude-opus-4-8).
+     # Las sugerencias EN VIVO usan COPILOT_MODEL_SUGGEST (default claude-haiku-4-5:
+     # TTFT ~0.9s vs ~2s de Opus y 5x más barato — el conocimiento vive en el
+     # playbook cacheado, así que el modelo chico rinde casi igual en vivo).
+     # supabase secrets set COPILOT_MODEL_SUGGEST=claude-opus-4-8   # para volver a Opus en vivo
+     # Proveedor alterno (A/B testing, ej. Kimi K3 de Moonshot — OpenAI-compatible):
+     # supabase secrets set COPILOT_PROVIDER=kimi KIMI_API_KEY=sk-... KIMI_MODEL=kimi-k3
      ```
    - **Transcripción premium (opcional, recomendada para llamadas):** despliega la
      función de token y dale tu master key de Deepgram. La app pide un **token temporal**
@@ -171,9 +177,20 @@ vive en `services/mappers.ts`.
    - **Detector de momentos en tiempo real** (regex, sin LLM): gatekeeper, apertura,
      descubrimiento, pitch, objeción, precio, señal de compra, peligro de colgar, cierre
      y despedida — con chip en vivo en la UI y coach instantáneo en los momentos urgentes.
+   - **NEPQ (Jeremy Miner)**: el registro neutro-curioso para abrir puertas cerradas —
+     desapego, disarming, preguntas de consecuencia — con la regla de cuándo cambiar a
+     la certeza Belfort/Cardone.
    - **25 battlecards** con triggers del habla real latina ("mi sobrino me la hace",
      "mándame la info", "¿me garantiza salir primero en Google?", el fiado, el plantón…)
      que saltan al instante sin esperar al LLM.
+   - **Reacción en tiempo real (arquitectura tipo Cluely)**: la detección corre sobre la
+     transcripción PARCIAL (~300ms tras hablar, sin esperar la frase final), la capa
+     local pinta battlecard + momento + jugada instantánea en <100ms, y el LLM refina
+     encima en streaming con "frase primero" (línea 1 = la frase decible). Cada consejo
+     nuevo aborta al anterior en vuelo (siempre gana el más fresco), y el coach responde
+     tras cada frase del prospecto (no cada 15s). Deepgram va tuneado para latencia:
+     nova-3 español, sin smart_format (retenía finales hasta 3s), endpointing 300ms,
+     PCM linear16 vía AudioWorklet en buffers de ~50ms y KeepAlive.
    - **Postventa**: la reunión de la muestra (3 pantallas, ancla de precios, el anticipo
      se cobra EN la reunión), el tramo del sí al depósito y el anti-ghosting (regla 3-10,
      reactivación a 90 días).

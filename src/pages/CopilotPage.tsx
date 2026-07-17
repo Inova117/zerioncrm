@@ -20,7 +20,11 @@ import { cn, colorFromString, initials, telLink, waLink, webLink, googleMapsUrl,
 import { stageLabel } from '../lib/constants';
 
 type Phase = 'pick' | 'brief' | 'live' | 'wrap';
-const AUTO_SUGGEST_MS = 15000; // coach espontáneo cada ~15s si hay transcript nuevo
+// Coach reactivo: responde tras CADA frase final del prospecto, con un colchón
+// mínimo para no ametrallar el API cuando la conversación fluye normal.
+// Los momentos urgentes y las objeciones se saltan el colchón.
+const SUGGEST_GAP_MS = 5000;
+const URGENT_MOMENTS = ['senal-compra', 'peligro', 'gatekeeper', 'precio', 'cierre'];
 
 /** Condensa el historial del prospecto (comentarios/llamadas) para el coach. */
 function buildHistory(
@@ -70,7 +74,10 @@ export function CopilotPage() {
   const transcriptRef = useRef('');
   const historyRef = useRef('');
   const momentRef = useRef<MomentInfo | null>(null);
+  const cardIdRef = useRef<string | null>(null);
   const lastSuggestRef = useRef(0);
+  const suggestAbortRef = useRef<AbortController | null>(null);
+  const suggestingRef = useRef(false);
   const linesEndRef = useRef<HTMLDivElement | null>(null);
 
   const myLeads = useMemo(() => {
@@ -92,12 +99,19 @@ export function CopilotPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params, leads]);
 
-  // --- Coach (streaming) -----------------------------------------------------
+  // --- Coach (streaming, con supersede) ---------------------------------------
+  // Cada suggest nuevo ABORTA al anterior en vuelo: siempre gana el consejo más
+  // fresco. Y no blanqueamos el panel: la jugada anterior (o la instantánea)
+  // queda visible hasta que llega el primer token del refinamiento.
   const runSuggest = useCallback(
     async (l: Lead, trigger?: string) => {
+      suggestAbortRef.current?.abort();
+      const ctrl = new AbortController();
+      suggestAbortRef.current = ctrl;
       lastSuggestRef.current = Date.now();
+      suggestingRef.current = true;
       setSuggesting(true);
-      setSuggestion('');
+      let acc = '';
       try {
         await copilotSuggest(
           {
@@ -107,12 +121,22 @@ export function CopilotPage() {
             history: historyRef.current,
             moment: momentRef.current ? `${momentRef.current.label}: ${momentRef.current.bestMove}` : undefined,
           },
-          (chunk) => setSuggestion((s) => s + chunk)
+          (chunk) => {
+            if (ctrl.signal.aborted) return;
+            acc += chunk;
+            setSuggestion(acc);
+          },
+          ctrl.signal
         );
       } catch (e) {
-        setSuggestion(`⚠️ ${e instanceof Error ? e.message : 'Coach no disponible'}`);
+        if (!ctrl.signal.aborted) {
+          setSuggestion(`⚠️ ${e instanceof Error ? e.message : 'Coach no disponible'}`);
+        }
       } finally {
-        setSuggesting(false);
+        if (suggestAbortRef.current === ctrl) {
+          suggestingRef.current = false;
+          setSuggesting(false);
+        }
       }
     },
     []
@@ -125,6 +149,7 @@ export function CopilotPage() {
       setLines((prev) => [...prev, text]);
 
       // 1) ¿En qué momento de la llamada estamos? (regex, instantáneo)
+      const prevMomentId = momentRef.current?.id;
       const m = detectMoment(text);
       if (m) {
         momentRef.current = m;
@@ -133,24 +158,52 @@ export function CopilotPage() {
 
       // 2) Battlecard de objeción (respuesta lista sin esperar al LLM)
       const hit = detectObjection(text);
-      if (hit) setCard(hit);
+      if (hit) {
+        cardIdRef.current = hit.id;
+        setCard(hit);
+      }
 
-      // 3) ¿Cuándo llamar al coach? Objeción y momentos urgentes → YA;
-      //    si no, coach espontáneo cada AUTO_SUGGEST_MS.
-      const urgent = m && ['senal-compra', 'peligro', 'gatekeeper', 'precio', 'cierre'].includes(m.id);
+      // 3) Jugada instantánea: si entramos a un momento urgente NUEVO, la mejor
+      //    jugada de ese momento aparece YA (0ms); el LLM la refina encima.
+      const urgent = m && URGENT_MOMENTS.includes(m.id);
+      if (urgent && m.id !== prevMomentId && !suggestingRef.current) {
+        setSuggestion(`⚡ **${m.label}** — ${m.bestMove}`);
+      }
+
+      // 4) Coach LLM: objeción o momento urgente → YA (supersede al anterior);
+      //    si no, reactivo tras cada frase con colchón de SUGGEST_GAP_MS.
       if (lead && (hit || urgent)) {
         runSuggest(lead, text);
-      } else if (lead && Date.now() - lastSuggestRef.current > AUTO_SUGGEST_MS) {
+      } else if (lead && Date.now() - lastSuggestRef.current > SUGGEST_GAP_MS) {
         runSuggest(lead);
       }
     },
     [lead, runSuggest]
   );
 
+  // Cada resultado PARCIAL (~300ms tras hablar): detección instantánea local.
+  // El texto es inestable → jamás se manda al LLM ni al transcript; pero la
+  // battlecard, el chip de momento y la jugada instantánea saltan de una.
+  const onInterim = useCallback((text: string) => {
+    const hit = detectObjection(text);
+    if (hit && hit.id !== cardIdRef.current) {
+      cardIdRef.current = hit.id;
+      setCard(hit);
+    }
+    const m = detectMoment(text);
+    if (m && m.id !== momentRef.current?.id) {
+      momentRef.current = m;
+      setMoment(m);
+      if (!suggestingRef.current) {
+        setSuggestion(`⚡ **${m.label}** — ${m.bestMove}`);
+      }
+    }
+  }, []);
+
   // Dos motores de transcripción; misma interfaz. Deepgram (premium) si está
   // configurado y disponible; si no, Web Speech del navegador (gratis).
-  const dg = useDeepgram({ lang: 'es-EC', onFinal });
-  const ws = useSpeech({ lang: 'es-EC', onFinal });
+  const dg = useDeepgram({ lang: 'es-EC', onFinal, onInterim });
+  const ws = useSpeech({ lang: 'es-EC', onFinal, onInterim });
   const [engineName, setEngineName] = useState<'deepgram' | 'web'>('web');
   const engine = engineName === 'deepgram' ? dg : ws;
 
@@ -207,6 +260,7 @@ export function CopilotPage() {
     setCard(null);
     setMoment(null);
     momentRef.current = null;
+    cardIdRef.current = null;
     transcriptRef.current = '';
     lastSuggestRef.current = Date.now();
     engine.start();
@@ -215,6 +269,7 @@ export function CopilotPage() {
   async function hangUp() {
     dg.stop();
     ws.stop();
+    suggestAbortRef.current?.abort();
     setPhase('wrap');
     if (!lead) return;
     setSummarizing(true);
@@ -253,6 +308,7 @@ export function CopilotPage() {
   function reset() {
     dg.stop();
     ws.stop();
+    suggestAbortRef.current?.abort();
     degradedRef.current = false;
     setPhase('pick');
     setLead(null);
@@ -262,6 +318,7 @@ export function CopilotPage() {
     setCard(null);
     setMoment(null);
     momentRef.current = null;
+    cardIdRef.current = null;
     setSummary(null);
     setSaved(false);
     setError(null);

@@ -57,7 +57,8 @@ const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
 async function callFn(
   body: Record<string, unknown>,
-  onDelta?: (text: string) => void
+  onDelta?: (text: string) => void,
+  signal?: AbortSignal
 ): Promise<string> {
   const { data: sess } = await supabase!.auth.getSession();
   const token = sess.session?.access_token;
@@ -71,6 +72,7 @@ async function callFn(
       apikey: ANON_KEY,
     },
     body: JSON.stringify(body),
+    signal,
   });
 
   if (!res.ok) {
@@ -99,7 +101,7 @@ const supaBriefing = (lead: Lead, history: string, onDelta?: (t: string) => void
     onDelta
   );
 
-const supaSuggest = (args: SuggestArgs, onDelta: (t: string) => void) =>
+const supaSuggest = (args: SuggestArgs, onDelta: (t: string) => void, signal?: AbortSignal) =>
   callFn(
     {
       mode: 'suggest',
@@ -111,7 +113,8 @@ const supaSuggest = (args: SuggestArgs, onDelta: (t: string) => void) =>
       moment: args.moment ?? '',
       settings: settingsForPrompt(),
     },
-    onDelta
+    onDelta,
+    signal
   );
 
 async function supaSummary(lead: Lead, transcript: string): Promise<CallSummary> {
@@ -171,7 +174,7 @@ async function mockBriefing(lead: Lead, history: string, onDelta?: (t: string) =
   return streamOut(text, onDelta);
 }
 
-async function mockSuggest(args: SuggestArgs, onDelta: (t: string) => void): Promise<string> {
+async function mockSuggest(args: SuggestArgs, onDelta: (t: string) => void, _signal?: AbortSignal): Promise<string> {
   const card = args.trigger ? detectObjection(args.trigger) : detectObjection(args.transcript.slice(-300));
   let text: string;
   if (card) {
@@ -211,7 +214,10 @@ async function mockSummary(lead: Lead, transcript: string): Promise<CallSummary>
 // ===========================================================================
 export const copilotBriefing: (lead: Lead, history: string, onDelta?: (t: string) => void) => Promise<string> =
   supabase ? supaBriefing : mockBriefing;
-export const copilotSuggest: (args: SuggestArgs, onDelta: (t: string) => void) => Promise<string> =
-  supabase ? supaSuggest : mockSuggest;
+export const copilotSuggest: (
+  args: SuggestArgs,
+  onDelta: (t: string) => void,
+  signal?: AbortSignal
+) => Promise<string> = supabase ? supaSuggest : mockSuggest;
 export const copilotSummary: (lead: Lead, transcript: string) => Promise<CallSummary> =
   supabase ? supaSummary : mockSummary;

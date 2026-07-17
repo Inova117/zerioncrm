@@ -26,6 +26,7 @@ export { PRINCIPLES, ARBITRO } from './playbook/metodologias';
 export { OPENERS } from './playbook/apertura';
 export { CLOSES } from './playbook/cierres';
 export { POSTVENTA } from './playbook/postventa';
+export { NEPQ } from './playbook/nepq';
 export { BATTLECARDS, type Battlecard } from './playbook/battlecards';
 export { normalizeSpeech } from './playbook/normalize';
 export {
@@ -40,6 +41,7 @@ import { PRINCIPLES, ARBITRO } from './playbook/metodologias';
 import { OPENERS } from './playbook/apertura';
 import { CLOSES } from './playbook/cierres';
 import { POSTVENTA } from './playbook/postventa';
+import { NEPQ } from './playbook/nepq';
 import { BATTLECARDS, type Battlecard } from './playbook/battlecards';
 import { normalizeSpeech } from './playbook/normalize';
 import { momentsForPrompt } from './playbook/momentos';
@@ -66,6 +68,7 @@ export function playbookForPrompt(): string {
   return [
     ARBITRO,
     PRINCIPLES,
+    NEPQ,
     OPENERS,
     CLOSES,
     POSTVENTA,

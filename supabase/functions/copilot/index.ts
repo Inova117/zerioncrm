@@ -28,6 +28,23 @@ const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY') ?? '';
 // Opus 4.8 por defecto (calidad máxima de venta). Cambiable sin redeploy:
 //   supabase secrets set COPILOT_MODEL=claude-haiku-4-5   (más barato/rápido)
 const MODEL = Deno.env.get('COPILOT_MODEL') ?? 'claude-opus-4-8';
+// Modelo SOLO para las sugerencias en vivo (lo más sensible a latencia).
+// Default: Haiku 4.5 — TTFT ~0.9s vs ~2s de Opus y 5x más barato; el
+// conocimiento vive en el playbook (15k tokens cacheados), así que la tarea
+// en vivo es clasificar+seleccionar+reformular, justo donde el modelo chico
+// rinde casi igual. Para volver a Opus en vivo:
+//   supabase secrets set COPILOT_MODEL_SUGGEST=claude-opus-4-8
+const MODEL_SUGGEST = Deno.env.get('COPILOT_MODEL_SUGGEST') ?? 'claude-haiku-4-5';
+
+// Proveedor alterno OpenAI-compatible (Kimi/Moonshot u otro) para comparar
+// costo/latencia sin tocar código:
+//   supabase secrets set COPILOT_PROVIDER=kimi
+//   supabase secrets set KIMI_API_KEY=sk-...
+//   supabase secrets set KIMI_MODEL=<id real del modelo, p.ej. kimi-k3>
+const PROVIDER = (Deno.env.get('COPILOT_PROVIDER') ?? 'anthropic').toLowerCase();
+const KIMI_API_KEY = Deno.env.get('KIMI_API_KEY') ?? '';
+const KIMI_BASE_URL = (Deno.env.get('KIMI_BASE_URL') ?? 'https://api.moonshot.ai/v1').replace(/\/+$/, '');
+const KIMI_MODEL = Deno.env.get('KIMI_MODEL') ?? 'kimi-k3';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -35,7 +52,7 @@ const CORS = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-const PERSONA = `Eres "el Closer": la fusión de Jordan Belfort (Línea Recta, tonalidad, looping), Grant Cardone (acordar siempre, cierres, precio), Chris Voss (labels, preguntas calibradas, empatía táctica) y SPIN/Challenger — pero NO citas metodologías: HABLAS como el mejor vendedor que existe. Le susurras al oído a un vendedor DURANTE una llamada en frío real. Él vende páginas web y automatizaciones a negocios locales (ZerionStudio). Tu único trabajo: que cierre ESTA llamada.
+const PERSONA = `Eres "el Closer": la fusión de Jordan Belfort (Línea Recta, tonalidad, looping), Grant Cardone (acordar siempre, cierres, precio), Chris Voss (labels, preguntas calibradas, empatía táctica), Jeremy Miner/NEPQ (neutralidad curiosa, desapego, preguntas de consecuencia) y SPIN/Challenger — pero NO citas metodologías: HABLAS como el mejor vendedor que existe. Le susurras al oído a un vendedor DURANTE una llamada en frío real. Él vende páginas web y automatizaciones a negocios locales (ZerionStudio). Tu único trabajo: que cierre ESTA llamada.
 
 CÓMO PIENSAS (proceso interno — jamás lo expliques en la respuesta):
 1. Detecta el MOMENTO de la llamada: gatekeeper, apertura, descubrimiento, pitch, objeción, precio, señal de compra, peligro de colgar, cierre. El cliente puede mandarte su detección: confírmala o corrígela leyendo la transcripción.
@@ -117,6 +134,72 @@ function sseToTextStream(upstream: ReadableStream<Uint8Array>): ReadableStream<U
   );
 }
 
+// --- Proveedor OpenAI-compatible (Kimi/Moonshot u otro) ---------------------
+interface OpenAIRequest {
+  model: string;
+  max_tokens: number;
+  stream?: boolean;
+  system: string;
+  user: string;
+  json?: boolean;
+}
+
+async function openaiFetch(req: OpenAIRequest): Promise<Response> {
+  return await fetch(`${KIMI_BASE_URL}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${KIMI_API_KEY}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: req.model,
+      max_tokens: req.max_tokens,
+      stream: req.stream ?? false,
+      temperature: 0.6,
+      ...(req.json ? { response_format: { type: 'json_object' } } : {}),
+      messages: [
+        { role: 'system', content: req.system },
+        { role: 'user', content: req.user },
+      ],
+    }),
+  });
+}
+
+/** Convierte el SSE OpenAI-compatible en un stream de texto plano. */
+function oaiSseToTextStream(upstream: ReadableStream<Uint8Array>): ReadableStream<Uint8Array> {
+  const decoder = new TextDecoder();
+  const encoder = new TextEncoder();
+  let buffer = '';
+  return upstream.pipeThrough(
+    new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, controller) {
+        buffer += decoder.decode(chunk, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const payload = line.slice(6).trim();
+          if (!payload || payload === '[DONE]') continue;
+          try {
+            const evt = JSON.parse(payload) as {
+              choices?: Array<{ delta?: { content?: string } }>;
+            };
+            const text = evt.choices?.[0]?.delta?.content;
+            if (text) controller.enqueue(encoder.encode(text));
+          } catch {
+            /* línea parcial: ignorar */
+          }
+        }
+      },
+    })
+  );
+}
+
+/** El system multi-bloque de Anthropic como texto único (para OpenAI-compat). */
+function systemToText(blocks: Array<{ text: string }>): string {
+  return blocks.map((b) => b.text).join('\n\n');
+}
+
 // Caching en dos bloques: el bloque estático (persona + playbook, idéntico en
 // TODAS las llamadas de todos los leads) lleva cache_control y se paga una vez
 // (~0.1x el input después del primer hit, y menos latencia). El bloque dinámico
@@ -162,7 +245,9 @@ Deno.serve(async (req) => {
     .maybeSingle();
   if (!caller || caller.active === false) return json({ error: 'Cuenta inactiva' }, 403);
 
-  if (!ANTHROPIC_API_KEY) {
+  if (PROVIDER === 'kimi') {
+    if (!KIMI_API_KEY) return json({ error: 'KIMI_API_KEY no configurada (COPILOT_PROVIDER=kimi requiere supabase secrets set KIMI_API_KEY=...)' }, 500);
+  } else if (!ANTHROPIC_API_KEY) {
     return json({ error: 'ANTHROPIC_API_KEY no configurada (supabase secrets set ANTHROPIC_API_KEY=...)' }, 500);
   }
 
@@ -178,19 +263,30 @@ Deno.serve(async (req) => {
 
   // ---------------------------------------------------------------- briefing
   if (mode === 'briefing') {
+    const sys = buildSystem(lead, playbook, history, settings);
+    const userMsg =
+      'Prepárame para llamar AHORA a este prospecto. Dame: (1) el ángulo de apertura exacto entre comillas, personalizado con sus datos; (2) las 3 objeciones más probables de ESTE negocio con la respuesta de una línea para cada una; (3) la meta concreta de la llamada y el cierre a usar. Directo y en formato compacto con **negritas**.';
+
+    if (PROVIDER === 'kimi') {
+      const upstream = await openaiFetch({
+        model: KIMI_MODEL, max_tokens: 700, stream: true, system: systemToText(sys), user: userMsg,
+      });
+      if (!upstream.ok || !upstream.body) {
+        const detail = await upstream.text().catch(() => '');
+        return json({ error: `Kimi respondió ${upstream.status}`, detail: detail.slice(0, 300) }, 502);
+      }
+      return new Response(oaiSseToTextStream(upstream.body), {
+        headers: { 'Content-Type': 'text/plain; charset=utf-8', ...CORS },
+      });
+    }
+
     const upstream = await anthropicFetch({
       model: MODEL,
       max_tokens: 700,
       stream: true,
-      system: buildSystem(lead, playbook, history, settings),
+      system: sys,
       output_config: { effort: 'low' },
-      messages: [
-        {
-          role: 'user',
-          content:
-            'Prepárame para llamar AHORA a este prospecto. Dame: (1) el ángulo de apertura exacto entre comillas, personalizado con sus datos; (2) las 3 objeciones más probables de ESTE negocio con la respuesta de una línea para cada una; (3) la meta concreta de la llamada y el cierre a usar. Directo y en formato compacto con **negritas**.',
-        },
-      ],
+      messages: [{ role: 'user', content: userMsg }],
     });
     if (!upstream.ok || !upstream.body) {
       const detail = await upstream.text().catch(() => '');
@@ -209,18 +305,31 @@ Deno.serve(async (req) => {
     const momentLine = moment
       ? `MOMENTO DETECTADO (confírmalo o corrígelo con la transcripción): ${moment}\n\n`
       : '';
+    // "Frase primero": con streaming, el vendedor tiene la frase decible en
+    // TTFT+~200ms y el porqué llega mientras ya la está usando.
+    const userMsg = `${momentLine}TRANSCRIPCIÓN RECIENTE DE LA LLAMADA (mic en altavoz, ambas voces mezcladas):\n"""\n${transcript || '(la llamada acaba de empezar)'}\n"""\n\n${ask}\n\nFORMATO OBLIGATORIO: línea 1 = SOLO la frase exacta para decir en voz alta (máx 15 palabras), en **negrita**. Línea 2 (opcional) = una sola oración en cursiva con la tonalidad o el porqué.`;
+    const sys = buildSystem(lead, playbook, history, settings);
+
+    if (PROVIDER === 'kimi') {
+      const upstream = await openaiFetch({
+        model: KIMI_MODEL, max_tokens: 150, stream: true, system: systemToText(sys), user: userMsg,
+      });
+      if (!upstream.ok || !upstream.body) {
+        const detail = await upstream.text().catch(() => '');
+        return json({ error: `Kimi respondió ${upstream.status}`, detail: detail.slice(0, 300) }, 502);
+      }
+      return new Response(oaiSseToTextStream(upstream.body), {
+        headers: { 'Content-Type': 'text/plain; charset=utf-8', ...CORS },
+      });
+    }
+
     const upstream = await anthropicFetch({
-      model: MODEL,
-      max_tokens: 300,
+      model: MODEL_SUGGEST,
+      max_tokens: 150,
       stream: true,
-      system: buildSystem(lead, playbook, history, settings),
+      system: sys,
       output_config: { effort: 'low' },
-      messages: [
-        {
-          role: 'user',
-          content: `${momentLine}TRANSCRIPCIÓN RECIENTE DE LA LLAMADA (mic en altavoz, ambas voces mezcladas):\n"""\n${transcript || '(la llamada acaba de empezar)'}\n"""\n\n${ask}`,
-        },
-      ],
+      messages: [{ role: 'user', content: userMsg }],
     });
     if (!upstream.ok || !upstream.body) {
       const detail = await upstream.text().catch(() => '');
@@ -233,6 +342,24 @@ Deno.serve(async (req) => {
 
   // ----------------------------------------------------------------- summary
   if (mode === 'summary') {
+    if (PROVIDER === 'kimi') {
+      const res = await openaiFetch({
+        model: KIMI_MODEL,
+        max_tokens: 700,
+        json: true,
+        system:
+          'Eres un analista de ventas. Resumes llamadas de prospección en frío para un CRM, en español, con criterio comercial. Devuelve SOLO un objeto JSON con exactamente estas claves: "summary" (string, 3-5 frases), "temperature" (uno de: nuevo, frio, tibio, caliente, reunion, perdido) y "nextAction" (string, la próxima acción concreta con cuándo).',
+        user: `FICHA DEL PROSPECTO:\n${lead}\n\nTRANSCRIPCIÓN COMPLETA DE LA LLAMADA:\n"""\n${transcript || '(sin transcripción)'}\n"""\n\nAnaliza la llamada y devuelve el JSON.`,
+      });
+      if (!res.ok) {
+        const detail = await res.text().catch(() => '');
+        return json({ error: `Kimi respondió ${res.status}`, detail: detail.slice(0, 300) }, 502);
+      }
+      const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
+      const text = data.choices?.[0]?.message?.content ?? '{}';
+      return new Response(text, { headers: { 'Content-Type': 'application/json', ...CORS } });
+    }
+
     const res = await anthropicFetch({
       model: MODEL,
       max_tokens: 700,

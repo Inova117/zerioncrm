@@ -36,9 +36,12 @@ export interface UseSpeechOptions {
   lang?: string; // 'es-EC', 'es-MX', 'es-ES', 'en-US'…
   /** Llamado con cada frase FINAL transcrita. */
   onFinal: (text: string) => void;
+  /** Llamado con cada resultado PARCIAL (texto inestable, llega ~300ms tras hablar).
+   *  Úsalo solo para detección instantánea local — nunca para el LLM. */
+  onInterim?: (text: string) => void;
 }
 
-export function useSpeech({ lang = 'es-EC', onFinal }: UseSpeechOptions) {
+export function useSpeech({ lang = 'es-EC', onFinal, onInterim }: UseSpeechOptions) {
   const [supported] = useState(() => getRecognitionCtor() !== null);
   const [listening, setListening] = useState(false);
   const [interim, setInterim] = useState('');
@@ -46,6 +49,8 @@ export function useSpeech({ lang = 'es-EC', onFinal }: UseSpeechOptions) {
   const activeRef = useRef(false);
   const onFinalRef = useRef(onFinal);
   onFinalRef.current = onFinal;
+  const onInterimRef = useRef(onInterim);
+  onInterimRef.current = onInterim;
 
   const start = useCallback(() => {
     const Ctor = getRecognitionCtor();
@@ -66,7 +71,9 @@ export function useSpeech({ lang = 'es-EC', onFinal }: UseSpeechOptions) {
         if (r.isFinal) onFinalRef.current(text);
         else interimText += ` ${text}`;
       }
-      setInterim(interimText.trim());
+      const it = interimText.trim();
+      setInterim(it);
+      if (it) onInterimRef.current?.(it);
     };
 
     // El motor corta sesiones largas / silencios: re-arrancamos mientras activo.

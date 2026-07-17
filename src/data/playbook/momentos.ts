@@ -118,9 +118,9 @@ export const MOMENTS: MomentInfo[] = [
     label: 'Apertura',
     emoji: '📞',
     priority: 35,
-    cues: /^alo\b|quien habla|con quien tengo el gusto|que desea|que se le ofrece|como consiguio mi numero|quien le dio mi numero|es una venta|digame\b|si,? diga/,
+    cues: /^alo\b|hola,? buen(a|o)s|buenos dias|buenas tardes|quien habla|con quien (hablo|tengo el gusto)|que desea|que se le ofrece|como consiguio mi numero|quien le dio mi numero|es una venta|digame\b|si,? diga|si,? con el( mismo)?\b|con el mismo|el habla|ella habla|mucho gusto|para servirle/,
     bestMove:
-      'Primeros 4 segundos: nombre de pila + empresa + un dato específico de SU negocio + micro-permiso, en menos de 10 segundos: "Don [nombre], le habla Martín de ZerionStudio. Busqué su negocio en Google y no me aparece — ¿me regala 30 segundos y usted mismo decide?" Si pregunta "¿es una venta?": "Es una llamada de negocio: creo que está perdiendo clientes en Google y se lo puedo mostrar en 30 segundos." Energía arriba, cero "disculpe la molestia".',
+      'Primeros 4 segundos: nombre de pila + empresa + un dato específico de SU negocio + micro-permiso, en menos de 10 segundos: "Don [nombre], le habla Martín de ZerionStudio. Busqué su negocio en Google y no me aparece — ¿me regala 30 segundos y usted mismo decide?" Si confirma que es el dueño ("sí, con él") → es tu ventana de oro: lanza la apertura YA, sin relleno. Si pregunta "¿es una venta?": "Es una llamada de negocio: creo que está perdiendo clientes en Google y se lo puedo mostrar en 30 segundos." Energía arriba, cero "disculpe la molestia".',
   },
   {
     id: 'despedida',
