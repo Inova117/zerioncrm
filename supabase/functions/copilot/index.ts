@@ -51,6 +51,7 @@ interface CopilotBody {
   playbook?: string;
   transcript?: string;
   trigger?: string;
+  history?: string;
 }
 
 // --- Llamada a Anthropic (raw HTTP; streaming SSE → texto plano) ------------
@@ -112,11 +113,14 @@ function sseToTextStream(upstream: ReadableStream<Uint8Array>): ReadableStream<U
 // Opus 4.8 el prefijo mínimo cacheable es ~4096 tokens; si el playbook aún es
 // más corto simplemente no cachea (sin error). Cuando crezca (Fase 2), las
 // sugerencias de una misma llamada pagarán ~0.1x el input.
-function buildSystem(lead: string, playbook: string) {
+function buildSystem(lead: string, playbook: string, history: string) {
+  const hist = history.trim()
+    ? `\n\n# HISTORIAL CON ESTE PROSPECTO (ya lo conoces — NO arranques de cero, referencia lo previo)\n${history.trim()}`
+    : '';
   return [
     {
       type: 'text' as const,
-      text: `${PERSONA}\n\n# PLAYBOOK DE VENTAS\n${playbook}\n\n# FICHA DEL PROSPECTO (úsala: personaliza con SUS datos)\n${lead}`,
+      text: `${PERSONA}\n\n# PLAYBOOK DE VENTAS\n${playbook}\n\n# FICHA DEL PROSPECTO (úsala: personaliza con SUS datos)\n${lead}${hist}`,
       cache_control: { type: 'ephemeral' as const },
     },
   ];
@@ -151,6 +155,7 @@ Deno.serve(async (req) => {
   const playbook = (body.playbook ?? '').slice(0, 40000);
   const transcript = (body.transcript ?? '').slice(-6000);
   const trigger = (body.trigger ?? '').slice(0, 500);
+  const history = (body.history ?? '').slice(0, 4000);
 
   // ---------------------------------------------------------------- briefing
   if (mode === 'briefing') {
@@ -158,7 +163,7 @@ Deno.serve(async (req) => {
       model: MODEL,
       max_tokens: 700,
       stream: true,
-      system: buildSystem(lead, playbook),
+      system: buildSystem(lead, playbook, history),
       output_config: { effort: 'low' },
       messages: [
         {
@@ -186,7 +191,7 @@ Deno.serve(async (req) => {
       model: MODEL,
       max_tokens: 300,
       stream: true,
-      system: buildSystem(lead, playbook),
+      system: buildSystem(lead, playbook, history),
       output_config: { effort: 'low' },
       messages: [
         {

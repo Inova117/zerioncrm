@@ -19,6 +19,8 @@ export interface SuggestArgs {
   transcript: string;
   /** Contexto del disparo: objeción detectada o pedido manual. */
   trigger?: string;
+  /** Historial con el prospecto (llamadas/comentarios previos). */
+  history?: string;
 }
 
 export interface CallSummary {
@@ -88,9 +90,9 @@ async function callFn(
   return full;
 }
 
-const supaBriefing = (lead: Lead, onDelta?: (t: string) => void) =>
+const supaBriefing = (lead: Lead, history: string, onDelta?: (t: string) => void) =>
   callFn(
-    { mode: 'briefing', lead: leadBrief(lead), playbook: playbookForPrompt() },
+    { mode: 'briefing', lead: leadBrief(lead), playbook: playbookForPrompt(), history },
     onDelta
   );
 
@@ -102,6 +104,7 @@ const supaSuggest = (args: SuggestArgs, onDelta: (t: string) => void) =>
       playbook: playbookForPrompt(),
       transcript: args.transcript,
       trigger: args.trigger ?? '',
+      history: args.history ?? '',
     },
     onDelta
   );
@@ -135,10 +138,14 @@ const streamOut = async (text: string, onDelta?: (t: string) => void): Promise<s
   return text;
 };
 
-async function mockBriefing(lead: Lead, onDelta?: (t: string) => void): Promise<string> {
+async function mockBriefing(lead: Lead, history: string, onDelta?: (t: string) => void): Promise<string> {
   const e = lead.enrichment;
   const noWeb = !lead.website.trim();
+  const histLine = history.trim()
+    ? [`**Ya tienes historia con este prospecto:** ${history.trim()}`, 'Retómala: no arranques de cero, referénciala ("La vez pasada quedamos en…").', '']
+    : [];
   const text = [
+    ...histLine,
     `**Ángulo de apertura:** "${lead.contactName || 'Hola'}, los encontré en Google Maps — ${
       e?.rating != null ? `tienen ${e.rating}⭐ con ${e.reviewCount} reseñas, se nota que trabajan bien` : 'vi su negocio y me llamó la atención'
     }. ${noWeb ? 'Lo curioso: NO tienen página web, y con esa reputación están dejando clientes en la mesa.' : 'Revisé su página y hay 3 cosas que les traerían más clientes.'}"`,
@@ -192,7 +199,7 @@ async function mockSummary(lead: Lead, transcript: string): Promise<CallSummary>
 }
 
 // ===========================================================================
-export const copilotBriefing: (lead: Lead, onDelta?: (t: string) => void) => Promise<string> =
+export const copilotBriefing: (lead: Lead, history: string, onDelta?: (t: string) => void) => Promise<string> =
   supabase ? supaBriefing : mockBriefing;
 export const copilotSuggest: (args: SuggestArgs, onDelta: (t: string) => void) => Promise<string> =
   supabase ? supaSuggest : mockSuggest;

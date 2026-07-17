@@ -13,15 +13,32 @@ import { useSpeech } from '../hooks/useSpeech';
 import { copilotBriefing, copilotSuggest, copilotSummary, type CallSummary } from '../services/copilotService';
 import { detectObjection, type Battlecard } from '../data/salesPlaybook';
 import type { Lead } from '../types';
-import { cn, colorFromString, initials, telLink, waLink, webLink, googleMapsUrl } from '../lib/utils';
+import { cn, colorFromString, initials, telLink, waLink, webLink, googleMapsUrl, fmtDate } from '../lib/utils';
 import { stageLabel } from '../lib/constants';
 
 type Phase = 'pick' | 'brief' | 'live' | 'wrap';
 const AUTO_SUGGEST_MS = 15000; // coach espontáneo cada ~15s si hay transcript nuevo
 
+/** Condensa el historial del prospecto (comentarios/llamadas) para el coach. */
+function buildHistory(
+  comments: { body: string; type: string; createdAt: string }[],
+  lead: Lead
+): string {
+  const notes = [...comments]
+    .filter((c) => c.body?.trim())
+    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+    .slice(0, 6)
+    .map((c) => `• ${fmtDate(c.createdAt)}: ${c.body.trim()}`);
+  const parts: string[] = [];
+  if (lead.temperature !== 'nuevo') parts.push(`Etapa actual: ${stageLabel(lead.temperature)}.`);
+  if (lead.lastContactAt) parts.push(`Último contacto: ${fmtDate(lead.lastContactAt)}.`);
+  if (notes.length) parts.push(`Notas previas (recientes primero):\n${notes.join('\n')}`);
+  return parts.join('\n');
+}
+
 export function CopilotPage() {
   const { user, isAdmin } = useAuth();
-  const { leads, addComment, moveLead, createTask } = useData();
+  const { leads, addComment, moveLead, createTask, loadComments } = useData();
   const [params, setParams] = useSearchParams();
 
   const [phase, setPhase] = useState<Phase>('pick');
@@ -45,6 +62,7 @@ export function CopilotPage() {
   const [error, setError] = useState<string | null>(null);
 
   const transcriptRef = useRef('');
+  const historyRef = useRef('');
   const lastSuggestRef = useRef(0);
   const linesEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -74,8 +92,9 @@ export function CopilotPage() {
       setSuggesting(true);
       setSuggestion('');
       try {
-        await copilotSuggest({ lead: l, transcript: transcriptRef.current, trigger }, (chunk) =>
-          setSuggestion((s) => s + chunk)
+        await copilotSuggest(
+          { lead: l, transcript: transcriptRef.current, trigger, history: historyRef.current },
+          (chunk) => setSuggestion((s) => s + chunk)
         );
       } catch (e) {
         setSuggestion(`⚠️ ${e instanceof Error ? e.message : 'Coach no disponible'}`);
@@ -115,8 +134,11 @@ export function CopilotPage() {
     setBriefing('');
     setBriefLoading(true);
     setError(null);
+    // El coach conoce al prospecto: cargamos su historial (llamadas/notas previas).
+    const comments = await loadComments(l.id).catch(() => []);
+    historyRef.current = buildHistory(comments, l);
     try {
-      await copilotBriefing(l, (chunk) => setBriefing((s) => s + chunk));
+      await copilotBriefing(l, historyRef.current, (chunk) => setBriefing((s) => s + chunk));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo generar el briefing.');
     } finally {
@@ -187,6 +209,7 @@ export function CopilotPage() {
     setSaved(false);
     setError(null);
     transcriptRef.current = '';
+    historyRef.current = '';
     if (params.get('lead')) setParams({}, { replace: true });
   }
 
