@@ -304,8 +304,10 @@ Deno.serve(async (req) => {
   // ---------------------------------------------------------------- briefing
   if (mode === 'briefing') {
     const sys = buildSystem(lead, playbook, history, settings, memory);
+    // Guion SECUENCIAL de turnos, no hoja de estudio: la llamada es yo hablo →
+    // él responde → yo hablo. Las objeciones NO van aquí (se soplan en vivo).
     const userMsg =
-      'Prepárame para llamar AHORA a este prospecto. Dame: (1) el ángulo de apertura exacto entre comillas, personalizado con sus datos; (2) las 3 objeciones más probables de ESTE negocio con la respuesta de una línea para cada una; (3) la meta concreta de la llamada y el cierre a usar. Directo y en formato compacto con **negritas**.';
+      'Prepárame el ARRANQUE de la llamada como guion SECUENCIAL de turnos (yo hablo → el prospecto responde → yo hablo). Formato EXACTO y compacto:\n\n**PASO 1 — Tu apertura (dila y CALLA):** la frase exacta entre comillas, personalizada con sus datos — 4 segundos: su nombre + un dato SUYO + micro-permiso.\n\n**PASO 2 — Cuando diga "ya, dígame" (o parecido):** el pitch de UNA frase sin tecnicismos + tu primera pregunta de descubrimiento, entre comillas.\n\n**PASO 3 — Tu meta:** qué cita vas a agendar y el cierre alternativo exacto entre comillas.\n\nNO listes objeciones ni respuestas a objeciones: esas me las soplas EN VIVO cuando suenen. Todo listo para decirse en voz alta.';
 
     if (PROVIDER === 'kimi') {
       const upstream = await openaiFetch({

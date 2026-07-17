@@ -132,6 +132,7 @@ export function CopilotPage() {
   const perdidosRef = useRef<number | null>(null);
   const callStartRef = useRef(0);
   const memoryRef = useRef(''); // memoria del nicho (lecciones acumuladas)
+  const openerRef = useRef(''); // la apertura del briefing (se siembra en vivo)
 
   useEffect(() => {
     suggestionRef.current = suggestion;
@@ -372,7 +373,19 @@ export function CopilotPage() {
     historyRef.current = buildHistory(comments, l);
     memoryRef.current = memory;
     try {
-      await copilotBriefing(l, historyRef.current, memoryRef.current, (chunk) => setBriefing((s) => s + chunk));
+      // La apertura (primera frase larga entre comillas) se extrae DURANTE el
+      // stream — así queda lista aunque actives la escucha antes de que el
+      // briefing termine — y se siembra en el panel del coach al escuchar.
+      openerRef.current = '';
+      let acc = '';
+      await copilotBriefing(l, historyRef.current, memoryRef.current, (chunk) => {
+        acc += chunk;
+        setBriefing((s) => s + chunk);
+        if (!openerRef.current) {
+          const m = /"([^"\n]{40,320})"/.exec(acc);
+          if (m) openerRef.current = m[1]!;
+        }
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo generar el briefing.');
     } finally {
@@ -402,6 +415,13 @@ export function CopilotPage() {
     perdidosRef.current = null;
     callStartRef.current = Date.now();
     lastSuggestRef.current = Date.now();
+    // La primera jugada YA está en pantalla: tu apertura. La dices, callas,
+    // y cuando el prospecto responda el coach sopla la siguiente.
+    if (openerRef.current) {
+      setSuggestion(
+        `🎯 **Tu apertura — dila y CALLA:**\n"${openerRef.current}"\n\n*Cuando el prospecto responda, te soplo la siguiente jugada.*`
+      );
+    }
     copilotWarm(); // re-toque al cache por si el briefing tomó >5 min
     engine.start();
   }
@@ -496,6 +516,7 @@ export function CopilotPage() {
     setError(null);
     transcriptRef.current = '';
     historyRef.current = '';
+    openerRef.current = '';
     if (params.get('lead')) setParams({}, { replace: true });
     // El copilot vive DENTRO del flujo de prospectos: al terminar, de vuelta.
     navigate('/leads');

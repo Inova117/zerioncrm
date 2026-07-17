@@ -314,18 +314,17 @@ async function mockBriefing(lead: Lead, history: string, _memory: string, onDelt
   const text = [
     ...settingsLine,
     ...histLine,
-    `**Ángulo de apertura:** "${lead.contactName || 'Hola'}, los encontré en Google Maps — ${
-      e?.rating != null ? `tienen ${e.rating}⭐ con ${e.reviewCount} reseñas, se nota que trabajan bien` : 'vi su negocio y me llamó la atención'
-    }. ${noWeb ? 'Lo curioso: NO tienen página web, y con esa reputación están dejando clientes en la mesa.' : 'Revisé su página y hay 3 cosas que les traerían más clientes.'}"`,
+    `**PASO 1 — Tu apertura (dila y CALLA):**`,
+    `"${lead.contactName || 'Buenos días'}, le habla Martín de ZerionStudio. Busqué su negocio en Google — ${
+      e?.rating != null ? `vi sus ${e.rating} estrellas con ${e.reviewCount} reseñas` : 'me llamó la atención'
+    }${noWeb ? ', pero no me aparece página suya' : ''}. ¿Me regala 30 segundos y usted mismo decide?"`,
     '',
-    '**Objeciones probables:**',
-    '1. "No me interesa" → dato suyo + 20 segundos: "7 de cada 10 buscan en Google antes de llamar."',
-    '2. "Está caro" → ¿cuánto vale un cliente? Un cliente/mes y la página se pagó sola.',
-    `3. "${noWeb ? 'Con Facebook me basta' : 'Ya tengo quien me la maneja'}" → ${
-      noWeb ? 'redes = quien ya te conoce; Google = quien te necesita HOY.' : 'revisión gratis con 3 mejoras concretas.'
-    }`,
+    '**PASO 2 — Cuando diga "ya, dígame":**',
+    '"Ayudo a negocios como el suyo a que los encuentren en Google y les escriban directo al WhatsApp. Cuénteme, ¿hoy cómo le llegan los clientes nuevos?"',
     '',
-    '**Meta de la llamada:** agendar demo del diseño (cierre alternativo: ¿mañana 10am o jueves 3pm?). Recuerda: 4 primeros segundos con energía, acuerda antes de responder, y NUNCA cuelgues sin fecha y hora.',
+    '**PASO 3 — Tu meta:** agendar la muestra gratis. Cierre: "¿La vemos el martes a las 10 o el miércoles a las 3?"',
+    '',
+    '*Las objeciones NO las memorices: te las soplo en vivo cuando suenen.*',
   ].join('\n');
   await new Promise((r) => setTimeout(r, 400));
   return streamOut(text, onDelta);
