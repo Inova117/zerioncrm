@@ -512,6 +512,37 @@ export function CopilotPage() {
     setSaved(true);
   }
 
+  // Volver a llamar al MISMO prospecto sin dar la vuelta por Prospectos:
+  // limpia la llamada anterior y regenera el briefing (que ya incluye la
+  // llamada recién guardada en el historial y en 📼 llamadas anteriores).
+  function callAgain() {
+    if (!lead) return;
+    const l = lead;
+    dg.stop();
+    ws.stop();
+    suggestAbortRef.current?.abort();
+    degradedRef.current = false;
+    setLines([]);
+    setSuggestion('');
+    setCard(null);
+    setMoment(null);
+    setSummary(null);
+    setDebrief(null);
+    setSaved(false);
+    setError(null);
+    setTtftMs(null);
+    setNumbers({ ticket: null, perdidos: null });
+    transcriptRef.current = '';
+    momentRef.current = null;
+    cardIdRef.current = null;
+    objCountsRef.current = {};
+    momentsSeenRef.current = [];
+    ticketRef.current = null;
+    perdidosRef.current = null;
+    callStartRef.current = 0;
+    startBriefing(l);
+  }
+
   function reset() {
     dg.stop();
     ws.stop();
@@ -827,19 +858,28 @@ export function CopilotPage() {
                     </div>
                   ) : null}
 
-                  <div className="mt-3 flex gap-2">
+                  <div className="mt-3 space-y-2">
                     {saved ? (
-                      <span className="btn-secondary flex-1 justify-center py-3 text-emerald-600">
+                      <span className="btn-secondary flex w-full justify-center py-3 text-emerald-600">
                         <Save className="h-4 w-4" /> Guardado en el prospecto
                       </span>
                     ) : (
-                      <button className="btn-primary flex-1 py-3" onClick={saveToLead} disabled={!summary}>
+                      <button className="btn-primary w-full py-3" onClick={saveToLead} disabled={!summary}>
                         <Save className="h-4 w-4" /> Guardar en el prospecto
                       </button>
                     )}
-                    <button className="btn-secondary py-3" onClick={reset}>
-                      Volver a Prospectos <ArrowRight className="h-4 w-4" />
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        className="btn-secondary flex-1 py-3"
+                        onClick={callAgain}
+                        title="Nuevo briefing con el historial ya actualizado — sin dar la vuelta por Prospectos"
+                      >
+                        <Phone className="h-4 w-4" /> Llamar de nuevo
+                      </button>
+                      <button className="btn-secondary flex-1 py-3" onClick={reset}>
+                        Volver a Prospectos <ArrowRight className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
