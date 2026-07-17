@@ -1,0 +1,19 @@
+# ============================================================================
+# Config del CLI de Supabase para las Edge Functions.
+#
+# verify_jwt = false en las tres funciones: TODAS hacen su propia autenticación
+# adentro (Authorization Bearer → auth.getUser() → profiles.active), y el
+# verificador de la plataforma ROMPE el preflight CORS del navegador (el
+# OPTIONS nunca lleva token → 401 → "blocked by CORS policy").
+# Con esto, `supabase functions deploy <fn>` ya no necesita --no-verify-jwt.
+# ============================================================================
+project_id = "kvgrjqszmfiylqwnuhpr"
+
+[functions.copilot]
+verify_jwt = false
+
+[functions.deepgram-token]
+verify_jwt = false
+
+[functions.find-leads]
+verify_jwt = false
