@@ -11,7 +11,7 @@
 // ============================================================================
 import type { Lead, Temperature } from '../types';
 import { supabase } from '../lib/supabaseClient';
-import { detectObjection, playbookForPrompt } from '../data/salesPlaybook';
+import { detectObjection } from '../data/salesPlaybook';
 import { settingsForPrompt } from '../lib/copilotSettings';
 
 export interface SuggestArgs {
@@ -95,9 +95,11 @@ async function callFn(
   return full;
 }
 
+// El playbook ya NO viaja desde el navegador: vive en el servidor (generado
+// por npm run sync:playbook). Cada request baja de ~58KB a ~2-5KB de subida.
 const supaBriefing = (lead: Lead, history: string, onDelta?: (t: string) => void) =>
   callFn(
-    { mode: 'briefing', lead: leadBrief(lead), playbook: playbookForPrompt(), history, settings: settingsForPrompt() },
+    { mode: 'briefing', lead: leadBrief(lead), history, settings: settingsForPrompt() },
     onDelta
   );
 
@@ -106,8 +108,8 @@ const supaSuggest = (args: SuggestArgs, onDelta: (t: string) => void, signal?: A
     {
       mode: 'suggest',
       lead: leadBrief(args.lead),
-      playbook: playbookForPrompt(),
-      transcript: args.transcript,
+      // Solo el intercambio reciente: menos tokens sin cache = menos TTFT.
+      transcript: args.transcript.slice(-3000),
       trigger: args.trigger ?? '',
       history: args.history ?? '',
       moment: args.moment ?? '',
@@ -116,6 +118,18 @@ const supaSuggest = (args: SuggestArgs, onDelta: (t: string) => void, signal?: A
     onDelta,
     signal
   );
+
+// Precalienta el cache del modelo de suggest (fire-and-forget). El cache de
+// Anthropic es por modelo: el briefing (Opus) no calienta el de Haiku.
+const supaWarm = () => {
+  callFn({ mode: 'warm' }).catch(() => {
+    /* best-effort: si falla, la primera sugerencia solo será más lenta */
+  });
+};
+const mockWarm = () => {
+  /* mock: nada que calentar */
+};
+export const copilotWarm: () => void = supabase ? supaWarm : mockWarm;
 
 async function supaSummary(lead: Lead, transcript: string): Promise<CallSummary> {
   const raw = await callFn({

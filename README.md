@@ -187,10 +187,18 @@ vive en `services/mappers.ts`.
      transcripción PARCIAL (~300ms tras hablar, sin esperar la frase final), la capa
      local pinta battlecard + momento + jugada instantánea en <100ms, y el LLM refina
      encima en streaming con "frase primero" (línea 1 = la frase decible). Cada consejo
-     nuevo aborta al anterior en vuelo (siempre gana el más fresco), y el coach responde
+     nuevo aborta al anterior en vuelo (siempre gana el más fresco), en momentos
+     urgentes el LLM se dispara ESPECULATIVAMENTE sobre el parcial, y el coach responde
      tras cada frase del prospecto (no cada 15s). Deepgram va tuneado para latencia:
      nova-3 español, sin smart_format (retenía finales hasta 3s), endpointing 300ms,
      PCM linear16 vía AudioWorklet en buffers de ~50ms y KeepAlive.
+   - **Eficiencia de red y cache**: el playbook vive en el SERVIDOR (generado con
+     `npm run sync:playbook`, corre solo en cada build) — el navegador sube ~2-5KB por
+     request en vez de ~58KB. Al abrir el briefing se PRECALIENTA el cache del modelo
+     en vivo (modo `warm`: la primera sugerencia pasa de ~3-5s a ~1.2s), y la UI muestra
+     la latencia real (badge de TTFT junto a "Coach en vivo").
+     ⚠️ Si editas `src/data/playbook/`, corre `npm run sync:playbook` y re-deploya:
+     `supabase functions deploy copilot`.
    - **Postventa**: la reunión de la muestra (3 pantallas, ancla de precios, el anticipo
      se cobra EN la reunión), el tramo del sí al depósito y el anti-ghosting (regla 3-10,
      reactivación a 90 días).

@@ -13,7 +13,7 @@ import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { useSpeech } from '../hooks/useSpeech';
 import { useDeepgram } from '../hooks/useDeepgram';
-import { copilotBriefing, copilotSuggest, copilotSummary, type CallSummary } from '../services/copilotService';
+import { copilotBriefing, copilotSuggest, copilotSummary, copilotWarm, type CallSummary } from '../services/copilotService';
 import { detectObjection, detectMoment, type Battlecard, type MomentInfo } from '../data/salesPlaybook';
 import type { Lead } from '../types';
 import { cn, colorFromString, initials, telLink, waLink, webLink, googleMapsUrl, fmtDate } from '../lib/utils';
@@ -70,9 +70,11 @@ export function CopilotPage() {
   const [summarizing, setSummarizing] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [ttftMs, setTtftMs] = useState<number | null>(null); // latencia real del coach
 
   const transcriptRef = useRef('');
   const historyRef = useRef('');
+  const leadRef = useRef<Lead | null>(null);
   const momentRef = useRef<MomentInfo | null>(null);
   const cardIdRef = useRef<string | null>(null);
   const lastSuggestRef = useRef(0);
@@ -111,6 +113,7 @@ export function CopilotPage() {
       lastSuggestRef.current = Date.now();
       suggestingRef.current = true;
       setSuggesting(true);
+      const t0 = Date.now();
       let acc = '';
       try {
         await copilotSuggest(
@@ -123,6 +126,7 @@ export function CopilotPage() {
           },
           (chunk) => {
             if (ctrl.signal.aborted) return;
+            if (!acc) setTtftMs(Date.now() - t0); // primer token: latencia real
             acc += chunk;
             setSuggestion(acc);
           },
@@ -182,23 +186,32 @@ export function CopilotPage() {
   );
 
   // Cada resultado PARCIAL (~300ms tras hablar): detección instantánea local.
-  // El texto es inestable → jamás se manda al LLM ni al transcript; pero la
-  // battlecard, el chip de momento y la jugada instantánea saltan de una.
-  const onInterim = useCallback((text: string) => {
-    const hit = detectObjection(text);
-    if (hit && hit.id !== cardIdRef.current) {
-      cardIdRef.current = hit.id;
-      setCard(hit);
-    }
-    const m = detectMoment(text);
-    if (m && m.id !== momentRef.current?.id) {
-      momentRef.current = m;
-      setMoment(m);
-      if (!suggestingRef.current) {
-        setSuggestion(`⚡ **${m.label}** — ${m.bestMove}`);
+  // El texto es inestable → no entra al transcript; pero la battlecard, el
+  // chip de momento y la jugada instantánea saltan de una. Y en momentos
+  // URGENTES disparamos el LLM ESPECULATIVAMENTE sobre el parcial (no
+  // esperamos el cierre de frase): si el final difiere, el supersede lo
+  // corrige; si coincide, ganamos ~0.5-1.5s.
+  const onInterim = useCallback(
+    (text: string) => {
+      const hit = detectObjection(text);
+      if (hit && hit.id !== cardIdRef.current) {
+        cardIdRef.current = hit.id;
+        setCard(hit);
       }
-    }
-  }, []);
+      const m = detectMoment(text);
+      if (m && m.id !== momentRef.current?.id) {
+        momentRef.current = m;
+        setMoment(m);
+        if (!suggestingRef.current) {
+          setSuggestion(`⚡ **${m.label}** — ${m.bestMove}`);
+        }
+        if (URGENT_MOMENTS.includes(m.id) && leadRef.current) {
+          runSuggest(leadRef.current, text); // especulativo: una vez por cambio de momento
+        }
+      }
+    },
+    [runSuggest]
+  );
 
   // Dos motores de transcripción; misma interfaz. Deepgram (premium) si está
   // configurado y disponible; si no, Web Speech del navegador (gratis).
@@ -232,10 +245,14 @@ export function CopilotPage() {
   // --- Flujo -----------------------------------------------------------------
   async function startBriefing(l: Lead) {
     setLead(l);
+    leadRef.current = l;
     setPhase('brief');
     setBriefing('');
     setBriefLoading(true);
     setError(null);
+    // Precalienta el cache del modelo de suggest (fire-and-forget): la primera
+    // sugerencia en vivo pasa de ~3-5s a ~1.2s.
+    copilotWarm();
     // El coach conoce al prospecto: cargamos su historial (llamadas/notas previas).
     const comments = await loadComments(l.id).catch(() => []);
     historyRef.current = buildHistory(comments, l);
@@ -259,10 +276,12 @@ export function CopilotPage() {
     setSuggestion('');
     setCard(null);
     setMoment(null);
+    setTtftMs(null);
     momentRef.current = null;
     cardIdRef.current = null;
     transcriptRef.current = '';
     lastSuggestRef.current = Date.now();
+    copilotWarm(); // re-toque al cache por si el briefing tomó >5 min
     engine.start();
   }
 
@@ -312,6 +331,7 @@ export function CopilotPage() {
     degradedRef.current = false;
     setPhase('pick');
     setLead(null);
+    leadRef.current = null;
     setBriefing('');
     setLines([]);
     setSuggestion('');
@@ -490,6 +510,14 @@ export function CopilotPage() {
                     <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-brand-500">
                       <Sparkles className="h-3.5 w-3.5" /> Coach en vivo
                       {suggesting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                      {ttftMs != null && (
+                        <span
+                          className="ml-auto rounded-full bg-surface-100 px-1.5 py-0.5 text-[9px] font-bold normal-case tracking-normal text-surface-400"
+                          title="Tiempo hasta el primer token de la última sugerencia"
+                        >
+                          {(ttftMs / 1000).toFixed(1)}s
+                        </span>
+                      )}
                     </p>
                     <div className="min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap pr-1 text-sm leading-relaxed text-surface-800">
                       {suggestion || (

@@ -20,6 +20,7 @@
 // ============================================================================
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { PLAYBOOK } from './playbook.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -254,12 +255,32 @@ Deno.serve(async (req) => {
   const body = (await req.json().catch(() => ({}))) as CopilotBody;
   const mode = body.mode ?? 'suggest';
   const lead = (body.lead ?? '').slice(0, 4000);
-  const playbook = (body.playbook ?? '').slice(0, 90000);
+  // El playbook vive AQUÍ (generado por npm run sync:playbook) — el cliente ya
+  // no lo sube en cada request (~58KB menos de payload). body.playbook queda
+  // como override de compatibilidad/experimentos.
+  const playbook = (body.playbook && body.playbook.length > 0 ? body.playbook : PLAYBOOK).slice(0, 90000);
   const transcript = (body.transcript ?? '').slice(-6000);
   const trigger = (body.trigger ?? '').slice(0, 500);
   const settings = (body.settings ?? '').slice(0, 4000);
   const history = (body.history ?? '').slice(0, 4000);
   const moment = (body.moment ?? '').slice(0, 600);
+
+  // -------------------------------------------------------------------- warm
+  // Precalienta el cache del system (PERSONA + playbook, por modelo) para que
+  // la PRIMERA sugerencia en vivo no pague el cache-write (~3-5s → ~1.2s).
+  // El cache de Anthropic es por modelo: el briefing (Opus) NO calienta el de
+  // Haiku, por eso el cliente dispara esto en paralelo (fire-and-forget).
+  // Solo importa el bloque estático: los datos dinámicos van vacíos.
+  if (mode === 'warm') {
+    if (PROVIDER === 'kimi') return json({ ok: true }); // Moonshot cachea automático
+    const res = await anthropicFetch({
+      model: MODEL_SUGGEST,
+      max_tokens: 1,
+      system: buildSystem('', playbook, '', ''),
+      messages: [{ role: 'user', content: 'ok' }],
+    });
+    return json({ ok: res.ok });
+  }
 
   // ---------------------------------------------------------------- briefing
   if (mode === 'briefing') {
