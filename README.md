@@ -159,13 +159,27 @@ vive en `services/mappers.ts`.
      `Navegador`), y si Deepgram se cae en plena llamada, sigue con Web Speech sin cortar.
    Cómo funciona: pon el celular en **altavoz** junto a la laptop; el navegador
    transcribe la llamada (Deepgram si está configurado; si no, Web Speech, **solo
-   Chrome/Edge de escritorio**) y la función consulta a Claude con el **playbook de
-   ventas** (`src/data/salesPlaybook.ts`: Belfort/Cardone/SPIN/Challenger + objeciones en
-   español) para soplarte qué decir en streaming (<2s). Las objeciones se detectan **al
-   instante en el cliente** (battlecard sin esperar al LLM). Al colgar, genera resumen →
-   comentario en el prospecto + temperatura sugerida + tarea de seguimiento.
-   **Sin `ANTHROPIC_API_KEY` usa el playbook local** (mock), así que toda la UI se prueba
-   sin gastar en el API.
+   Chrome/Edge de escritorio**) y la función consulta a Claude con el **cerebro de
+   ventas** (`src/data/playbook/`, ~14k tokens construidos con investigación profunda):
+   - **Metodologías operativas**: Belfort (tonalidades con instrucciones de entrega,
+     looping máx. 3 vueltas, los 3 dieces), Cardone (acordar siempre, precio, second
+     money, seguimiento 10X), Voss (espejo, etiquetas, calibradas, orientado al no,
+     silencio de 4s), SPIN comprimido (la matemática en voz alta con SUS números) y
+     Challenger (insights con datos verificados).
+   - **El Árbitro**: cuando varias jugadas aplican, decide cuál gana (señal de compra y
+     peligro cortan todo → hostilidad → etapa → n.º de loop → temperatura).
+   - **Detector de momentos en tiempo real** (regex, sin LLM): gatekeeper, apertura,
+     descubrimiento, pitch, objeción, precio, señal de compra, peligro de colgar, cierre
+     y despedida — con chip en vivo en la UI y coach instantáneo en los momentos urgentes.
+   - **25 battlecards** con triggers del habla real latina ("mi sobrino me la hace",
+     "mándame la info", "¿me garantiza salir primero en Google?", el fiado, el plantón…)
+     que saltan al instante sin esperar al LLM.
+   - **Postventa**: la reunión de la muestra (3 pantallas, ancla de precios, el anticipo
+     se cobra EN la reunión), el tramo del sí al depósito y el anti-ghosting (regla 3-10,
+     reactivación a 90 días).
+   Al colgar, genera resumen → comentario en el prospecto + temperatura sugerida + tarea
+   de seguimiento. **Sin `ANTHROPIC_API_KEY` usa el playbook local** (mock), así que toda
+   la UI se prueba sin gastar en el API.
    - **Ajustes del Copilot** (botón ⚙️ arriba a la derecha): enséñale al coach *tu* oferta,
      precios, tono y frases que te funcionan. El coach los usa **por encima** del playbook
      para dejar de sonar genérico. Se guardan en tu navegador y viajan en cada consulta.

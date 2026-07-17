@@ -22,6 +22,8 @@ export interface SuggestArgs {
   trigger?: string;
   /** Historial con el prospecto (llamadas/comentarios previos). */
   history?: string;
+  /** Momento de la llamada detectado en el cliente ("label: mejor jugada"). */
+  moment?: string;
 }
 
 export interface CallSummary {
@@ -106,6 +108,7 @@ const supaSuggest = (args: SuggestArgs, onDelta: (t: string) => void) =>
       transcript: args.transcript,
       trigger: args.trigger ?? '',
       history: args.history ?? '',
+      moment: args.moment ?? '',
       settings: settingsForPrompt(),
     },
     onDelta
@@ -173,6 +176,8 @@ async function mockSuggest(args: SuggestArgs, onDelta: (t: string) => void): Pro
   let text: string;
   if (card) {
     text = `**Dile esto:** ${card.response}\n\n*(${card.why})*`;
+  } else if (args.moment) {
+    text = `**${args.moment.split(':')[0]}** — ${args.moment.split(':').slice(1).join(':').trim()}`;
   } else if (/cuanto (cuesta|vale|sale)|precio|que incluye|cuanto se demora/i.test(args.transcript.slice(-200))) {
     text =
       '🟢 **SEÑAL DE COMPRA** — deja de presentar y cierra: "Le propongo esto: le preparo el diseño de muestra y lo vemos el jueves. Si le encanta, arrancamos con el plan de $X al mes. ¿Jueves a las 10 o a las 4?"';

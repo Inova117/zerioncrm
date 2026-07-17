@@ -1,0 +1,39 @@
+// ============================================================================
+// Postventa de la llamada: la reunión de la muestra, el cobro del anticipo
+// y el anti-ghosting. Huecos detectados por el crítico de la investigación:
+// toda la llamada en frío empuja hacia la cita con la muestra — y donde de
+// verdad se gana o se pierde la plata es en esa reunión y en el tramo del
+// "sí" al depósito.
+// ============================================================================
+
+export const POSTVENTA = `
+## LA REUNIÓN DE LA MUESTRA (donde se cierra de verdad)
+- La muestra se ENSEÑA, nunca se manda sola: mandada muere en visto; enseñada, cada reacción es una señal que juegas en vivo.
+- Apertura (60 segundos): NO arranques mostrando. Recap con SUS números de la llamada 1: "Usted me contó que se le van unos 5 clientes al mes… ¿sigue así la cosa?" → consigue ese sí → anuncia el plan: "Le enseño tres pantallas nomás — cinco minutos. Al final le doy precios claros y usted decide. ¿Le parece?" Si no capturaste números en la llamada 1, pídelos AHORA: sin número suyo no hay ancla para el precio.
+- Tour: MÁXIMO 3 pantallas — (1) su negocio apareciendo en Google ("ese de ahí arriba es SU negocio, con sus estrellas — hoy esa persona termina donde su competencia"), (2) el botón verde directo a su WhatsApp ("le llegan al mismo número de siempre, no aprende nada nuevo"), (3) el menú/servicios con fotos y precios ("la gente llega ya sabiendo qué quiere"). Un beneficio por pantalla, contado como HISTORIA de un cliente suyo llegando. Micro-check tras cada una: "¿Se la imagina así, pero con sus fotos de verdad?" — tres síes chicos preparan el sí grande.
+- Pide cambios o elogia = YA COMPRÓ mentalmente. Todo cambio se responde igual: "Eso se ajusta en un día — ¿la dejamos con sus fotos y arrancamos?" Jamás defiendas el diseño ni sigas paseando pantallas.
+- Puente al precio (lo dices TÚ, sin esperar): "Eso es todo lo que hace — sin enredos. Ahora sí hablemos de la inversión. Trabajamos con tres opciones."
+- Los tres precios DE CORRIDO, de mayor a menor, tono plano, números completos. Remate con recomendación dirigida: "Negocios como el suyo arrancan con el intermedio" — y SILENCIO ABSOLUTO hasta que él hable.
+- Rebaja pedida → baja de PAQUETE o parte el pago, nunca el precio del mismo paquete. Con SU número: "usted me dijo que un cliente le deja 80 — con dos que le traiga ya se pagó". Cierra entre dos síes: "¿el intermedio en dos pagos, o el básico de una?"
+- EL ANTICIPO SE COBRA EN LA REUNIÓN: "La mitad ahora y el resto cuando la vea terminada — ¿le paso los datos por WhatsApp o prefiere en efectivo?" Y si acepta: "Hágala con calma, yo aquí le espero." El anticipo que se cobra después, casi nunca se cobra.
+- Quiere irse sin decidir → aísla con el sí previo: "La página sí le gustó, ¿cierto? Entonces lo que hay que pensar es la inversión — ¿es eso, o hay otra cosa?" Si hay esposa/socio: link por WhatsApp hoy + llamada de tres mañana con hora exacta. NUNCA termina la reunión sin próximo paso con fecha y hora.
+
+## DEL SÍ AL DEPÓSITO (donde más ventas mueren en LatAm)
+- En la llamada del sí, amarra ANTES de colgar: "Ahorita le mando por WhatsApp el acuerdo con los datos de pago y la fecha de entrega. ¿El anticipo me lo confirma hoy o máximo mañana?" + "¿Este número tiene WhatsApp? Le está llegando el mensaje… avíseme cuando lo vea."
+- WhatsApp de cierre en <5 minutos (una pantalla): proyecto + monto + anticipo 50% + fecha de entrega ("el plazo corre desde que llega el anticipo") + datos bancarios COMPLETOS + las 3 cosas que necesitas (logo, 4-5 fotos, datos/horarios). Cierra con pregunta: "¿Me confirma hoy para separarle el cupo de este mes?"
+- Cobra como COORDINADOR, no como cobrador. Prohibido "¿ya me depositó?". El pago siempre atado a un evento del proyecto: "para agendar al diseñador el lunes necesito el anticipo hoy". El anticipo compra un CUPO del mes, no un favor.
+- Calendario de escalada: Día 1 → excusa de valor ("ya separé su cupo y avisé al diseñador, ¿alguna duda con el depósito?") + reenvía los datos bancarios (nunca asumas que los guardó) + pide el logo y fotos ("así apenas caiga el anticipo arrancamos sin perder un día" — el que manda material ya invirtió). Día 3 → fecha límite con consecuencia REAL: "necesito el anticipo hasta el viernes; pasado eso el cupo pasa al siguiente y su entrega se corre al otro mes. ¿Lo alcanzo a esperar?" Si promete fecha, amarra franja horaria. Día 7 → soltar con puerta abierta: "Voy a liberar su cupo para no quedarle mal a nadie. Le escribo el 1 del próximo mes cuando abra agenda" (liberar el cupo por escrito a veces revive la venta ese mismo día).
+- NUNCA arrancar con $0. Piso: 30% o plan 30/35/35. La regla se dice como política ("así trabajo con todos, sin excepción — lo que sí puedo es acomodarle el arranque"), jamás como desconfianza.
+- Efectivo/dueño tradicional: "Le caigo mañana por el local, ¿en la mañana o en la tarde? Llevo el acuerdo impreso, firmamos y me da el anticipo ahí mismo, con su recibo." — la vía que más cierra con dueños de ferretería/taller/mercado.
+- "¿Me da factura?" = SEÑAL DE COMPRA (ya está calculando cómo pagarte). "Claro, factura electrónica. Páseme su RUC y correo y le facturo el anticipo apenas llegue." Sin titubear — dudar aquí huele a informal. Aclara si es IVA incluido o más IVA, por escrito.
+- Llegó el depósito → confirma en MINUTOS: "¡Recibido! Queda separado su cupo, arrancamos hoy y le escribo el [día] con el primer avance." El silencio después de pagar es lo que fabrica arrepentimiento.
+
+## PLANTÓN, GHOSTING Y REACTIVACIÓN (la cadencia que el coach hace cumplir)
+- Reconfirmación de cita = 2 toques ENTREGANDO valor, no pidiendo permiso: día antes 5-6pm ("Ya quedó lista la muestra de su página — se la enseño mañana a las 10 como quedamos. ¿Seguimos en pie?") y el mismo día 2 horas antes, SIN pregunta ("A las 10 le enseño su página — le va a gustar cómo quedó el menú. Nos vemos ahí."). Cancelar algo que ya existe y tiene su nombre cuesta más.
+- Plantón: espera 15 min → 1 llamada + 1 WhatsApp con FOTO de la muestra ese mismo día. CERO reproche — jamás "lo estuve esperando" ni "¿qué pasó?": abre absolviendo ("Seguro se le cruzó algo — así es el negocio, uno no para") y reagenda con alternativa doble en la misma respiración. El avergonzado no reagenda: desaparece.
+- Máximo 2 reintentos de cita; el segundo SIEMPRE en versión barata: videollamada de 10 min o video de la muestra, en horario fuera de su operación ("¿hoy a las 6 o mañana a las 8, antes de que abra?").
+- Regla 3-10 post-muestra sin respuesta: toque 1 a las 24h (pregunta binaria: "¿Qué le pareció? Con un 'me gusta' o un 'no me convence' me basta"), toque 2 a las 48-72h (ángulo NUEVO con evidencia visual: captura de Google donde el competidor sale primero — "con su página usted aparecería ahí mismo"), toque 3 al día 7 (pregunta orientada al no: "¿Lo doy por descartado, o lo retomamos el otro mes con más calma?" — la de más tasa de respuesta que existe, resérvala para el final). Día 10 sin respuesta: expediente a reactivación en 90 días.
+- Regla anti-quemado: NINGÚN mensaje sale sin ángulo nuevo Y evidencia visual. "Le escribo para dar seguimiento" y "¿ya lo pensó?" están PROHIBIDOS en toda la secuencia.
+- Reactivación (90 días, conversación NUEVA, nunca el hilo viejo): caso de éxito del MISMO rubro con número concreto: "Acabamos de entregar la página de [negocio del rubro] y en el primer mes le entraron [N] pedidos por WhatsApp. Me acordé de su negocio — ¿le muestro cómo se vería el suyo?" + remate a las 48h: "Todavía tengo guardada la muestra que le había hecho. La actualizo en un día — ¿le mando el enlace?"
+- "No" definitivo → premia la franqueza: "Se lo agradezco de verdad por decírmelo de frente — así no lo molesto por gusto. Si más adelante quiere aparecer en Google, este número es el mío."
+`.trim();

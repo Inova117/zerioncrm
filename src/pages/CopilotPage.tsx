@@ -14,7 +14,7 @@ import { useData } from '../context/DataContext';
 import { useSpeech } from '../hooks/useSpeech';
 import { useDeepgram } from '../hooks/useDeepgram';
 import { copilotBriefing, copilotSuggest, copilotSummary, type CallSummary } from '../services/copilotService';
-import { detectObjection, type Battlecard } from '../data/salesPlaybook';
+import { detectObjection, detectMoment, type Battlecard, type MomentInfo } from '../data/salesPlaybook';
 import type { Lead } from '../types';
 import { cn, colorFromString, initials, telLink, waLink, webLink, googleMapsUrl, fmtDate } from '../lib/utils';
 import { stageLabel } from '../lib/constants';
@@ -59,6 +59,7 @@ export function CopilotPage() {
   const [suggestion, setSuggestion] = useState('');
   const [suggesting, setSuggesting] = useState(false);
   const [card, setCard] = useState<Battlecard | null>(null);
+  const [moment, setMoment] = useState<MomentInfo | null>(null);
 
   // Wrap
   const [summary, setSummary] = useState<CallSummary | null>(null);
@@ -68,6 +69,7 @@ export function CopilotPage() {
 
   const transcriptRef = useRef('');
   const historyRef = useRef('');
+  const momentRef = useRef<MomentInfo | null>(null);
   const lastSuggestRef = useRef(0);
   const linesEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -98,7 +100,13 @@ export function CopilotPage() {
       setSuggestion('');
       try {
         await copilotSuggest(
-          { lead: l, transcript: transcriptRef.current, trigger, history: historyRef.current },
+          {
+            lead: l,
+            transcript: transcriptRef.current,
+            trigger,
+            history: historyRef.current,
+            moment: momentRef.current ? `${momentRef.current.label}: ${momentRef.current.bestMove}` : undefined,
+          },
           (chunk) => setSuggestion((s) => s + chunk)
         );
       } catch (e) {
@@ -110,17 +118,30 @@ export function CopilotPage() {
     []
   );
 
-  // Cada frase final: transcript + objeción instantánea + coach si aplica.
+  // Cada frase final: transcript + momento + objeción instantánea + coach.
   const onFinal = useCallback(
     (text: string) => {
       transcriptRef.current = `${transcriptRef.current} ${text}`.trim().slice(-6000);
       setLines((prev) => [...prev, text]);
+
+      // 1) ¿En qué momento de la llamada estamos? (regex, instantáneo)
+      const m = detectMoment(text);
+      if (m) {
+        momentRef.current = m;
+        setMoment(m);
+      }
+
+      // 2) Battlecard de objeción (respuesta lista sin esperar al LLM)
       const hit = detectObjection(text);
-      if (hit) {
-        setCard(hit);
-        if (lead) runSuggest(lead, text); // el coach amplía la battlecard
+      if (hit) setCard(hit);
+
+      // 3) ¿Cuándo llamar al coach? Objeción y momentos urgentes → YA;
+      //    si no, coach espontáneo cada AUTO_SUGGEST_MS.
+      const urgent = m && ['senal-compra', 'peligro', 'gatekeeper', 'precio', 'cierre'].includes(m.id);
+      if (lead && (hit || urgent)) {
+        runSuggest(lead, text);
       } else if (lead && Date.now() - lastSuggestRef.current > AUTO_SUGGEST_MS) {
-        runSuggest(lead); // coach espontáneo
+        runSuggest(lead);
       }
     },
     [lead, runSuggest]
@@ -184,6 +205,8 @@ export function CopilotPage() {
     setLines([]);
     setSuggestion('');
     setCard(null);
+    setMoment(null);
+    momentRef.current = null;
     transcriptRef.current = '';
     lastSuggestRef.current = Date.now();
     engine.start();
@@ -237,6 +260,8 @@ export function CopilotPage() {
     setLines([]);
     setSuggestion('');
     setCard(null);
+    setMoment(null);
+    momentRef.current = null;
     setSummary(null);
     setSaved(false);
     setError(null);
@@ -381,6 +406,21 @@ export function CopilotPage() {
 
               {phase === 'live' && (
                 <>
+                  {moment && (
+                    <div
+                      className={cn(
+                        'flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold',
+                        moment.id === 'senal-compra' && 'border-green-300 bg-green-50 text-green-800',
+                        moment.id === 'peligro' && 'border-red-300 bg-red-50 text-red-800',
+                        (moment.id === 'precio' || moment.id === 'objecion') && 'border-amber-300 bg-amber-50 text-amber-800',
+                        !['senal-compra', 'peligro', 'precio', 'objecion'].includes(moment.id) &&
+                          'border-surface-200 bg-surface-50 text-surface-700'
+                      )}
+                    >
+                      <span className="text-base leading-none">{moment.emoji}</span>
+                      <span>Momento: {moment.label}</span>
+                    </div>
+                  )}
                   {card && (
                     <div className="card border-l-4 border-l-amber-400 bg-amber-50/50 p-3">
                       <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-amber-600">

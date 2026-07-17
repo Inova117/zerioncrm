@@ -35,15 +35,20 @@ const CORS = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-const PERSONA = `Eres un coach de ventas de élite que susurra al oído de un vendedor DURANTE una llamada en frío. Combinas la Línea Recta de Jordan Belfort, la mentalidad de Grant Cardone, SPIN Selling y Challenger. El vendedor vende desarrollo de páginas web y automatizaciones a negocios locales (ZerionStudio).
+const PERSONA = `Eres "el Closer": la fusión de Jordan Belfort (Línea Recta, tonalidad, looping), Grant Cardone (acordar siempre, cierres, precio), Chris Voss (labels, preguntas calibradas, empatía táctica) y SPIN/Challenger — pero NO citas metodologías: HABLAS como el mejor vendedor que existe. Le susurras al oído a un vendedor DURANTE una llamada en frío real. Él vende páginas web y automatizaciones a negocios locales (ZerionStudio). Tu único trabajo: que cierre ESTA llamada.
 
-REGLAS DE ORO:
-- Responde SOLO con lo accionable: qué decir o qué preguntar AHORA. Sin preámbulos, sin teoría, sin meta-comentarios.
-- Máximo 2-4 frases (el vendedor está EN la llamada y lee de reojo).
-- Español neutro latinoamericano, frases listas para decirse en voz alta.
-- La transcripción viene del altavoz del teléfono: mezcla la voz del vendedor y del prospecto, con errores de transcripción. Interprétala con ese ruido.
-- Si detectas objeción → da la respuesta exacta (acuerda primero, luego redirige). Si detectas señal de compra → di que CIERRE ya, con el cierre alternativo. Si la conversación va bien → la siguiente pregunta SPIN.
-- Formato: **negrita** para la frase a decir. Una nota breve en cursiva solo si hace falta.`;
+CÓMO PIENSAS (proceso interno — jamás lo expliques en la respuesta):
+1. Detecta el MOMENTO de la llamada: gatekeeper, apertura, descubrimiento, pitch, objeción, precio, señal de compra, peligro de colgar, cierre. El cliente puede mandarte su detección: confírmala o corrígela leyendo la transcripción.
+2. Juega LA jugada de ESE momento según el playbook: objeción → acordar + loop (nunca contradecir); señal de compra → dejar de presentar y cerrar YA con alternativa; peligro → rescate de 15 segundos con un dato SUYO; descubrimiento → la siguiente pregunta que cuantifica el dolor; precio → cuantificar retorno con SUS números, jamás defender ni bajar el precio de una; gatekeeper → aliado, nombre y hora, sin pitchear.
+3. Personaliza SIEMPRE con la ficha y el historial del prospecto, y con la oferta real del vendedor (MI NEGOCIO tiene prioridad sobre el playbook).
+
+CÓMO RESPONDES:
+- SOLO lo accionable: la frase EXACTA para decir en voz alta AHORA, en **negrita**, lista para salir de la boca. Opcional: UNA nota en cursiva (tonalidad o porqué) de una línea.
+- Máximo 2-4 frases. El vendedor lee de reojo EN la llamada.
+- Español latino natural y HABLADO (como suena la gente, no como se escribe). Con la energía del momento: certeza tranquila, entusiasmo o urgencia según toque.
+- Nada de teoría, nada de "deberías considerar", nada de meta-comentarios, JAMÁS nombres de metodologías o autores.
+- La transcripción viene del altavoz del teléfono: ambas voces mezcladas, con errores. Interprétala con ese ruido, sin comentarlo.
+- Suenas como quien ya hizo diez mil de estas llamadas y sabe exactamente qué sigue.`;
 
 interface CopilotBody {
   mode?: string;
@@ -53,6 +58,8 @@ interface CopilotBody {
   trigger?: string;
   history?: string;
   settings?: string;
+  /** Momento de la llamada detectado en el cliente ("label: mejor jugada"). */
+  moment?: string;
 }
 
 // --- Llamada a Anthropic (raw HTTP; streaming SSE → texto plano) ------------
@@ -110,13 +117,15 @@ function sseToTextStream(upstream: ReadableStream<Uint8Array>): ReadableStream<U
   );
 }
 
-// Nota caching: el playbook + ficha van en `system` con cache_control. En
-// Opus 4.8 el prefijo mínimo cacheable es ~4096 tokens; si el playbook aún es
-// más corto simplemente no cachea (sin error). Cuando crezca (Fase 2), las
-// sugerencias de una misma llamada pagarán ~0.1x el input.
+// Caching en dos bloques: el bloque estático (persona + playbook, idéntico en
+// TODAS las llamadas de todos los leads) lleva cache_control y se paga una vez
+// (~0.1x el input después del primer hit, y menos latencia). El bloque dinámico
+// (mi negocio + ficha + historial, cambia por lead) va aparte, sin cache.
+// Prefijo mínimo cacheable en Opus 4.8: ~4096 tokens — el playbook expandido
+// lo supera con holgura.
 function buildSystem(lead: string, playbook: string, history: string, settings: string) {
   const mine = settings.trim()
-    ? `\n\n# MI NEGOCIO Y MI FORMA DE VENDER (PRIORIDAD: usa ESTO por encima del playbook genérico — mis precios, mi oferta, mi tono)\n${settings.trim()}`
+    ? `# MI NEGOCIO Y MI FORMA DE VENDER (PRIORIDAD: usa ESTO por encima del playbook — mis precios, mi oferta, mi tono)\n${settings.trim()}\n\n`
     : '';
   const hist = history.trim()
     ? `\n\n# HISTORIAL CON ESTE PROSPECTO (ya lo conoces — NO arranques de cero, referencia lo previo)\n${history.trim()}`
@@ -124,8 +133,12 @@ function buildSystem(lead: string, playbook: string, history: string, settings: 
   return [
     {
       type: 'text' as const,
-      text: `${PERSONA}\n\n# PLAYBOOK DE VENTAS\n${playbook}${mine}\n\n# FICHA DEL PROSPECTO (úsala: personaliza con SUS datos)\n${lead}${hist}`,
+      text: `${PERSONA}\n\n# PLAYBOOK DE VENTAS (tu conocimiento de closer — aplícalo, no lo cites)\n${playbook}`,
       cache_control: { type: 'ephemeral' as const },
+    },
+    {
+      type: 'text' as const,
+      text: `${mine}# FICHA DEL PROSPECTO (úsala: personaliza con SUS datos)\n${lead}${hist}`,
     },
   ];
 }
@@ -156,11 +169,12 @@ Deno.serve(async (req) => {
   const body = (await req.json().catch(() => ({}))) as CopilotBody;
   const mode = body.mode ?? 'suggest';
   const lead = (body.lead ?? '').slice(0, 4000);
-  const playbook = (body.playbook ?? '').slice(0, 40000);
+  const playbook = (body.playbook ?? '').slice(0, 90000);
   const transcript = (body.transcript ?? '').slice(-6000);
   const trigger = (body.trigger ?? '').slice(0, 500);
   const settings = (body.settings ?? '').slice(0, 4000);
   const history = (body.history ?? '').slice(0, 4000);
+  const moment = (body.moment ?? '').slice(0, 600);
 
   // ---------------------------------------------------------------- briefing
   if (mode === 'briefing') {
@@ -192,6 +206,9 @@ Deno.serve(async (req) => {
     const ask = trigger
       ? `Se detectó: "${trigger}". Dame la respuesta EXACTA para decir ahora.`
       : 'Dame la mejor jugada AHORA (responder objeción, cerrar, o la siguiente pregunta).';
+    const momentLine = moment
+      ? `MOMENTO DETECTADO (confírmalo o corrígelo con la transcripción): ${moment}\n\n`
+      : '';
     const upstream = await anthropicFetch({
       model: MODEL,
       max_tokens: 300,
@@ -201,7 +218,7 @@ Deno.serve(async (req) => {
       messages: [
         {
           role: 'user',
-          content: `TRANSCRIPCIÓN RECIENTE DE LA LLAMADA (mic en altavoz, ambas voces mezcladas):\n"""\n${transcript || '(la llamada acaba de empezar)'}\n"""\n\n${ask}`,
+          content: `${momentLine}TRANSCRIPCIÓN RECIENTE DE LA LLAMADA (mic en altavoz, ambas voces mezcladas):\n"""\n${transcript || '(la llamada acaba de empezar)'}\n"""\n\n${ask}`,
         },
       ],
     });
