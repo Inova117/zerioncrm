@@ -57,8 +57,33 @@ Deno.serve(async (req) => {
   if (!DEEPGRAM_API_KEY) return json({ available: false });
 
   const body = (await req.json().catch(() => ({}))) as { probe?: boolean };
-  // Probe: solo confirmar disponibilidad, sin gastar un token.
-  if (body.probe) return json({ available: true });
+  // Probe DIAGNÓSTICO: intenta un grant real (acuñar es gratis) y si falla,
+  // devuelve el porqué exacto + la huella de la key que la función está usando.
+  // Así la consola del navegador distingue "quedó la key vieja en el secret"
+  // de "la key no tiene permisos" sin que nadie adivine.
+  if (body.probe) {
+    const fp = `${DEEPGRAM_API_KEY.slice(0, 4)}…${DEEPGRAM_API_KEY.slice(-4)} (${DEEPGRAM_API_KEY.length} chars)`;
+    const test = await fetch('https://api.deepgram.com/v1/auth/grant', {
+      method: 'POST',
+      headers: {
+        Authorization: `Token ${DEEPGRAM_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ ttl_seconds: 30 }),
+    });
+    if (!test.ok) {
+      const detail = await test.text().catch(() => '');
+      return json(
+        {
+          available: false,
+          error: `Deepgram respondió ${test.status} usando la key ${fp}`,
+          detail: detail.slice(0, 300),
+        },
+        502
+      );
+    }
+    return json({ available: true });
+  }
 
   // Acuñar el token temporal.
   const grant = await fetch('https://api.deepgram.com/v1/auth/grant', {
