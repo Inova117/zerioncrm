@@ -22,6 +22,7 @@
 //  • el briefing pre-llamada del modo mock
 // ============================================================================
 
+export { SISTEMA } from './playbook/sistema';
 export { PRINCIPLES, ARBITRO } from './playbook/metodologias';
 export { OPENERS } from './playbook/apertura';
 export { CLOSES } from './playbook/cierres';
@@ -38,6 +39,7 @@ export {
   type MomentInfo,
 } from './playbook/momentos';
 
+import { SISTEMA } from './playbook/sistema';
 import { PRINCIPLES, ARBITRO } from './playbook/metodologias';
 import { OPENERS } from './playbook/apertura';
 import { CLOSES } from './playbook/cierres';
@@ -68,6 +70,7 @@ export function playbookForPrompt(): string {
     (c) => `### ${c.objection}\nRespuesta: ${c.response}\nPrincipio: ${c.why}`
   ).join('\n\n');
   return [
+    SISTEMA,
     ARBITRO,
     PRINCIPLES,
     NEPQ,
