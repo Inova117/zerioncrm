@@ -144,11 +144,12 @@ vive en `services/mappers.ts`.
      ```bash
      supabase functions deploy copilot
      supabase secrets set ANTHROPIC_API_KEY=sk-ant-xxxxx
-     # Modelos: briefing/resumen/coaching usan COPILOT_MODEL (default claude-sonnet-5:
-     # calidad casi-Opus en análisis a menos de la mitad del precio — la inteligencia
-     # vive en el playbook, el modelo la aplica). Las sugerencias EN VIVO usan
-     # COPILOT_MODEL_SUGGEST (default claude-haiku-4-5: el más rápido).
-     # supabase secrets set COPILOT_MODEL=claude-opus-4-8   # subir el análisis a Opus
+     # Modelos (optimizados a costo): vivo + briefing + resumen → claude-haiku-4-5
+     # ($1/$5, el escalón más barato); coaching/memoria del nicho → claude-sonnet-5
+     # (corre 1 vez por llamada y escribe la memoria que alimenta las siguientes).
+     # Overrides sin redeploy:
+     # supabase secrets set COPILOT_MODEL=claude-sonnet-5          # subir briefing/resumen
+     # supabase secrets set COPILOT_MODEL_DEBRIEF=claude-haiku-4-5 # máximo ahorro
      # Proveedor alterno (A/B testing, ej. Kimi K3 de Moonshot — OpenAI-compatible):
      # supabase secrets set COPILOT_PROVIDER=kimi KIMI_API_KEY=sk-... KIMI_MODEL=kimi-k3
      ```
