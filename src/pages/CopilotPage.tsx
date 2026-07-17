@@ -104,6 +104,9 @@ export function CopilotPage() {
   const [lines, setLines] = useState<string[]>([]);
   const [suggestion, setSuggestion] = useState('');
   const [suggesting, setSuggesting] = useState(false);
+  // Jugadas que el coach ya reemplazó — siguen visibles abajo (feedback real:
+  // "cambiaba el mensaje y ya no podía ver lo anterior").
+  const [pastSuggestions, setPastSuggestions] = useState<string[]>([]);
   const [card, setCard] = useState<Battlecard | null>(null);
   const [moment, setMoment] = useState<MomentInfo | null>(null);
 
@@ -146,6 +149,15 @@ export function CopilotPage() {
   useEffect(() => {
     suggestionRef.current = suggestion;
   }, [suggestion]);
+
+  // Antes de que una jugada nueva pise a la visible, la visible baja al
+  // historial ("jugadas anteriores") en vez de desaparecer.
+  const archiveSuggestion = useCallback(() => {
+    const cur = suggestionRef.current.trim();
+    if (cur && !cur.startsWith('⚠️')) {
+      setPastSuggestions((h) => (h[0] === cur ? h : [cur, ...h].slice(0, 12)));
+    }
+  }, []);
 
   // Stats legibles de la llamada (para el debrief, el comentario y el registro).
   const buildStatsLine = useCallback((): string => {
@@ -222,7 +234,10 @@ export function CopilotPage() {
           },
           (chunk) => {
             if (ctrl.signal.aborted) return;
-            if (!acc) setTtftMs(Date.now() - t0); // primer token: latencia real
+            if (!acc) {
+              setTtftMs(Date.now() - t0); // primer token: latencia real
+              archiveSuggestion(); // la jugada anterior baja al historial, no se pierde
+            }
             acc += chunk;
             setSuggestion(acc);
           },
@@ -230,6 +245,7 @@ export function CopilotPage() {
         );
       } catch (e) {
         if (!ctrl.signal.aborted) {
+          archiveSuggestion();
           setSuggestion(`⚠️ ${e instanceof Error ? e.message : 'Coach no disponible'}`);
         }
       } finally {
@@ -239,7 +255,7 @@ export function CopilotPage() {
         }
       }
     },
-    []
+    [archiveSuggestion]
   );
 
   // Cada frase final: transcript + momento + objeción instantánea + coach.
@@ -285,6 +301,7 @@ export function CopilotPage() {
       //    jugada de ese momento aparece YA (0ms); el LLM la refina encima.
       const urgent = m && URGENT_MOMENTS.includes(m.id);
       if (urgent && m.id !== prevMomentId && !suggestingRef.current) {
+        archiveSuggestion();
         setSuggestion(`⚡ **${m.label}** — ${m.bestMove}`);
       }
 
@@ -296,7 +313,7 @@ export function CopilotPage() {
         runSuggest(lead);
       }
     },
-    [lead, runSuggest]
+    [lead, runSuggest, archiveSuggestion]
   );
 
   // Cada resultado PARCIAL (~300ms tras hablar): detección instantánea local.
@@ -322,6 +339,7 @@ export function CopilotPage() {
           momentsSeenRef.current.push(m.label);
         }
         if (!suggestingRef.current) {
+          archiveSuggestion();
           setSuggestion(`⚡ **${m.label}** — ${m.bestMove}`);
         }
         if (URGENT_MOMENTS.includes(m.id) && leadRef.current) {
@@ -329,7 +347,7 @@ export function CopilotPage() {
         }
       }
     },
-    [runSuggest]
+    [runSuggest, archiveSuggestion]
   );
 
   // Dos motores de transcripción; misma interfaz. Deepgram (premium) si está
@@ -419,6 +437,7 @@ export function CopilotPage() {
     setPhase('live');
     setLines([]);
     setSuggestion('');
+    setPastSuggestions([]);
     setCard(null);
     setMoment(null);
     setTtftMs(null);
@@ -530,6 +549,7 @@ export function CopilotPage() {
     degradedRef.current = false;
     setLines([]);
     setSuggestion('');
+    setPastSuggestions([]);
     setCard(null);
     setMoment(null);
     setSummary(null);
@@ -561,6 +581,7 @@ export function CopilotPage() {
     setBriefing('');
     setLines([]);
     setSuggestion('');
+    setPastSuggestions([]);
     setCard(null);
     setMoment(null);
     setDebrief(null);
@@ -774,9 +795,25 @@ export function CopilotPage() {
                         </span>
                       )}
                     </p>
-                    <div className="min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap pr-1 text-sm leading-relaxed text-surface-800">
-                      {suggestion || (
-                        <span className="text-surface-400">El coach te irá soplando la mejor jugada. Toca “Ayuda” cuando lo necesites.</span>
+                    <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+                      <div className="whitespace-pre-wrap text-sm leading-relaxed text-surface-800">
+                        {suggestion || (
+                          <span className="text-surface-400">El coach te irá soplando la mejor jugada. Toca “Ayuda” cuando lo necesites.</span>
+                        )}
+                      </div>
+                      {pastSuggestions.length > 0 && (
+                        <div className="mt-3 border-t border-surface-100 pt-2">
+                          <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-surface-300">
+                            Jugadas anteriores
+                          </p>
+                          <div className="space-y-2">
+                            {pastSuggestions.map((s, i) => (
+                              <p key={i} className="whitespace-pre-wrap text-xs leading-relaxed text-surface-400">
+                                {s}
+                              </p>
+                            ))}
+                          </div>
+                        </div>
                       )}
                     </div>
                   </div>

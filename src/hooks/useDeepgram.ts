@@ -156,7 +156,20 @@ export function useDeepgram({ lang = 'es-EC', onFinal, onInterim }: UseDeepgramO
         return;
       }
 
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Audio CRUDO: el DSP del navegador está afinado para videollamadas —
+      // el cancelador de eco y el supresor de ruido tratan la voz que sale del
+      // PARLANTE del celular (la del cliente, chillona y lejana) como
+      // interferencia y la borran antes de que llegue al WebSocket. Sin ellos,
+      // Deepgram recibe las dos voces y separa mejor que Chrome. AGC se queda:
+      // sube la voz lejana del parlante cuando el vendedor calla.
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: true,
+          channelCount: 1,
+        },
+      });
       if (!activeRef.current) {
         stream.getTracks().forEach((t) => t.stop());
         return;
