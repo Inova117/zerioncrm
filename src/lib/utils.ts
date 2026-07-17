@@ -113,7 +113,8 @@ export const colorFromString = (s: string): string => {
 // Contact deep-links (open the user's mail/phone/WhatsApp app).
 export const mailLink = (email: string) => `mailto:${email.trim()}`;
 export const telLink = (phone: string) => `tel:${phone.replace(/[^\d+]/g, '')}`;
-export const waLink = (phone: string) => `https://wa.me/${phone.replace(/[^\d]/g, '')}`;
+export const waLink = (phone: string, text?: string) =>
+  `https://wa.me/${phone.replace(/[^\d]/g, '')}${text ? `?text=${encodeURIComponent(text)}` : ''}`;
 export const webLink = (site: string) =>
   /^https?:\/\//i.test(site) ? site : `https://${site}`;
 

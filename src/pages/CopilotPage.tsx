@@ -112,6 +112,8 @@ export function CopilotPage() {
   const [summarizing, setSummarizing] = useState(false);
   const [debrief, setDebrief] = useState<CallDebrief | null>(null);
   const [debriefing, setDebriefing] = useState(false);
+  // Mensaje de seguimiento por WhatsApp (editable antes de enviarlo).
+  const [waText, setWaText] = useState('');
   const [pastCalls, setPastCalls] = useState<CopilotCallRecord[]>([]);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -453,6 +455,7 @@ export function CopilotPage() {
     setSummarizing(true);
     setSaved(false);
     setDebrief(null);
+    setWaText('');
     // Resumen y coaching corren EN PARALELO: el resumen alimenta el CRM,
     // el debrief te dice qué mejorar y actualiza la memoria del nicho.
     setDebriefing(true);
@@ -462,7 +465,10 @@ export function CopilotPage() {
       stats: buildStatsLine(),
       memory: memoryRef.current,
     })
-      .then(setDebrief)
+      .then((d) => {
+        setDebrief(d);
+        setWaText(d?.whatsapp ?? '');
+      })
       .catch(() => setDebrief(null))
       .finally(() => setDebriefing(false));
     try {
@@ -528,6 +534,7 @@ export function CopilotPage() {
     setMoment(null);
     setSummary(null);
     setDebrief(null);
+    setWaText('');
     setSaved(false);
     setError(null);
     setTtftMs(null);
@@ -557,6 +564,7 @@ export function CopilotPage() {
     setCard(null);
     setMoment(null);
     setDebrief(null);
+    setWaText('');
     setPastCalls([]);
     momentRef.current = null;
     cardIdRef.current = null;
@@ -841,6 +849,39 @@ export function CopilotPage() {
                           <p className="text-sm text-surface-400">Sin coaching para esta llamada.</p>
                         )}
                       </div>
+
+                      {/* Seguimiento por WhatsApp: rescate takeaway (si colgó sin
+                          escuchar la oferta) o confirmación de cita. El coach lo
+                          redacta; tú lo editas y lo mandas con un toque. */}
+                      {debrief?.whatsapp && lead && (lead.phone || lead.enrichment?.whatsapp) ? (
+                        <div className="rounded-lg border border-emerald-200 bg-emerald-50/40 p-3">
+                          <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-emerald-700">
+                            💬 WhatsApp de seguimiento
+                          </p>
+                          <textarea
+                            className="input min-h-24 w-full resize-y text-sm"
+                            value={waText}
+                            onChange={(e) => setWaText(e.target.value)}
+                          />
+                          <div className="mt-2 flex flex-wrap items-center gap-2">
+                            <a
+                              href={waLink(lead.phone || lead.enrichment?.whatsapp || '', waText)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="btn-primary px-3 py-1.5 text-xs"
+                            >
+                              Enviar por WhatsApp
+                            </a>
+                            <p className="text-[11px] text-surface-400">
+                              Edítalo si quieres — se abre en WhatsApp listo para enviar.
+                            </p>
+                          </div>
+                        </div>
+                      ) : debrief && debrief.whatsapp === '' ? (
+                        <p className="text-[11px] text-surface-400">
+                          💤 El coach recomienda no escribirle por WhatsApp — dejar enfriar y reintentar en 2-3 meses.
+                        </p>
+                      ) : null}
 
                       {/* La conversación completa, revisable */}
                       {lines.length > 0 && (

@@ -52,7 +52,7 @@ const KIMI_MODEL = Deno.env.get('KIMI_MODEL') ?? 'kimi-k3';
 // Versión visible en las cabeceras de TODA respuesta (incluido el preflight):
 //   curl -sI -X OPTIONS <url>/functions/v1/copilot | grep x-copilot-version
 // Súbela en cada cambio relevante — es la forma de verificar qué está deployado.
-const VERSION = '2026-07-17.2-haiku-effort-fix';
+const VERSION = '2026-07-17.3-wa-rescate';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -416,7 +416,7 @@ Deno.serve(async (req) => {
   if (mode === 'debrief') {
     const debriefSystem =
       'Eres el mejor sales manager de Latinoamérica revisando la grabación de una llamada en frío de tu vendedor (vende páginas web + automatizaciones a negocios locales, Ecuador). Conoces Belfort, Cardone, Voss, NEPQ y SPIN, pero hablas como jefe de ventas, no como libro. La transcripción viene del altavoz del teléfono: ambas voces mezcladas, con errores — interprétala con ese ruido.';
-    const debriefUser = `FICHA DEL PROSPECTO:\n${lead}\n\nSTATS DE LA LLAMADA:\n${stats || '(sin stats)'}\n\nMEMORIA DEL NICHO ACTUAL (lecciones acumuladas hasta hoy):\n"""\n${memory || '(vacía — primera llamada)'}\n"""\n\nTRANSCRIPCIÓN COMPLETA:\n"""\n${transcript || '(sin transcripción)'}\n"""\n\nDevuelve el JSON con coaching y lessons.`;
+    const debriefUser = `FICHA DEL PROSPECTO:\n${lead}\n\nSTATS DE LA LLAMADA:\n${stats || '(sin stats)'}\n\nMEMORIA DEL NICHO ACTUAL (lecciones acumuladas hasta hoy):\n"""\n${memory || '(vacía — primera llamada)'}\n"""\n\nTRANSCRIPCIÓN COMPLETA:\n"""\n${transcript || '(sin transcripción)'}\n"""\n\nDevuelve el JSON con coaching, lessons y whatsapp.`;
 
     if (PROVIDER === 'kimi') {
       const res = await openaiFetch({
@@ -425,7 +425,7 @@ Deno.serve(async (req) => {
         json: true,
         system:
           debriefSystem +
-          ' Devuelve SOLO un objeto JSON con: "coaching" (string: 3-5 puntos concretos de esta llamada) y "lessons" (string: la memoria del nicho ACTUALIZADA completa, máx 3500 caracteres).',
+          ' Devuelve SOLO un objeto JSON con: "coaching" (string: 3-5 puntos concretos de esta llamada), "lessons" (string: la memoria del nicho ACTUALIZADA completa, máx 3500 caracteres) y "whatsapp" (string: mensaje de seguimiento listo para enviar — rescate takeaway con muestra gratis y salida fácil si no hubo cita pero es rescatable, confirmación de cita si la hubo, o "" si fue hostil o rechazó la oferta completa).',
         user: debriefUser,
       });
       if (!res.ok) {
@@ -461,8 +461,13 @@ Deno.serve(async (req) => {
                 description:
                   'La MEMORIA DEL NICHO actualizada COMPLETA (no solo lo nuevo): fusiona lo aprendido en esta llamada con la memoria actual, elimina lo repetido u obsoleto, agrupa por temas (## Objeciones frecuentes y qué funciona / ## Aperturas / ## Horarios y rubros / ## Errores a evitar). SOLO lecciones GENERALIZABLES del nicho — los detalles de este prospecto específico van al historial del lead, no aquí. Máximo 3500 caracteres. Si la llamada no dejó nada nuevo generalizable, devuelve la memoria actual tal cual.',
               },
+              whatsapp: {
+                type: 'string',
+                description:
+                  'El mensaje de WhatsApp de seguimiento, listo para enviar tal cual (o "" si no corresponde). Reglas según el desenlace: (A) RESCATE — si NO quedó cita y el prospecto es rescatable (colgó rápido, "no me interesa" ANTES de escuchar la oferta, "mándeme info", quedó tibio): mensaje takeaway de máximo 400 caracteres — quién soy en una frase ("le llamé hace un momento de ZerionStudio"), el regalo sin compromiso (una muestra de cómo quedaría la página de SU negocio, gratis, la ve cuando tenga un minuto), y la salida fácil textual ("si no le interesa, no le vuelvo a escribir — sin compromiso"). CERO preguntas de venta, CERO precio, máximo 1 emoji. Usa el nombre real del negocio y trato de usted. (B) CITA CERRADA — confirmación en 2 frases: recap de día/hora + "cuando le llegue este mensaje, ¿me confirma con un OK?". (C) NO ESCRIBIR — si el prospecto fue hostil, pidió que no lo contacten más, o dijo que no DESPUÉS de escuchar la oferta completa: devuelve "" (insistir por WhatsApp ahí quema el prospecto de dentro de 3 meses).',
+              },
             },
-            required: ['coaching', 'lessons'],
+            required: ['coaching', 'lessons', 'whatsapp'],
           },
         },
       },

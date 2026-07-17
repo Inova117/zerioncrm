@@ -41,6 +41,8 @@ export interface CallDebrief {
   coaching: string;
   /** La memoria del nicho actualizada completa. */
   lessons: string;
+  /** Mensaje de WhatsApp de seguimiento listo para enviar ('' = mejor no escribir). */
+  whatsapp?: string;
 }
 
 export interface CopilotCallRecord {
@@ -177,7 +179,11 @@ async function supaDebrief(args: DebriefArgs): Promise<CallDebrief> {
   });
   try {
     const j = JSON.parse(raw) as CallDebrief;
-    if (typeof j.coaching === 'string' && typeof j.lessons === 'string') return j;
+    if (typeof j.coaching === 'string' && typeof j.lessons === 'string') {
+      // Distinción que la UI usa: undefined = la función deployada aún no
+      // genera el campo; '' = el coach decidió que es mejor NO escribir.
+      return { ...j, whatsapp: typeof j.whatsapp === 'string' ? j.whatsapp : undefined };
+    }
   } catch {
     /* cae al fallback */
   }
@@ -193,7 +199,8 @@ async function mockDebrief(args: DebriefArgs): Promise<CallDebrief> {
   ].join('\n');
   const nueva = `- ${new Date().toLocaleDateString()}: la objeción más frecuente sigue siendo el precio; ancla primero la pérdida mensual.`;
   const lessons = `${args.memory}\n${nueva}`.trim().slice(-3500);
-  return { coaching, lessons };
+  const whatsapp = `Hola, le llamé hace un momento de ZerionStudio — disculpe si le agarré ocupado. Solo le dejo esto: tenemos una muestra de cómo quedaría la página de ${args.lead.company}, gratis y sin compromiso, para que la vea cuando tenga un minuto. Si no le interesa, no le vuelvo a escribir. Saludos 🙌`;
+  return { coaching, lessons, whatsapp };
 }
 
 export const copilotDebrief: (args: DebriefArgs) => Promise<CallDebrief> =
