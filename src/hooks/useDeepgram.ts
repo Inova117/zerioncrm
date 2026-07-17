@@ -80,7 +80,13 @@ async function fetchToken(probe: boolean): Promise<TokenResponse> {
     },
     body: JSON.stringify({ probe }),
   });
-  if (!res.ok) return { available: false };
+  if (!res.ok) {
+    // Superficie del porqué (p.ej. la master key de Deepgram sin permiso para
+    // /v1/auth/grant): sin esto solo se ve un 502 opaco y cuesta diagnosticar.
+    const err = (await res.json().catch(() => ({}))) as { error?: string; detail?: string };
+    console.warn('[deepgram-token]', res.status, err.error ?? '', err.detail ?? '');
+    return { available: false };
+  }
   return (await res.json()) as TokenResponse;
 }
 

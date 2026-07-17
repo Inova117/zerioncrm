@@ -103,6 +103,12 @@ interface AnthropicRequest {
   output_config?: Record<string, unknown>;
 }
 
+// `output_config.effort` solo existe en Opus 4.5+ / Sonnet 4.6+ / Fable.
+// En Haiku 4.5 y Sonnet 4.5 el parámetro devuelve 400 — se omite.
+const supportsEffort = (model: string): boolean => !/haiku|sonnet-4-5/.test(model);
+const effortFor = (model: string): Record<string, unknown> =>
+  supportsEffort(model) ? { output_config: { effort: 'low' } } : {};
+
 async function anthropicFetch(req: AnthropicRequest): Promise<Response> {
   return await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -327,7 +333,7 @@ Deno.serve(async (req) => {
       max_tokens: 300,
       stream: true,
       system: sys,
-      output_config: { effort: 'low' },
+      ...effortFor(MODEL),
       messages: [{ role: 'user', content: userMsg }],
     });
     if (!upstream.ok || !upstream.body) {
@@ -373,7 +379,7 @@ Deno.serve(async (req) => {
       max_tokens: 150,
       stream: true,
       system: sys,
-      output_config: { effort: 'low' },
+      ...effortFor(MODEL_SUGGEST),
       messages: [{ role: 'user', content: userMsg }],
     });
     if (!upstream.ok || !upstream.body) {
@@ -419,7 +425,7 @@ Deno.serve(async (req) => {
       max_tokens: 1500,
       system: [{ type: 'text', text: debriefSystem }],
       output_config: {
-        effort: 'low',
+        ...(supportsEffort(MODEL) ? { effort: 'low' } : {}),
         format: {
           type: 'json_schema',
           schema: {
@@ -488,7 +494,7 @@ Deno.serve(async (req) => {
         },
       ],
       output_config: {
-        effort: 'low',
+        ...(supportsEffort(MODEL) ? { effort: 'low' } : {}),
         format: {
           type: 'json_schema',
           schema: {
