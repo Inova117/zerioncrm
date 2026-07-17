@@ -14,7 +14,7 @@ import { useData } from '../context/DataContext';
 import { useSpeech } from '../hooks/useSpeech';
 import { useDeepgram } from '../hooks/useDeepgram';
 import { copilotBriefing, copilotSuggest, copilotSummary, copilotWarm, type CallSummary } from '../services/copilotService';
-import { detectObjection, detectMoment, type Battlecard, type MomentInfo } from '../data/salesPlaybook';
+import { detectObjection, detectMoment, normalizeSpeech, type Battlecard, type MomentInfo } from '../data/salesPlaybook';
 import type { Lead } from '../types';
 import { cn, colorFromString, initials, telLink, waLink, webLink, googleMapsUrl, fmtDate } from '../lib/utils';
 import { stageLabel } from '../lib/constants';
@@ -25,6 +25,38 @@ type Phase = 'pick' | 'brief' | 'live' | 'wrap';
 // Los momentos urgentes y las objeciones se saltan el colchón.
 const SUGGEST_GAP_MS = 5000;
 const URGENT_MOMENTS = ['senal-compra', 'peligro', 'gatekeeper', 'precio', 'cierre'];
+
+// Filtro de eco: si una línea del transcript comparte una ventana de N palabras
+// con la sugerencia actual, casi seguro es el VENDEDOR leyendo el consejo en
+// voz alta — no debe re-disparar battlecards ni al coach.
+// Se compara sin acentos NI puntuación (el habla transcrita no trae comas).
+const normForEcho = (s: string): string =>
+  normalizeSpeech(s)
+    .replace(/[^a-z0-9ñ\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+function sharesWindow(a: string, b: string, n = 5): boolean {
+  const words = a.split(/\s+/).filter(Boolean);
+  if (words.length < n || !b) return false;
+  for (let i = 0; i + n <= words.length; i++) {
+    if (b.includes(words.slice(i, i + n).join(' '))) return true;
+  }
+  return false;
+}
+
+// Qué jugada toca según cuántas veces sonó la MISMA objeción (disciplina del Árbitro).
+function loopPlay(n: number): string {
+  if (n <= 1) return 'loop 1: battlecard tal cual';
+  if (n === 2) return 'loop 2: riesgo cero + prueba en vivo';
+  if (n === 3) return 'loop 3: dolor futuro con sus números';
+  return 'loop 4 NO existe: retirada elegante con fecha y hora';
+}
+
+// Captura heurística de los números del prospecto (con numerals=true el
+// transcriptor entrega dígitos). Son el ancla de toda la matemática del coach.
+const RE_TICKET = /(?:me deja|deja (?:como|unos)|me queda|queda como|gano (?:como|unos)|cobro (?:como|unos)|vale (?:como|unos)|cada cliente(?: me)? deja)\D{0,8}(\d{1,4})/;
+const RE_PERDIDOS = /(?:se me van|se van como|pierdo|se pierden|se me escapan|se me pierden)\D{0,8}(\d{1,3})\b/;
 
 /** Condensa el historial del prospecto (comentarios/llamadas) para el coach. */
 function buildHistory(
@@ -71,6 +103,10 @@ export function CopilotPage() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ttftMs, setTtftMs] = useState<number | null>(null); // latencia real del coach
+  const [numbers, setNumbers] = useState<{ ticket: number | null; perdidos: number | null }>({
+    ticket: null,
+    perdidos: null,
+  });
 
   const transcriptRef = useRef('');
   const historyRef = useRef('');
@@ -80,7 +116,36 @@ export function CopilotPage() {
   const lastSuggestRef = useRef(0);
   const suggestAbortRef = useRef<AbortController | null>(null);
   const suggestingRef = useRef(false);
+  const suggestionRef = useRef('');
   const linesEndRef = useRef<HTMLDivElement | null>(null);
+  // Estado estructurado de la llamada (grounding del coach + stats al guardar)
+  const objCountsRef = useRef<Record<string, number>>({});
+  const momentsSeenRef = useRef<string[]>([]);
+  const ticketRef = useRef<number | null>(null);
+  const perdidosRef = useRef<number | null>(null);
+  const callStartRef = useRef(0);
+
+  useEffect(() => {
+    suggestionRef.current = suggestion;
+  }, [suggestion]);
+
+  // Resumen del estado que viaja al coach en cada suggest: le da el número de
+  // loop por objeción (disciplina L1→L2→L3) y los números del prospecto.
+  const buildCallState = useCallback((): string => {
+    const parts: string[] = [];
+    const objs = Object.entries(objCountsRef.current);
+    if (objs.length) {
+      parts.push(
+        'Objeciones sonadas: ' +
+          objs.map(([id, n]) => `${id}×${n} (→${loopPlay(n)})`).join(' · ')
+      );
+    }
+    const nums: string[] = [];
+    if (ticketRef.current != null) nums.push(`ticket ≈ $${ticketRef.current}`);
+    if (perdidosRef.current != null) nums.push(`pierde ≈ ${perdidosRef.current} clientes/mes`);
+    if (nums.length) parts.push(`Números del prospecto (úsalos EXACTOS): ${nums.join(' · ')}`);
+    return parts.join('. ');
+  }, []);
 
   const myLeads = useMemo(() => {
     const scoped = isAdmin ? leads : leads.filter((l) => l.assignedTo === user?.id);
@@ -123,6 +188,7 @@ export function CopilotPage() {
             trigger,
             history: historyRef.current,
             moment: momentRef.current ? `${momentRef.current.label}: ${momentRef.current.bestMove}` : undefined,
+            callState: buildCallState() || undefined,
           },
           (chunk) => {
             if (ctrl.signal.aborted) return;
@@ -152,19 +218,37 @@ export function CopilotPage() {
       transcriptRef.current = `${transcriptRef.current} ${text}`.trim().slice(-6000);
       setLines((prev) => [...prev, text]);
 
+      // 0) Filtro de eco: si es el vendedor leyendo el consejo en voz alta,
+      //    entra al transcript pero NO re-dispara detección ni coach.
+      const norm = normalizeSpeech(text);
+      if (sharesWindow(normForEcho(text), normForEcho(suggestionRef.current))) return;
+
+      // 0b) Números del prospecto (ticket / clientes perdidos): el ancla de
+      //     toda la matemática. Solo sobre finales (texto estable).
+      const mt = RE_TICKET.exec(norm);
+      if (mt) ticketRef.current = Number(mt[1]);
+      const mp = RE_PERDIDOS.exec(norm);
+      if (mp) perdidosRef.current = Number(mp[1]);
+      if (mt || mp) setNumbers({ ticket: ticketRef.current, perdidos: perdidosRef.current });
+
       // 1) ¿En qué momento de la llamada estamos? (regex, instantáneo)
       const prevMomentId = momentRef.current?.id;
       const m = detectMoment(text);
       if (m) {
         momentRef.current = m;
         setMoment(m);
+        if (momentsSeenRef.current[momentsSeenRef.current.length - 1] !== m.label) {
+          momentsSeenRef.current.push(m.label);
+        }
       }
 
-      // 2) Battlecard de objeción (respuesta lista sin esperar al LLM)
+      // 2) Battlecard de objeción (respuesta lista sin esperar al LLM) + el
+      //    contador de loops POR objeción que alimenta la disciplina del Árbitro
       const hit = detectObjection(text);
       if (hit) {
         cardIdRef.current = hit.id;
         setCard(hit);
+        objCountsRef.current[hit.id] = (objCountsRef.current[hit.id] ?? 0) + 1;
       }
 
       // 3) Jugada instantánea: si entramos a un momento urgente NUEVO, la mejor
@@ -193,6 +277,8 @@ export function CopilotPage() {
   // corrige; si coincide, ganamos ~0.5-1.5s.
   const onInterim = useCallback(
     (text: string) => {
+      // Filtro de eco: el vendedor leyendo el consejo no dispara nada.
+      if (sharesWindow(normForEcho(text), normForEcho(suggestionRef.current))) return;
       const hit = detectObjection(text);
       if (hit && hit.id !== cardIdRef.current) {
         cardIdRef.current = hit.id;
@@ -202,6 +288,9 @@ export function CopilotPage() {
       if (m && m.id !== momentRef.current?.id) {
         momentRef.current = m;
         setMoment(m);
+        if (momentsSeenRef.current[momentsSeenRef.current.length - 1] !== m.label) {
+          momentsSeenRef.current.push(m.label);
+        }
         if (!suggestingRef.current) {
           setSuggestion(`⚡ **${m.label}** — ${m.bestMove}`);
         }
@@ -277,9 +366,15 @@ export function CopilotPage() {
     setCard(null);
     setMoment(null);
     setTtftMs(null);
+    setNumbers({ ticket: null, perdidos: null });
     momentRef.current = null;
     cardIdRef.current = null;
     transcriptRef.current = '';
+    objCountsRef.current = {};
+    momentsSeenRef.current = [];
+    ticketRef.current = null;
+    perdidosRef.current = null;
+    callStartRef.current = Date.now();
     lastSuggestRef.current = Date.now();
     copilotWarm(); // re-toque al cache por si el briefing tomó >5 min
     engine.start();
@@ -304,7 +399,21 @@ export function CopilotPage() {
 
   async function saveToLead() {
     if (!lead || !summary || saved) return;
-    const body = `📞 Llamada (Copilot) — ${summary.summary}${summary.nextAction ? `\n➡️ Próxima acción: ${summary.nextAction}` : ''}`;
+    // Stats de la llamada: datos para iterar el playbook (qué objeciones
+    // suenan, qué ruta siguió la llamada, los números del prospecto).
+    const mins = callStartRef.current ? Math.max(1, Math.round((Date.now() - callStartRef.current) / 60000)) : 0;
+    const objs = Object.entries(objCountsRef.current)
+      .map(([id, n]) => (n > 1 ? `${id}×${n}` : id))
+      .join(', ');
+    const statsParts = [
+      mins ? `${mins} min` : '',
+      momentsSeenRef.current.length ? `Ruta: ${momentsSeenRef.current.join(' → ')}` : '',
+      objs ? `Objeciones: ${objs}` : '',
+      ticketRef.current != null ? `Ticket ≈ $${ticketRef.current}` : '',
+      perdidosRef.current != null ? `Pierde ≈ ${perdidosRef.current}/mes` : '',
+    ].filter(Boolean);
+    const stats = statsParts.length ? `\n📊 ${statsParts.join(' · ')}` : '';
+    const body = `📞 Llamada (Copilot) — ${summary.summary}${summary.nextAction ? `\n➡️ Próxima acción: ${summary.nextAction}` : ''}${stats}`;
     await addComment(lead.id, body);
     if (summary.temperature !== lead.temperature) {
       await moveLead(lead.id, summary.temperature);
@@ -483,19 +592,39 @@ export function CopilotPage() {
 
               {phase === 'live' && (
                 <>
-                  {moment && (
-                    <div
-                      className={cn(
-                        'flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold',
-                        moment.id === 'senal-compra' && 'border-green-300 bg-green-50 text-green-800',
-                        moment.id === 'peligro' && 'border-red-300 bg-red-50 text-red-800',
-                        (moment.id === 'precio' || moment.id === 'objecion') && 'border-amber-300 bg-amber-50 text-amber-800',
-                        !['senal-compra', 'peligro', 'precio', 'objecion'].includes(moment.id) &&
-                          'border-surface-200 bg-surface-50 text-surface-700'
+                  {(moment || numbers.ticket != null || numbers.perdidos != null) && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      {moment && (
+                        <div
+                          className={cn(
+                            'flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold',
+                            moment.id === 'senal-compra' && 'border-green-300 bg-green-50 text-green-800',
+                            moment.id === 'peligro' && 'border-red-300 bg-red-50 text-red-800',
+                            (moment.id === 'precio' || moment.id === 'objecion') && 'border-amber-300 bg-amber-50 text-amber-800',
+                            !['senal-compra', 'peligro', 'precio', 'objecion'].includes(moment.id) &&
+                              'border-surface-200 bg-surface-50 text-surface-700'
+                          )}
+                        >
+                          <span className="text-base leading-none">{moment.emoji}</span>
+                          <span>Momento: {moment.label}</span>
+                        </div>
                       )}
-                    >
-                      <span className="text-base leading-none">{moment.emoji}</span>
-                      <span>Momento: {moment.label}</span>
+                      {numbers.ticket != null && (
+                        <span
+                          className="rounded-xl border border-emerald-200 bg-emerald-50 px-2.5 py-2 text-sm font-semibold text-emerald-800"
+                          title="Lo que le deja un cliente — el ancla de toda la matemática"
+                        >
+                          💵 Ticket ≈ ${numbers.ticket}
+                        </span>
+                      )}
+                      {numbers.perdidos != null && (
+                        <span
+                          className="rounded-xl border border-rose-200 bg-rose-50 px-2.5 py-2 text-sm font-semibold text-rose-800"
+                          title="Clientes que dice perder al mes"
+                        >
+                          📉 Pierde ≈ {numbers.perdidos}/mes
+                        </span>
+                      )}
                     </div>
                   )}
                   {card && (

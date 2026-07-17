@@ -27,6 +27,7 @@ export { OPENERS } from './playbook/apertura';
 export { CLOSES } from './playbook/cierres';
 export { POSTVENTA } from './playbook/postventa';
 export { NEPQ } from './playbook/nepq';
+export { EJEMPLOS } from './playbook/ejemplos';
 export { BATTLECARDS, type Battlecard } from './playbook/battlecards';
 export { normalizeSpeech } from './playbook/normalize';
 export {
@@ -42,6 +43,7 @@ import { OPENERS } from './playbook/apertura';
 import { CLOSES } from './playbook/cierres';
 import { POSTVENTA } from './playbook/postventa';
 import { NEPQ } from './playbook/nepq';
+import { EJEMPLOS } from './playbook/ejemplos';
 import { BATTLECARDS, type Battlecard } from './playbook/battlecards';
 import { normalizeSpeech } from './playbook/normalize';
 import { momentsForPrompt } from './playbook/momentos';
@@ -76,5 +78,6 @@ export function playbookForPrompt(): string {
     momentsForPrompt(),
     '## MANEJO DE OBJECIONES (responde con estas líneas, adaptadas al contexto del prospecto)',
     cards,
+    EJEMPLOS,
   ].join('\n\n');
 }

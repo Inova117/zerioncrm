@@ -64,7 +64,7 @@ export const MOMENTS: MomentInfo[] = [
     label: 'Señal de compra — CIERRA',
     emoji: '🟢',
     priority: 95,
-    cues: /cuanto (cuesta|vale|sale|es|cobran?|me sale|se demoran?)|que incluye|en cuanto tiempo|cuanto (tiempo )?se demoran?|estaria list[ao]|como (seria|funciona( eso)?|trabajan)|tienen ejemplos|trabajos (hechos|anteriores)|han trabajado con|donde puedo ver|me pueden poner (el menu|las fotos)|ustedes tambien manejan|y si despues quiero cambiar|suena (bien|interesante)|estaria bueno/,
+    cues: /cuanto (cuesta|vale|sale|es|cobran?|me sale|se demoran?)|que incluye|en cuanto tiempo|cuanto (tiempo )?se demoran?|estaria list[ao]|como seria|tienen ejemplos|trabajos (hechos|anteriores)|han trabajado con|donde puedo ver|me pueden poner (el menu|las fotos)|ustedes tambien manejan|y si despues quiero cambiar|suena (bien|interesante)|estaria bueno/,
     bestMove:
       'Dejó de evaluarte: está imaginándose CON la página. Responde en UNA frase y convierte en cita con alternativa: "Claro, le explico todo con ejemplos de su mismo rubro. ¿Le va mejor mañana a las 10 o el jueves a las 3?" Si pregunta precio en frío: "Depende de lo que necesite — por eso la muestra es gratis: la ve primero y hablamos de números con algo concreto en la mano. ¿Martes o miércoles?" DOS señales seguidas y sigues explicando = estás matando la venta.',
   },
@@ -100,7 +100,7 @@ export const MOMENTS: MomentInfo[] = [
     label: 'Pidió el pitch',
     emoji: '🎯',
     priority: 60,
-    cues: /que (es lo que )?hacen (ustedes)?|y ustedes que hacen|como funciona eso|explique(me)?|a ver,? expliqueme|que me ofrece|que ofrece exactamente|para que me sirve( eso)?|eso de las paginas como es|que harian con mi negocio|de que se trata/,
+    cues: /que (es lo que )?hacen (ustedes)?|y ustedes que hacen|como funciona( eso)?|como trabajan|explique(me)?|a ver,? expliqueme|que me ofrece|que ofrece exactamente|para que me sirve( eso)?|eso de las paginas como es|que harian con mi negocio|de que se trata/,
     bestMove:
       'Pitch de 20 segundos, anclado al dolor que ÉL ya dijo, CERO tecnicismos, y remata con pregunta: "Es simple: le hacemos una página donde lo encuentran en Google, ven sus [servicios/menú] y le escriben directo a su WhatsApp. Usted no toca nada, nosotros hacemos todo. ¿Le cuadra para su negocio?" PROHIBIDO: listar features técnicos, dar precio antes de mostrar valor, hablar mal de la competencia.',
   },

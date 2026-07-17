@@ -24,6 +24,8 @@ export interface SuggestArgs {
   history?: string;
   /** Momento de la llamada detectado en el cliente ("label: mejor jugada"). */
   moment?: string;
+  /** Estado estructurado: loops por objeción + números del prospecto. */
+  callState?: string;
 }
 
 export interface CallSummary {
@@ -113,6 +115,7 @@ const supaSuggest = (args: SuggestArgs, onDelta: (t: string) => void, signal?: A
       trigger: args.trigger ?? '',
       history: args.history ?? '',
       moment: args.moment ?? '',
+      callState: args.callState ?? '',
       settings: settingsForPrompt(),
     },
     onDelta,

@@ -34,16 +34,27 @@ export const BATTLECARDS: Battlecard[] = [
   {
     id: 'caro',
     triggers:
-      /caro|carisimo|carito|mucha plata|mucho dinero|no me alcanza|fuerte el precio|esta elevado|cuesta mucho|un ojo de la cara|no tengo (para|plata|dinero)|no hay (plata|presupuesto)|fuera de (mi )?presupuesto|no estoy para (esos )?gastos|es mucho eso/,
+      /\bcar(o|os|isimo|ito)\b|mucha plata|mucho dinero|no me alcanza|fuerte el precio|esta elevado|cuesta mucho|un ojo de la cara|no tengo (para|plata|dinero)|no hay (plata|presupuesto)|fuera de (mi )?presupuesto|no estoy para (esos )?gastos|es mucho eso/,
     objection: '"Está caro / no tengo presupuesto"',
     response:
       'Tiene toda la razón, no es barato — y justo por eso funciona. Le pregunto: ¿caro comparado con qué? ¿Cuánto le deja un cliente nuevo? Porque si la página le trae dos al mes, se pagó sola. Y se puede partir: la mitad para arrancar y la otra cuando esté lista y a usted le guste.',
     why: 'Cardone: acuerda primero y NUNCA defiendas el precio — cuantifica el costo de NO comprar con SUS números. Cede en términos (pago partido), jamás en precio. Y tras decir un precio: SILENCIO, el primero que habla cede.',
   },
   {
+    // Antes que 'sobrino': "un muchacho me lo hace a mitad de precio" es
+    // objeción de PRECIO contra fantasmas, no de familiar.
+    id: 'mas-barato',
+    triggers:
+      /(el otro|otros?|un muchacho) me (cobra|cobraba|ofrecio|lo hace) (menos|mas barato|a mitad)|mas barato|a mitad de precio|lo hace en cien|en marketplace sale|cobran menos|hay quien lo hace/,
+    objection: '"Otro me lo hace más barato"',
+    response:
+      'Seguro que sí — siempre hay más barato, como en todo… usted también tiene competencia que cobra menos que usted, ¿verdad? La pregunta es: ¿esa página le va a traer clientes, o solo va a existir? Déjeme mostrarle la diferencia con ejemplos reales: ¿mañana o el jueves?',
+    why: 'No pelees precio contra fantasmas: mueve la conversación a resultados y a la cita. "Como en todo" conecta con su propia experiencia de competir contra baratos — el mismo argumento que él usa a diario para defender su precio.',
+  },
+  {
     id: 'sobrino',
     triggers:
-      /mi (sobrino|hijo|hija|primo|hermano|pana)( me| sabe| maneja| hace| hizo| esta| la| lo)|un (amigo|muchacho|conocido|pana) me (la |lo )?(hace|hizo|esta haciendo|ayuda|maneja|ve|iba a hacer)|ya tengo quien|ya contrate a alguien|ya estoy en eso con alguien|mi disenador|un conocido que me ayuda/,
+      /mi (sobrino|hijo|hija|primo|hermano|pana)( me| sabe| maneja| hace| hizo| esta| la| lo)|un (amigo|muchacho|conocido|pana)( que)? me (la |lo )?(hace|hizo|esta haciendo|ayuda|maneja|ve|iba a hacer)|ya tengo quien|ya contrate a alguien|ya estoy en eso con alguien|mi disenador|un conocido que me ayuda/,
     objection: '"Mi sobrino/hijo/amigo me hace la página"',
     response:
       '¡Qué bueno, así no empieza de cero — y eso me dice que usted ya sabe que la necesita! Solo por curiosidad: ¿hace cuánto quedó en hacérsela? ¿Ya aparece en Google? … Hagamos algo justo: le mando gratis una muestra de cómo la haríamos nosotros, se la enseña a él, y deciden con las dos en la mano. No pierde nada.',
@@ -61,7 +72,7 @@ export const BATTLECARDS: Battlecard[] = [
   {
     id: 'facebook',
     triggers:
-      /(tengo|con el|con mi|puro|por) (facebook|face|instagram|insta)( me| nomas| y)?|me escriben por (el )?(face|instagram|insta|messenger)|publico en (el |mi )?(face|facebook|instagram)|para eso tengo (las redes|el whatsapp)|(facebook|instagram|las redes) me (basta|va bien|funciona)|manejo todo por (el )?(face|facebook|instagram|whatsapp)|puro whatsapp trabajo/,
+      /(tengo|con el|con mi|puro|por) (facebook|face|instagram|insta)( me| nomas| y)?|me escribe(n)? por (el )?(face|instagram|insta|messenger)|publico en (el |mi )?(face|facebook|instagram)|para eso tengo (las redes|el whatsapp)|(facebook|instagram|las redes) me (basta|va bien|funciona)|manejo todo por (el )?(face|facebook|instagram|whatsapp)|puro whatsapp trabajo/,
     objection: '"Con Facebook/Instagram me basta"',
     response:
       'Y eso está perfecto — no lo deje, es la mitad del trabajo. Solo fíjese en un detalle: cuando alguien que NO lo conoce busca su rubro en Google, su Facebook no aparece — aparecen sus competidores. Las redes son para los que ya lo conocen; la página agarra a los que lo buscan HOY con la plata en la mano, y los manda directo a su WhatsApp.',
@@ -70,7 +81,7 @@ export const BATTLECARDS: Battlecard[] = [
   {
     id: 'mandame-info',
     triggers:
-      /manda?(me|n)? (la |una |el |algo |todo )?(info|informacion|proforma|cotizacion|detalle|precios)|pas(a|e)(me)? (la |una |todo )?(info|informacion|cotizacion)|escrib(a|e)(me)? (mejor|al correo)|por (whatsapp|correo|interno) (y yo le aviso|mejor)|dej(a|e)(me)? (tu|su) numero y yo/,
+      /mand(a|e)(me|n)? (la |una |el |algo |todo )?(info|informacion|proforma|cotizacion|detalle|precios)|pas(a|e)(me)? (la |una |todo )?(info|informacion|cotizacion)|escrib(a|e)(me)? (mejor|al correo)|por (whatsapp|correo|interno) (y yo le aviso|mejor)|dej(a|e)(me)? (tu|su) numero y yo/,
     objection: '"Mándame la información" (el adiós educado)',
     response:
       'Claro que sí, ahorita mismo le mando. Pero no le quiero mandar un catálogo genérico que nadie lee: mejor le preparo la muestra de cómo se vería SU página, con su nombre y sus colores. ¿La revisamos juntos el jueves en la tarde o el viernes en la mañana? Son 10 minutos.',
@@ -129,15 +140,6 @@ export const BATTLECARDS: Battlecard[] = [
     response:
       'Y eso habla excelente de su trabajo — la recomendación no se compra, y eso nadie se lo quita. Ahora fíjese qué hace hoy el recomendado ANTES de llamarlo: lo busca en Google. Si no encuentra nada, esa recomendación se enfría y se va donde el que sí aparece. La página no reemplaza su boca a boca: lo remata.',
     why: 'Es la objeción de ORGULLO: atacarla es atacar su trayectoria. Móntate encima: "el recomendado te googlea primero" es algo que él mismo hace cuando le recomiendan algo — no lo puede negar. Dale un lugar a su orgullo dentro de tu solución.',
-  },
-  {
-    id: 'mas-barato',
-    triggers:
-      /(el otro|otros?|un muchacho) me (cobra|cobraba|ofrecio|lo hace) (menos|mas barato|a mitad)|mas barato|a mitad de precio|lo hace en cien|en marketplace sale|cobran menos|hay quien lo hace/,
-    objection: '"Otro me lo hace más barato"',
-    response:
-      'Seguro que sí — siempre hay más barato, como en todo… usted también tiene competencia que cobra menos que usted, ¿verdad? La pregunta es: ¿esa página le va a traer clientes, o solo va a existir? Déjeme mostrarle la diferencia con ejemplos reales: ¿mañana o el jueves?',
-    why: 'No pelees precio contra fantasmas: mueve la conversación a resultados y a la cita. "Como en todo" conecta con su propia experiencia de competir contra baratos — el mismo argumento que él usa a diario para defender su precio.',
   },
   {
     id: 'no-interesa',

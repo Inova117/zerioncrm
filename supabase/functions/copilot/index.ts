@@ -60,6 +60,13 @@ CÓMO PIENSAS (proceso interno — jamás lo expliques en la respuesta):
 2. Juega LA jugada de ESE momento según el playbook: objeción → acordar + loop (nunca contradecir); señal de compra → dejar de presentar y cerrar YA con alternativa; peligro → rescate de 15 segundos con un dato SUYO; descubrimiento → la siguiente pregunta que cuantifica el dolor; precio → cuantificar retorno con SUS números, jamás defender ni bajar el precio de una; gatekeeper → aliado, nombre y hora, sin pitchear.
 3. Personaliza SIEMPRE con la ficha y el historial del prospecto, y con la oferta real del vendedor (MI NEGOCIO tiene prioridad sobre el playbook).
 
+CONTRATO DE VERDAD (anti-alucinación — esto es INVIOLABLE):
+- Datos del PROSPECTO: usa SOLO lo que está en la FICHA o lo que él dijo en la transcripción. Si no sabes su rating, reseñas, nombre o rubro exacto — NO lo inventes: usa la versión sin dato ("vi su negocio en Google" en vez de "sus 4.8 estrellas").
+- Precios, plazos, garantías y formas de pago: usa SOLO los de MI NEGOCIO. Si MI NEGOCIO no los define, usa los del playbook marcados como ejemplo o difiere ("eso lo vemos con la muestra en la mano") — JAMÁS inventes una cifra, una garantía o una promesa que Martín no pueda cumplir.
+- Casos de éxito y clientes: NUNCA inventes nombres de clientes, negocios ni resultados ("le hicimos la página a X y ganó Y"). Si no hay caso real en MI NEGOCIO o el historial, ofrece la muestra gratis como prueba.
+- Transcripción ambigua o con ruido: prefiere una PREGUNTA sobre una afirmación. Ante la duda de qué dijo, la jugada segura es un espejo o una calibrada.
+- Números del prospecto (ticket, clientes perdidos): si él ya los dijo, repítelos EXACTOS; no los redondees hacia arriba ni "mejores" su matemática.
+
 CÓMO RESPONDES:
 - SOLO lo accionable: la frase EXACTA para decir en voz alta AHORA, en **negrita**, lista para salir de la boca. Opcional: UNA nota en cursiva (tonalidad o porqué) de una línea.
 - Máximo 2-4 frases. El vendedor lee de reojo EN la llamada.
@@ -78,6 +85,8 @@ interface CopilotBody {
   settings?: string;
   /** Momento de la llamada detectado en el cliente ("label: mejor jugada"). */
   moment?: string;
+  /** Estado estructurado: loops por objeción + números del prospecto. */
+  callState?: string;
 }
 
 // --- Llamada a Anthropic (raw HTTP; streaming SSE → texto plano) ------------
@@ -264,6 +273,7 @@ Deno.serve(async (req) => {
   const settings = (body.settings ?? '').slice(0, 4000);
   const history = (body.history ?? '').slice(0, 4000);
   const moment = (body.moment ?? '').slice(0, 600);
+  const callState = (body.callState ?? '').slice(0, 600);
 
   // -------------------------------------------------------------------- warm
   // Precalienta el cache del system (PERSONA + playbook, por modelo) para que
@@ -326,9 +336,12 @@ Deno.serve(async (req) => {
     const momentLine = moment
       ? `MOMENTO DETECTADO (confírmalo o corrígelo con la transcripción): ${moment}\n\n`
       : '';
+    const stateLine = callState
+      ? `ESTADO DE LA LLAMADA (lo llevó el detector local — respeta el número de loop y usa los números del prospecto EXACTOS): ${callState}\n\n`
+      : '';
     // "Frase primero": con streaming, el vendedor tiene la frase decible en
     // TTFT+~200ms y el porqué llega mientras ya la está usando.
-    const userMsg = `${momentLine}TRANSCRIPCIÓN RECIENTE DE LA LLAMADA (mic en altavoz, ambas voces mezcladas):\n"""\n${transcript || '(la llamada acaba de empezar)'}\n"""\n\n${ask}\n\nFORMATO OBLIGATORIO: línea 1 = SOLO la frase exacta para decir en voz alta (máx 15 palabras), en **negrita**. Línea 2 (opcional) = una sola oración en cursiva con la tonalidad o el porqué.`;
+    const userMsg = `${momentLine}${stateLine}TRANSCRIPCIÓN RECIENTE DE LA LLAMADA (mic en altavoz, ambas voces mezcladas):\n"""\n${transcript || '(la llamada acaba de empezar)'}\n"""\n\n${ask}\n\nFORMATO OBLIGATORIO: línea 1 = SOLO la frase exacta para decir en voz alta (máx 15 palabras), en **negrita**. Línea 2 (opcional) = una sola oración en cursiva con la tonalidad o el porqué.`;
     const sys = buildSystem(lead, playbook, history, settings);
 
     if (PROVIDER === 'kimi') {
