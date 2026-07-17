@@ -322,10 +322,10 @@ async function mockBriefing(lead: Lead, history: string, _memory: string, onDelt
     ...settingsLine,
     ...histLine,
     `**Tu apertura (dila y CALLA):**`,
-    `"${lead.contactName || 'Buenos días'}, le habla Martín de ZerionStudio. Busqué su negocio en Google — ${
-      e?.rating != null ? `vi sus ${e.rating} estrellas con ${e.reviewCount} reseñas` : 'me llamó la atención'
-    }${noWeb ? ', pero no me aparece página suya' : ''}. ¿Me regala 30 segundos y usted mismo decide?"`,
-    '*(cálido, sonriendo, sube apenas al final — no suenes a call center)*',
+    `"¡${lead.contactName || 'Buenas'}! ¿Cómo le va? … No me conoce todavía — soy Martín, de ZerionStudio. Antes de llamarle busqué su negocio en Google, como haría un cliente: ${
+      e?.rating != null ? `tiene ${e.rating} estrellas con ${e.reviewCount} reseñas` : 'me llamó la atención lo que encontré'
+    }${noWeb ? '… y no le aparece página' : ''}. ¿Usted sabía eso?"`,
+    '*(tono de conocido: saluda, PAUSA real hasta que responda, y recién ahí sigues — el remate es pregunta, no permiso)*',
     '',
     '**Meta:** agendar la muestra gratis de SU página en esta llamada.',
     '',

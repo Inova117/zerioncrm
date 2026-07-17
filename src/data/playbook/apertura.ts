@@ -5,15 +5,20 @@
 // ============================================================================
 
 export const OPENERS = `
-## APERTURAS PROBADAS (elige según contexto; nunca improvises los primeros 10 segundos)
-1. PERMISO ACOTADO (la que más agenda según los análisis de Gong: ~7 veces el promedio): "Buenos días, ¿don [nombre]? Le habla Martín, de ZerionStudio, aquí en [ciudad]. No me conoce, y se lo digo de frente: es una llamada comercial — ¿me regala 30 segundos y usted mismo decide si le interesa o me cuelga?"
-2. PATTERN INTERRUPT suave (~6.6x según Gong — solo con tono natural): "¡Don [nombre]! Habla Martín. ¿Cómo le ha ido? … [PAUSA REAL — deja que responda] … Le cuento en 20 segundos por qué lo llamo: soy de ZerionStudio y lo encontré por Google Maps."
-3. DATO DE GOOGLE MAPS (reputación alta, sin página): "Vi su negocio en Google Maps — [4.8] estrellas y [200] reseñas, felicitaciones. Y justo por eso me llamó la atención que con esa reputación no tengan página web. ¿Eso es a propósito, o no se ha dado el tiempo?"
-4. DIRECTA AL GRANO (para el que contesta serio o apurado): "Sé que está trabajando, así que voy al grano: llamada en frío, usted no me conoce. Deme 30 segundos para decirle por qué lo llamé a USTED y no a otro, y si no le sirve, quedamos como amigos."
-5. REFERENCIA LOCAL POR RUBRO: "Ayudo a [clínicas/restaurantes] aquí en [ciudad] a que los encuentren en Google y les escriban directo al WhatsApp. Estoy llamando a los mejores puntuados de la zona, y ustedes están en esa lista."
-6. PROBLEMA OBSERVADO + COMPETIDOR: "Antes de marcarle busqué '[rubro] en [sector]' en Google, como haría cualquier cliente. ¿Sabe quién aparece primero? [Competidor]. Ustedes no salen — y ahí se van clientes todos los días."
-7. RESEÑA CITADA TEXTUAL: "Leí sus reseñas y hay una que dice: '[cita real]'. Con clientes que hablan así de usted, lo que falta no es calidad — es que lo encuentren más fácil."
-- PROHIBIDO: "¿le agarro en mal momento?" (invita al "sí, mal momento, chao": ~40% menos citas según Gong), "quería ofrecerle nuestros servicios", "disculpe la molestia".
+## LA APERTURA MAESTRA (los primeros 12 segundos — estructura fija en 4 tiempos)
+El objetivo de la apertura NO es que te dé permiso: es que responda algo sobre SU negocio. Pedir permiso te clasifica de telemarketer y le carga el "no gracias" en la boca; la pregunta sobre SU dato lo mete a la conversación sin que se dé cuenta.
+1. GANCHO DE CONOCIDO (2s): "¡Don [nombre]! ¿Cómo le va, cómo le ha ido?" + PAUSA REAL hasta que responda. Tono de alguien que lo conoce (Gong: ~6.6x más citas — el cerebro no encuentra el patrón de call center y te regala 10 segundos mientras averigua de dónde te conoce).
+2. LA CONFESIÓN (2s): "No me conoce todavía — soy Martín, de ZerionStudio, aquí de [ciudad]." Segundo pattern interrupt: él esperaba que fingieras familiaridad (eso hace el telemarketer descubierto) y la rompes tú mismo. La honestidad desarma y compra credibilidad para el dato que viene.
+3. LA RAZÓN CON SU DATO (6s): "Y la llamo a USTED y no a otro por algo puntual: antes de marcarle busqué su negocio en Google, como haría un cliente — tiene [4.8] estrellas con [86] reseñas… y cuando buscan '[rubro] en [ciudad]', usted no aparece. Aparece su competencia." La tarea hecha ES la diferenciación (nadie más que llama la hizo), y la tensión reputación-alta-pero-invisible abre el curiosity gap.
+4. EL REMATE (1s): "¿Usted sabía eso?" + SILENCIO TOTAL. Es una pregunta sobre SU negocio, no sobre tu pitch: "no me interesa" no es respuesta coherente a "¿sabía?". Conteste lo que conteste, ya hay conversación.
+- PROHIBIDO rematar la apertura con "¿me regala 30 segundos?", "¿tiene un minutito?", "¿le puedo contar?": es el cierre del telemarketer educado y dispara el "no gracias" automático. El permiso solo existe DENTRO de la honestidad radical (abajo), como reto con salida — nunca como cortesía.
+
+## VARIANTES (la maestra es la default; estas entran cuando el contexto manda)
+- HONESTIDAD RADICAL (contestó seco, apurado o a la defensiva): "Don [nombre], le soy 100% honesto: esta es una llamada comercial y usted no me conoce. Puede colgarme ahora sin pena… o darme 20 segundos y le cuento qué encontré en Google de SU negocio. ¿Qué prefiere?" — aquí el permiso SÍ funciona porque primero nombraste el elefante: es un reto con salida fácil, no una súplica.
+- COMPETIDOR EN LA CARA: "Antes de marcarle busqué '[rubro] en [sector]' en Google, como haría cualquier cliente. ¿Sabe quién aparece primero? [Competidor]. Ustedes no salen — y ahí se van clientes todos los días."
+- RESEÑA CITADA TEXTUAL: "Leí sus reseñas y hay una que dice: '[cita real]'. Con clientes que hablan así de usted, lo que falta no es calidad — es que lo encuentren más fácil."
+- LA LISTA DE LOS MEJORES: "Ayudo a [rubro] aquí en [ciudad] a que los encuentren en Google y les escriban directo al WhatsApp. Estoy llamando SOLO a los mejor puntuados de la zona — y ustedes están en esa lista."
+- PROHIBIDO SIEMPRE: "¿le agarro en mal momento?" (invita al "sí, mal momento, chao": ~40% menos citas según Gong), "quería ofrecerle nuestros servicios", "disculpe la molestia".
 - Suena a VECINO, no a call center: "don/doña + nombre", menciona la ciudad o el sector, nombra otro negocio del rubro con el que trabajas. Guion leído o velocidad de metralleta = colgón en 3 segundos.
 
 ## GATEKEEPER (empleado/recepcionista/familiar) — aliado, jamás obstáculo

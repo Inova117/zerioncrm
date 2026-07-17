@@ -52,7 +52,7 @@ const KIMI_MODEL = Deno.env.get('KIMI_MODEL') ?? 'kimi-k3';
 // Versión visible en las cabeceras de TODA respuesta (incluido el preflight):
 //   curl -sI -X OPTIONS <url>/functions/v1/copilot | grep x-copilot-version
 // Súbela en cada cambio relevante — es la forma de verificar qué está deployado.
-const VERSION = '2026-07-17.3-wa-rescate';
+const VERSION = '2026-07-17.4-apertura-maestra';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -329,7 +329,7 @@ Deno.serve(async (req) => {
     // SOLO la apertura: la llamada es turno por turno y cada frase siguiente
     // la sopla el coach EN VIVO según lo que el prospecto responda de verdad.
     const userMsg =
-      'Dame SOLO el arranque de la llamada. Formato EXACTO:\n\n**Tu apertura (dila y CALLA):**\nLA frase exacta entre comillas, personalizada con sus datos — su nombre + un dato SUYO + micro-permiso, decible en 8-10 segundos.\nUna nota de tonalidad en cursiva, de una sola línea.\n\n**Meta:** una línea — qué cita vas a agendar en esta llamada.\n\nNADA MÁS. Ni pasos siguientes, ni objeciones, ni el resto del guion: cada frase siguiente me la soplas EN VIVO según lo que el prospecto responda.';
+      'Dame SOLO el arranque de la llamada. Formato EXACTO:\n\n**Tu apertura (dila y CALLA):**\nLA frase exacta entre comillas siguiendo LA APERTURA MAESTRA del playbook, con los datos REALES de la ficha: gancho de conocido con pausa ("¡Don/Doña [nombre]! ¿Cómo le va?…"), la confesión ("no me conoce todavía — soy Martín, de ZerionStudio"), la razón con SU dato (estrellas/reseñas/no aparece en Google) y el remate "¿usted sabía eso?". Decible en 10-12 segundos. PROHIBIDO rematarla pidiendo permiso ("¿me regala 30 segundos?", "¿tiene un minutito?").\nUna nota de tonalidad en cursiva, de una sola línea.\n\n**Meta:** una línea — qué cita vas a agendar en esta llamada.\n\nNADA MÁS. Ni pasos siguientes, ni objeciones, ni el resto del guion: cada frase siguiente me la soplas EN VIVO según lo que el prospecto responda.';
 
     if (PROVIDER === 'kimi') {
       const upstream = await openaiFetch({

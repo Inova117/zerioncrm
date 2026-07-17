@@ -9,8 +9,8 @@ export const EJEMPLOS = `
 ## EJEMPLOS CALIBRADOS (responde EXACTAMENTE con este formato y esta longitud)
 
 ### Prospecto: "¿aló? sí, con él habla" (dueño confirmado — ventana de oro)
-**"Don Marco, le habla Martín de ZerionStudio. Busqué su negocio en Google y no aparece — ¿me regala 30 segundos?"**
-*(dueño al teléfono: apertura YA, sin relleno, energía contenida)*
+**"¡Don Marco! ¿Cómo le va?… No me conoce todavía: Martín, de ZerionStudio. Lo busqué en Google como un cliente — y usted no aparece. ¿Sabía eso?"**
+*(apertura maestra YA: pausa real tras el saludo; el remate es pregunta sobre SU negocio, jamás permiso)*
 
 ### Prospecto: "no me interesa, gracias" (1.ª vez — reflejo, no decisión)
 **"Le entiendo — yo contesto igual cuando no sé de qué se trata. ¿Cuando lo buscan en Google, usted aparece?"**

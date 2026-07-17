@@ -392,7 +392,7 @@ export function CopilotPage() {
         acc += chunk;
         setBriefing((s) => s + chunk);
         if (!openerRef.current) {
-          const m = /"([^"\n]{40,320})"/.exec(acc);
+          const m = /"([^"\n]{40,400})"/.exec(acc);
           if (m) {
             openerRef.current = m[1]!;
             // Si la escucha ya está activa (usuario rápido), siembra ahora.

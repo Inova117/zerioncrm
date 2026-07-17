@@ -120,7 +120,7 @@ export const MOMENTS: MomentInfo[] = [
     priority: 35,
     cues: /^alo\b|hola,? buen(a|o)s|buenos dias|buenas tardes|quien habla|con quien (hablo|tengo el gusto)|que desea|que se le ofrece|como consiguio mi numero|quien le dio mi numero|es una venta|digame\b|si,? diga|si,? con el( mismo)?\b|con el mismo|el habla|ella habla|mucho gusto|para servirle/,
     bestMove:
-      'Primeros 4 segundos: nombre de pila + empresa + un dato específico de SU negocio + micro-permiso, en menos de 10 segundos: "Don [nombre], le habla Martín de ZerionStudio. Busqué su negocio en Google y no me aparece — ¿me regala 30 segundos y usted mismo decide?" Si confirma que es el dueño ("sí, con él") → es tu ventana de oro: lanza la apertura YA, sin relleno. Si pregunta "¿es una venta?": "Es una llamada de negocio: creo que está perdiendo clientes en Google y se lo puedo mostrar en 30 segundos." Energía arriba, cero "disculpe la molestia".',
+      'Los primeros 12 segundos deciden la llamada — LA APERTURA MAESTRA en 4 tiempos: gancho de conocido + PAUSA real ("¡Don [nombre]! ¿Cómo le va?…"), la confesión ("no me conoce todavía — soy Martín, de ZerionStudio"), la razón con SU dato ("antes de marcarle lo busqué en Google como un cliente: tiene [4.8] estrellas… y cuando buscan su rubro, usted no aparece"), y el remate "¿usted sabía eso?" + SILENCIO. JAMÁS remates pidiendo permiso ("¿me regala 30 segundos?" = telemarketer educado). Si confirma que es el dueño ("sí, con él") → ventana de oro: lánzala YA, sin relleno. Si pregunta "¿es una venta?": "Es una llamada de negocio: creo que está perdiendo clientes en Google, y se lo puedo mostrar. ¿Le interesa saber qué encontré?" Energía arriba, cero "disculpe la molestia".',
   },
   {
     id: 'despedida',
