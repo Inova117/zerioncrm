@@ -13,7 +13,11 @@ import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { useSpeech } from '../hooks/useSpeech';
 import { useDeepgram } from '../hooks/useDeepgram';
-import { copilotBriefing, copilotSuggest, copilotSummary, copilotWarm, type CallSummary } from '../services/copilotService';
+import {
+  copilotBriefing, copilotSuggest, copilotSummary, copilotWarm, copilotDebrief,
+  getCopilotMemory, saveCopilotMemory, saveCopilotCall, listCopilotCalls,
+  type CallSummary, type CallDebrief, type CopilotCallRecord,
+} from '../services/copilotService';
 import { detectObjection, detectMoment, normalizeSpeech, type Battlecard, type MomentInfo } from '../data/salesPlaybook';
 import type { Lead } from '../types';
 import { cn, colorFromString, initials, telLink, waLink, webLink, googleMapsUrl, fmtDate } from '../lib/utils';
@@ -100,6 +104,9 @@ export function CopilotPage() {
   // Wrap
   const [summary, setSummary] = useState<CallSummary | null>(null);
   const [summarizing, setSummarizing] = useState(false);
+  const [debrief, setDebrief] = useState<CallDebrief | null>(null);
+  const [debriefing, setDebriefing] = useState(false);
+  const [pastCalls, setPastCalls] = useState<CopilotCallRecord[]>([]);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ttftMs, setTtftMs] = useState<number | null>(null); // latencia real del coach
@@ -124,10 +131,30 @@ export function CopilotPage() {
   const ticketRef = useRef<number | null>(null);
   const perdidosRef = useRef<number | null>(null);
   const callStartRef = useRef(0);
+  const memoryRef = useRef(''); // memoria del nicho (lecciones acumuladas)
 
   useEffect(() => {
     suggestionRef.current = suggestion;
   }, [suggestion]);
+
+  // Stats legibles de la llamada (para el debrief, el comentario y el registro).
+  const buildStatsLine = useCallback((): string => {
+    const mins = callStartRef.current
+      ? Math.max(1, Math.round((Date.now() - callStartRef.current) / 60000))
+      : 0;
+    const objs = Object.entries(objCountsRef.current)
+      .map(([id, n]) => (n > 1 ? `${id}×${n}` : id))
+      .join(', ');
+    return [
+      mins ? `${mins} min` : '',
+      momentsSeenRef.current.length ? `Ruta: ${momentsSeenRef.current.join(' → ')}` : '',
+      objs ? `Objeciones: ${objs}` : '',
+      ticketRef.current != null ? `Ticket ≈ $${ticketRef.current}` : '',
+      perdidosRef.current != null ? `Pierde ≈ ${perdidosRef.current}/mes` : '',
+    ]
+      .filter(Boolean)
+      .join(' · ');
+  }, []);
 
   // Resumen del estado que viaja al coach en cada suggest: le da el número de
   // loop por objeción (disciplina L1→L2→L3) y los números del prospecto.
@@ -189,6 +216,7 @@ export function CopilotPage() {
             history: historyRef.current,
             moment: momentRef.current ? `${momentRef.current.label}: ${momentRef.current.bestMove}` : undefined,
             callState: buildCallState() || undefined,
+            memory: memoryRef.current || undefined,
           },
           (chunk) => {
             if (ctrl.signal.aborted) return;
@@ -342,11 +370,18 @@ export function CopilotPage() {
     // Precalienta el cache del modelo de suggest (fire-and-forget): la primera
     // sugerencia en vivo pasa de ~3-5s a ~1.2s.
     copilotWarm();
-    // El coach conoce al prospecto: cargamos su historial (llamadas/notas previas).
-    const comments = await loadComments(l.id).catch(() => []);
+    // Llamadas anteriores de este prospecto (revisables) — no bloquea el briefing.
+    setPastCalls([]);
+    listCopilotCalls(l.id).then(setPastCalls).catch(() => {});
+    // El coach conoce al prospecto (historial) Y el nicho (memoria acumulada).
+    const [comments, memory] = await Promise.all([
+      loadComments(l.id).catch(() => []),
+      getCopilotMemory().catch(() => ''),
+    ]);
     historyRef.current = buildHistory(comments, l);
+    memoryRef.current = memory;
     try {
-      await copilotBriefing(l, historyRef.current, (chunk) => setBriefing((s) => s + chunk));
+      await copilotBriefing(l, historyRef.current, memoryRef.current, (chunk) => setBriefing((s) => s + chunk));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo generar el briefing.');
     } finally {
@@ -388,6 +423,19 @@ export function CopilotPage() {
     if (!lead) return;
     setSummarizing(true);
     setSaved(false);
+    setDebrief(null);
+    // Resumen y coaching corren EN PARALELO: el resumen alimenta el CRM,
+    // el debrief te dice qué mejorar y actualiza la memoria del nicho.
+    setDebriefing(true);
+    copilotDebrief({
+      lead,
+      transcript: transcriptRef.current,
+      stats: buildStatsLine(),
+      memory: memoryRef.current,
+    })
+      .then(setDebrief)
+      .catch(() => setDebrief(null))
+      .finally(() => setDebriefing(false));
     try {
       setSummary(await copilotSummary(lead, transcriptRef.current));
     } catch (e) {
@@ -399,21 +447,23 @@ export function CopilotPage() {
 
   async function saveToLead() {
     if (!lead || !summary || saved) return;
-    // Stats de la llamada: datos para iterar el playbook (qué objeciones
-    // suenan, qué ruta siguió la llamada, los números del prospecto).
-    const mins = callStartRef.current ? Math.max(1, Math.round((Date.now() - callStartRef.current) / 60000)) : 0;
-    const objs = Object.entries(objCountsRef.current)
-      .map(([id, n]) => (n > 1 ? `${id}×${n}` : id))
-      .join(', ');
-    const statsParts = [
-      mins ? `${mins} min` : '',
-      momentsSeenRef.current.length ? `Ruta: ${momentsSeenRef.current.join(' → ')}` : '',
-      objs ? `Objeciones: ${objs}` : '',
-      ticketRef.current != null ? `Ticket ≈ $${ticketRef.current}` : '',
-      perdidosRef.current != null ? `Pierde ≈ ${perdidosRef.current}/mes` : '',
-    ].filter(Boolean);
-    const stats = statsParts.length ? `\n📊 ${statsParts.join(' · ')}` : '';
-    const body = `📞 Llamada (Copilot) — ${summary.summary}${summary.nextAction ? `\n➡️ Próxima acción: ${summary.nextAction}` : ''}${stats}`;
+    const statsLine = buildStatsLine();
+    const body = `📞 Llamada (Copilot) — ${summary.summary}${summary.nextAction ? `\n➡️ Próxima acción: ${summary.nextAction}` : ''}${statsLine ? `\n📊 ${statsLine}` : ''}`;
+    // La llamada completa (transcript + coaching) queda revisable, y la
+    // memoria del nicho actualizada alimenta TODAS las llamadas siguientes.
+    saveCopilotCall({
+      leadId: lead.id,
+      transcript: transcriptRef.current,
+      summary: summary.summary,
+      temperature: summary.temperature,
+      nextAction: summary.nextAction,
+      stats: statsLine,
+      coaching: debrief?.coaching ?? '',
+    }).catch(() => {});
+    if (debrief?.lessons && debrief.lessons !== memoryRef.current) {
+      memoryRef.current = debrief.lessons;
+      saveCopilotMemory(debrief.lessons).catch(() => {});
+    }
     await addComment(lead.id, body);
     if (summary.temperature !== lead.temperature) {
       await moveLead(lead.id, summary.temperature);
@@ -446,6 +496,8 @@ export function CopilotPage() {
     setSuggestion('');
     setCard(null);
     setMoment(null);
+    setDebrief(null);
+    setPastCalls([]);
     momentRef.current = null;
     cardIdRef.current = null;
     setSummary(null);
@@ -584,6 +636,38 @@ export function CopilotPage() {
                       {briefLoading && <Loader2 className="ml-1 inline h-4 w-4 animate-spin text-brand-400" />}
                     </div>
                   </div>
+                  {pastCalls.length > 0 && (
+                    <div className="card max-h-56 overflow-y-auto p-3">
+                      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-surface-400">
+                        📼 Llamadas anteriores con este prospecto ({pastCalls.length})
+                      </p>
+                      <div className="space-y-2">
+                        {pastCalls.map((c) => (
+                          <details key={c.id} className="rounded-lg border border-surface-200 p-2.5">
+                            <summary className="cursor-pointer text-xs text-surface-600">
+                              <span className="font-semibold">{fmtDate(c.createdAt)}</span>
+                              {c.stats && <span className="text-surface-400"> · {c.stats.split(' · ')[0]}</span>}
+                              {' — '}
+                              {c.summary.slice(0, 80)}
+                              {c.summary.length > 80 ? '…' : ''}
+                            </summary>
+                            <div className="mt-2 space-y-2 text-xs text-surface-600">
+                              {c.coaching && (
+                                <p className="whitespace-pre-wrap rounded bg-brand-50/50 p-2">🎓 {c.coaching}</p>
+                              )}
+                              {c.stats && <p className="text-surface-400">📊 {c.stats}</p>}
+                              {c.transcript && (
+                                <details>
+                                  <summary className="cursor-pointer text-surface-400">Ver transcripción</summary>
+                                  <p className="mt-1 max-h-40 overflow-y-auto whitespace-pre-wrap">{c.transcript}</p>
+                                </details>
+                              )}
+                            </div>
+                          </details>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   <button className="btn-primary w-full py-3 text-base" onClick={startListening}>
                     <Mic className="h-5 w-5" /> Empezar a escuchar la llamada
                   </button>
@@ -700,6 +784,42 @@ export function CopilotPage() {
                           <p className="text-[11px] uppercase tracking-wide text-surface-400">Próxima acción</p>
                           <p className="text-sm text-surface-700">{summary.nextAction}</p>
                         </div>
+                      )}
+
+                      {/* Coaching post-llamada: el sales manager revisando la grabación */}
+                      <div className="rounded-lg border border-brand-200 bg-brand-50/40 p-3">
+                        <p className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-brand-600">
+                          🎓 Coaching de esta llamada
+                          {debriefing && <Loader2 className="h-3 w-3 animate-spin" />}
+                        </p>
+                        {debrief ? (
+                          <>
+                            <p className="whitespace-pre-wrap text-sm leading-relaxed text-surface-700">{debrief.coaching}</p>
+                            {debrief.lessons && debrief.lessons !== memoryRef.current && (
+                              <p className="mt-2 text-[11px] text-brand-600">
+                                🧠 La memoria del nicho se actualizará al guardar — la próxima llamada arranca sabiendo esto.
+                              </p>
+                            )}
+                          </>
+                        ) : debriefing ? (
+                          <p className="text-sm text-surface-400">Revisando la grabación…</p>
+                        ) : (
+                          <p className="text-sm text-surface-400">Sin coaching para esta llamada.</p>
+                        )}
+                      </div>
+
+                      {/* La conversación completa, revisable */}
+                      {lines.length > 0 && (
+                        <details className="rounded-lg border border-surface-200 p-3">
+                          <summary className="cursor-pointer text-[11px] font-semibold uppercase tracking-wide text-surface-400">
+                            📼 Ver la conversación completa ({lines.length} frases)
+                          </summary>
+                          <div className="mt-2 max-h-64 space-y-1.5 overflow-y-auto text-sm text-surface-600">
+                            {lines.map((l, i) => (
+                              <p key={i}>{l}</p>
+                            ))}
+                          </div>
+                        </details>
                       )}
                     </div>
                   ) : null}

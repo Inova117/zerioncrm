@@ -26,12 +26,40 @@ export interface SuggestArgs {
   moment?: string;
   /** Estado estructurado: loops por objeción + números del prospecto. */
   callState?: string;
+  /** Memoria del nicho (lecciones de llamadas anteriores). */
+  memory?: string;
 }
 
 export interface CallSummary {
   summary: string;
   temperature: Temperature;
   nextAction: string;
+}
+
+export interface CallDebrief {
+  /** Coaching accionable de ESTA llamada (bullets). */
+  coaching: string;
+  /** La memoria del nicho actualizada completa. */
+  lessons: string;
+}
+
+export interface CopilotCallRecord {
+  id: string;
+  leadId: string;
+  transcript: string;
+  summary: string;
+  temperature: string;
+  nextAction: string;
+  stats: string;
+  coaching: string;
+  createdAt: string;
+}
+
+export interface DebriefArgs {
+  lead: Lead;
+  transcript: string;
+  stats: string;
+  memory: string;
 }
 
 /** Ficha del lead como texto para los prompts (igual en mock y server). */
@@ -99,9 +127,9 @@ async function callFn(
 
 // El playbook ya NO viaja desde el navegador: vive en el servidor (generado
 // por npm run sync:playbook). Cada request baja de ~58KB a ~2-5KB de subida.
-const supaBriefing = (lead: Lead, history: string, onDelta?: (t: string) => void) =>
+const supaBriefing = (lead: Lead, history: string, memory: string, onDelta?: (t: string) => void) =>
   callFn(
-    { mode: 'briefing', lead: leadBrief(lead), history, settings: settingsForPrompt() },
+    { mode: 'briefing', lead: leadBrief(lead), history, memory, settings: settingsForPrompt() },
     onDelta
   );
 
@@ -116,6 +144,7 @@ const supaSuggest = (args: SuggestArgs, onDelta: (t: string) => void, signal?: A
       history: args.history ?? '',
       moment: args.moment ?? '',
       callState: args.callState ?? '',
+      memory: args.memory ?? '',
       settings: settingsForPrompt(),
     },
     onDelta,
@@ -133,6 +162,117 @@ const mockWarm = () => {
   /* mock: nada que calentar */
 };
 export const copilotWarm: () => void = supabase ? supaWarm : mockWarm;
+
+// ===========================================================================
+// Debrief post-llamada: coaching + memoria del nicho actualizada
+// ===========================================================================
+async function supaDebrief(args: DebriefArgs): Promise<CallDebrief> {
+  const raw = await callFn({
+    mode: 'debrief',
+    lead: leadBrief(args.lead),
+    transcript: args.transcript.slice(-6000),
+    stats: args.stats,
+    memory: args.memory,
+    settings: settingsForPrompt(),
+  });
+  try {
+    const j = JSON.parse(raw) as CallDebrief;
+    if (typeof j.coaching === 'string' && typeof j.lessons === 'string') return j;
+  } catch {
+    /* cae al fallback */
+  }
+  return { coaching: raw, lessons: args.memory };
+}
+
+async function mockDebrief(args: DebriefArgs): Promise<CallDebrief> {
+  await new Promise((r) => setTimeout(r, 500));
+  const coaching = [
+    '• Bien: mantuviste la llamada viva tras la primera objeción.',
+    '• Te faltó cuantificar: cuando dijo su problema, la jugada era "¿cuántos clientes al mes se le van por eso?"',
+    '• Próxima llamada: cierra SIEMPRE con alternativa de dos fechas, nunca con "¿le interesa?".',
+  ].join('\n');
+  const nueva = `- ${new Date().toLocaleDateString()}: la objeción más frecuente sigue siendo el precio; ancla primero la pérdida mensual.`;
+  const lessons = `${args.memory}\n${nueva}`.trim().slice(-3500);
+  return { coaching, lessons };
+}
+
+export const copilotDebrief: (args: DebriefArgs) => Promise<CallDebrief> =
+  supabase ? supaDebrief : mockDebrief;
+
+// ===========================================================================
+// Memoria del nicho (lecciones acumuladas) + llamadas guardadas
+// ===========================================================================
+const MEMORY_KEY = 'zerioncrm:copilotMemory';
+const CALLS_KEY = 'zerioncrm:copilotCalls';
+
+async function supaGetMemory(): Promise<string> {
+  const { data } = await supabase!.from('copilot_memory').select('memory').maybeSingle();
+  return data?.memory ?? '';
+}
+async function supaSaveMemory(memory: string): Promise<void> {
+  const { data: u } = await supabase!.auth.getUser();
+  if (!u.user) return;
+  await supabase!
+    .from('copilot_memory')
+    .upsert({ user_id: u.user.id, memory, updated_at: new Date().toISOString() });
+}
+async function mockGetMemory(): Promise<string> {
+  return localStorage.getItem(MEMORY_KEY) ?? '';
+}
+async function mockSaveMemory(memory: string): Promise<void> {
+  localStorage.setItem(MEMORY_KEY, memory);
+}
+export const getCopilotMemory: () => Promise<string> = supabase ? supaGetMemory : mockGetMemory;
+export const saveCopilotMemory: (m: string) => Promise<void> = supabase ? supaSaveMemory : mockSaveMemory;
+
+type NewCallRecord = Omit<CopilotCallRecord, 'id' | 'createdAt'>;
+
+async function supaSaveCall(rec: NewCallRecord): Promise<void> {
+  const { data: u } = await supabase!.auth.getUser();
+  if (!u.user) return;
+  await supabase!.from('copilot_calls').insert({
+    lead_id: rec.leadId,
+    user_id: u.user.id,
+    transcript: rec.transcript,
+    summary: rec.summary,
+    temperature: rec.temperature,
+    next_action: rec.nextAction,
+    stats: rec.stats,
+    coaching: rec.coaching,
+  });
+}
+async function supaListCalls(leadId: string): Promise<CopilotCallRecord[]> {
+  const { data } = await supabase!
+    .from('copilot_calls')
+    .select('id, lead_id, transcript, summary, temperature, next_action, stats, coaching, created_at')
+    .eq('lead_id', leadId)
+    .order('created_at', { ascending: false })
+    .limit(10);
+  return (data ?? []).map((r) => ({
+    id: r.id as string,
+    leadId: r.lead_id as string,
+    transcript: (r.transcript as string) ?? '',
+    summary: (r.summary as string) ?? '',
+    temperature: (r.temperature as string) ?? '',
+    nextAction: (r.next_action as string) ?? '',
+    stats: (r.stats as string) ?? '',
+    coaching: (r.coaching as string) ?? '',
+    createdAt: r.created_at as string,
+  }));
+}
+async function mockSaveCall(rec: NewCallRecord): Promise<void> {
+  const all = JSON.parse(localStorage.getItem(CALLS_KEY) ?? '[]') as CopilotCallRecord[];
+  all.unshift({ ...rec, id: `call-${Date.now()}`, createdAt: new Date().toISOString() });
+  localStorage.setItem(CALLS_KEY, JSON.stringify(all.slice(0, 50)));
+}
+async function mockListCalls(leadId: string): Promise<CopilotCallRecord[]> {
+  const all = JSON.parse(localStorage.getItem(CALLS_KEY) ?? '[]') as CopilotCallRecord[];
+  return all.filter((c) => c.leadId === leadId).slice(0, 10);
+}
+export const saveCopilotCall: (rec: NewCallRecord) => Promise<void> =
+  supabase ? supaSaveCall : mockSaveCall;
+export const listCopilotCalls: (leadId: string) => Promise<CopilotCallRecord[]> =
+  supabase ? supaListCalls : mockListCalls;
 
 async function supaSummary(lead: Lead, transcript: string): Promise<CallSummary> {
   const raw = await callFn({
@@ -163,7 +303,7 @@ const streamOut = async (text: string, onDelta?: (t: string) => void): Promise<s
   return text;
 };
 
-async function mockBriefing(lead: Lead, history: string, onDelta?: (t: string) => void): Promise<string> {
+async function mockBriefing(lead: Lead, history: string, _memory: string, onDelta?: (t: string) => void): Promise<string> {
   const e = lead.enrichment;
   const noWeb = !lead.website.trim();
   const settings = settingsForPrompt();
@@ -229,8 +369,12 @@ async function mockSummary(lead: Lead, transcript: string): Promise<CallSummary>
 }
 
 // ===========================================================================
-export const copilotBriefing: (lead: Lead, history: string, onDelta?: (t: string) => void) => Promise<string> =
-  supabase ? supaBriefing : mockBriefing;
+export const copilotBriefing: (
+  lead: Lead,
+  history: string,
+  memory: string,
+  onDelta?: (t: string) => void
+) => Promise<string> = supabase ? supaBriefing : mockBriefing;
 export const copilotSuggest: (
   args: SuggestArgs,
   onDelta: (t: string) => void,

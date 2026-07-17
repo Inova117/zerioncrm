@@ -87,6 +87,10 @@ interface CopilotBody {
   moment?: string;
   /** Estado estructurado: loops por objeción + números del prospecto. */
   callState?: string;
+  /** Memoria del nicho: lecciones acumuladas de llamadas anteriores. */
+  memory?: string;
+  /** Stats de la llamada (para el debrief). */
+  stats?: string;
 }
 
 // --- Llamada a Anthropic (raw HTTP; streaming SSE → texto plano) ------------
@@ -216,12 +220,15 @@ function systemToText(blocks: Array<{ text: string }>): string {
 // (mi negocio + ficha + historial, cambia por lead) va aparte, sin cache.
 // Prefijo mínimo cacheable en Opus 4.8: ~4096 tokens — el playbook expandido
 // lo supera con holgura.
-function buildSystem(lead: string, playbook: string, history: string, settings: string) {
+function buildSystem(lead: string, playbook: string, history: string, settings: string, memory: string) {
   const mine = settings.trim()
     ? `# MI NEGOCIO Y MI FORMA DE VENDER (PRIORIDAD: usa ESTO por encima del playbook — mis precios, mi oferta, mi tono)\n${settings.trim()}\n\n`
     : '';
   const hist = history.trim()
     ? `\n\n# HISTORIAL CON ESTE PROSPECTO (ya lo conoces — NO arranques de cero, referencia lo previo)\n${history.trim()}`
+    : '';
+  const mem = memory.trim()
+    ? `\n\n# MEMORIA DEL NICHO (lecciones REALES de mis llamadas anteriores — pesan más que la teoría del playbook)\n${memory.trim()}`
     : '';
   return [
     {
@@ -231,7 +238,7 @@ function buildSystem(lead: string, playbook: string, history: string, settings: 
     },
     {
       type: 'text' as const,
-      text: `${mine}# FICHA DEL PROSPECTO (úsala: personaliza con SUS datos)\n${lead}${hist}`,
+      text: `${mine}# FICHA DEL PROSPECTO (úsala: personaliza con SUS datos)\n${lead}${hist}${mem}`,
     },
   ];
 }
@@ -274,6 +281,8 @@ Deno.serve(async (req) => {
   const history = (body.history ?? '').slice(0, 4000);
   const moment = (body.moment ?? '').slice(0, 600);
   const callState = (body.callState ?? '').slice(0, 600);
+  const memory = (body.memory ?? '').slice(0, 5000);
+  const stats = (body.stats ?? '').slice(0, 800);
 
   // -------------------------------------------------------------------- warm
   // Precalienta el cache del system (PERSONA + playbook, por modelo) para que
@@ -286,7 +295,7 @@ Deno.serve(async (req) => {
     const res = await anthropicFetch({
       model: MODEL_SUGGEST,
       max_tokens: 1,
-      system: buildSystem('', playbook, '', ''),
+      system: buildSystem('', playbook, '', '', ''),
       messages: [{ role: 'user', content: 'ok' }],
     });
     return json({ ok: res.ok });
@@ -294,7 +303,7 @@ Deno.serve(async (req) => {
 
   // ---------------------------------------------------------------- briefing
   if (mode === 'briefing') {
-    const sys = buildSystem(lead, playbook, history, settings);
+    const sys = buildSystem(lead, playbook, history, settings, memory);
     const userMsg =
       'Prepárame para llamar AHORA a este prospecto. Dame: (1) el ángulo de apertura exacto entre comillas, personalizado con sus datos; (2) las 3 objeciones más probables de ESTE negocio con la respuesta de una línea para cada una; (3) la meta concreta de la llamada y el cierre a usar. Directo y en formato compacto con **negritas**.';
 
@@ -342,7 +351,7 @@ Deno.serve(async (req) => {
     // "Frase primero": con streaming, el vendedor tiene la frase decible en
     // TTFT+~200ms y el porqué llega mientras ya la está usando.
     const userMsg = `${momentLine}${stateLine}TRANSCRIPCIÓN RECIENTE DE LA LLAMADA (mic en altavoz, ambas voces mezcladas):\n"""\n${transcript || '(la llamada acaba de empezar)'}\n"""\n\n${ask}\n\nFORMATO OBLIGATORIO: línea 1 = SOLO la frase exacta para decir en voz alta (máx 15 palabras), en **negrita**. Línea 2 (opcional) = una sola oración en cursiva con la tonalidad o el porqué.`;
-    const sys = buildSystem(lead, playbook, history, settings);
+    const sys = buildSystem(lead, playbook, history, settings, memory);
 
     if (PROVIDER === 'kimi') {
       const upstream = await openaiFetch({
@@ -372,6 +381,79 @@ Deno.serve(async (req) => {
     return new Response(sseToTextStream(upstream.body), {
       headers: { 'Content-Type': 'text/plain; charset=utf-8', ...CORS },
     });
+  }
+
+  // ----------------------------------------------------------------- debrief
+  // El sales manager revisa la grabación: coaching accionable de ESTA llamada
+  // + la MEMORIA DEL NICHO actualizada (lecciones generalizables que se
+  // inyectan en todas las llamadas siguientes — así "aprende" el copilot).
+  if (mode === 'debrief') {
+    const debriefSystem =
+      'Eres el mejor sales manager de Latinoamérica revisando la grabación de una llamada en frío de tu vendedor (vende páginas web + automatizaciones a negocios locales, Ecuador). Conoces Belfort, Cardone, Voss, NEPQ y SPIN, pero hablas como jefe de ventas, no como libro. La transcripción viene del altavoz del teléfono: ambas voces mezcladas, con errores — interprétala con ese ruido.';
+    const debriefUser = `FICHA DEL PROSPECTO:\n${lead}\n\nSTATS DE LA LLAMADA:\n${stats || '(sin stats)'}\n\nMEMORIA DEL NICHO ACTUAL (lecciones acumuladas hasta hoy):\n"""\n${memory || '(vacía — primera llamada)'}\n"""\n\nTRANSCRIPCIÓN COMPLETA:\n"""\n${transcript || '(sin transcripción)'}\n"""\n\nDevuelve el JSON con coaching y lessons.`;
+
+    if (PROVIDER === 'kimi') {
+      const res = await openaiFetch({
+        model: KIMI_MODEL,
+        max_tokens: 1500,
+        json: true,
+        system:
+          debriefSystem +
+          ' Devuelve SOLO un objeto JSON con: "coaching" (string: 3-5 puntos concretos de esta llamada) y "lessons" (string: la memoria del nicho ACTUALIZADA completa, máx 3500 caracteres).',
+        user: debriefUser,
+      });
+      if (!res.ok) {
+        const detail = await res.text().catch(() => '');
+        return json({ error: `Kimi respondió ${res.status}`, detail: detail.slice(0, 300) }, 502);
+      }
+      const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
+      return new Response(data.choices?.[0]?.message?.content ?? '{}', {
+        headers: { 'Content-Type': 'application/json', ...CORS },
+      });
+    }
+
+    const res = await anthropicFetch({
+      model: MODEL,
+      max_tokens: 1500,
+      system: [{ type: 'text', text: debriefSystem }],
+      output_config: {
+        effort: 'low',
+        format: {
+          type: 'json_schema',
+          schema: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              coaching: {
+                type: 'string',
+                description:
+                  'Coaching de ESTA llamada, 3-5 puntos concretos en bullets ("• "): (1) qué hizo BIEN el vendedor (uno solo, real), (2) el momento exacto que se perdió o la jugada que faltó, con la FRASE que debió decir, (3) qué hacer distinto en la próxima llamada. Directo, específico, cero teoría.',
+              },
+              lessons: {
+                type: 'string',
+                description:
+                  'La MEMORIA DEL NICHO actualizada COMPLETA (no solo lo nuevo): fusiona lo aprendido en esta llamada con la memoria actual, elimina lo repetido u obsoleto, agrupa por temas (## Objeciones frecuentes y qué funciona / ## Aperturas / ## Horarios y rubros / ## Errores a evitar). SOLO lecciones GENERALIZABLES del nicho — los detalles de este prospecto específico van al historial del lead, no aquí. Máximo 3500 caracteres. Si la llamada no dejó nada nuevo generalizable, devuelve la memoria actual tal cual.',
+              },
+            },
+            required: ['coaching', 'lessons'],
+          },
+        },
+      },
+      messages: [{ role: 'user', content: debriefUser }],
+    });
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '');
+      return json({ error: `Claude respondió ${res.status}`, detail: detail.slice(0, 300) }, 502);
+    }
+    const data = (await res.json()) as {
+      stop_reason?: string;
+      content?: Array<{ type: string; text?: string }>;
+    };
+    if (data.stop_reason === 'refusal') {
+      return json({ error: 'El modelo declinó analizar esta llamada.' }, 502);
+    }
+    const text = (data.content ?? []).find((b) => b.type === 'text')?.text ?? '{}';
+    return new Response(text, { headers: { 'Content-Type': 'application/json', ...CORS } });
   }
 
   // ----------------------------------------------------------------- summary

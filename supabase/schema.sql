@@ -351,6 +351,50 @@ alter default privileges in schema public grant execute on functions to service_
 -- automáticamente. El rol/nombre/color salen de user_metadata. (Cuentas SOLO por
 -- el admin: recuerda desactivar "Enable sign ups" en Auth → Providers → Email.)
 -- ---------------------------------------------------------------------------
+-- ============================================================================
+-- SALES COPILOT — llamadas grabadas (transcript + coaching) y memoria del nicho
+-- ============================================================================
+-- Cada llamada queda completa (transcript, resumen, stats, coaching) para
+-- revisarla después; copilot_memory es el documento de lecciones acumuladas
+-- que el propio coach mantiene y que se inyecta en las llamadas siguientes.
+
+create table if not exists public.copilot_calls (
+  id          uuid primary key default gen_random_uuid(),
+  lead_id     uuid not null references public.leads(id) on delete cascade,
+  user_id     uuid not null references public.profiles(id) on delete cascade,
+  transcript  text not null default '',
+  summary     text not null default '',
+  temperature text not null default '',
+  next_action text not null default '',
+  stats       text not null default '',
+  coaching    text not null default '',
+  created_at  timestamptz not null default now()
+);
+create index if not exists copilot_calls_lead_idx on public.copilot_calls (lead_id, created_at desc);
+
+create table if not exists public.copilot_memory (
+  user_id    uuid primary key references public.profiles(id) on delete cascade,
+  memory     text not null default '',
+  updated_at timestamptz not null default now()
+);
+
+alter table public.copilot_calls  enable row level security;
+alter table public.copilot_memory enable row level security;
+
+drop policy if exists "copilot_calls read"  on public.copilot_calls;
+create policy "copilot_calls read"  on public.copilot_calls for select
+  using (public.is_admin() or user_id = auth.uid());
+drop policy if exists "copilot_calls insert" on public.copilot_calls;
+create policy "copilot_calls insert" on public.copilot_calls for insert
+  with check (user_id = auth.uid());
+drop policy if exists "copilot_calls delete" on public.copilot_calls;
+create policy "copilot_calls delete" on public.copilot_calls for delete
+  using (public.is_admin() or user_id = auth.uid());
+
+drop policy if exists "copilot_memory own" on public.copilot_memory;
+create policy "copilot_memory own" on public.copilot_memory for all
+  using (user_id = auth.uid()) with check (user_id = auth.uid());
+
 create or replace function public.handle_new_user()
 returns trigger language plpgsql security definer set search_path = public as $$
 begin

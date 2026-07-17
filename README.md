@@ -205,6 +205,14 @@ vive en `services/mappers.ts`.
    Al colgar, genera resumen → comentario en el prospecto + temperatura sugerida + tarea
    de seguimiento. **Sin `ANTHROPIC_API_KEY` usa el playbook local** (mock), así que toda
    la UI se prueba sin gastar en el API.
+   - **El copilot aprende de tus llamadas** (⚠️ requiere re-correr `schema.sql`: tablas
+     `copilot_calls` y `copilot_memory`): al colgar, un "sales manager" (Opus) revisa la
+     grabación y te da **coaching** de esa llamada (qué hiciste bien, la jugada que
+     faltó, qué cambiar); cada llamada queda **guardada completa** (transcript + resumen
+     + stats + coaching) y es revisable en el briefing de la siguiente llamada al mismo
+     prospecto; y el coach mantiene una **memoria del nicho** (lecciones generalizables:
+     qué objeciones dominan, qué respuestas funcionan, horarios, rubros) que se inyecta
+     en TODAS las llamadas siguientes — el sistema mejora con el uso.
    - **Ajustes del Copilot** (botón ⚙️ arriba a la derecha): enséñale al coach *tu* oferta,
      precios, tono y frases que te funcionan. El coach los usa **por encima** del playbook
      para dejar de sonar genérico. Se guardan en tu navegador y viajan en cada consulta.
