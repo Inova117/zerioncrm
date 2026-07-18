@@ -13,38 +13,38 @@ export const EJEMPLOS = `
 *(apertura maestra YA: pausa real tras el saludo; el remate es pregunta sobre SU negocio, jamás permiso)*
 
 ### Prospecto: "no me interesa, gracias" (1.ª vez — reflejo, no decisión)
-**"Le entiendo — yo contesto igual cuando no sé de qué se trata. ¿Cuando lo buscan en Google, usted aparece?"**
-*(no pelees el reflejo: pregunta que solo él puede responder)*
+**"Le entiendo — le llaman vendedores toda semana. Por eso no le pido plata ni reunión: la página ya existe, y verla no cuesta nada."**
+*(no pelees el reflejo: quítale TODO lo que está rechazando y deja solo "mirar")*
 
 ### Prospecto: "uy no, está caro" (1.ª vez → battlecard tal cual)
-**"Tiene toda la razón, no es barato — y justo por eso funciona. ¿Cuánto le deja un cliente nuevo?"**
-*(acuerda primero, nunca defiendas el precio: cuantifica con SUS números)*
+**"Le entiendo, trescientos de un solo no es cualquier cosa. Pero es una vez en la vida del negocio — y un solo cliente nuevo la paga."**
+*(acuerda primero, nunca defiendas el precio: el monto jamás baja)*
 
-### Prospecto: "sí pero igual está caro" (2.ª vez → loop 2: riesgo cero)
-**"Hagamos esto: le preparo la muestra gratis y usted decide viendo. Si no le encanta, ahí queda."**
-*(loop 2 = bajar riesgo + prueba en vivo, no repetir el argumento)*
+### Prospecto: "sí pero igual está caro" (2.ª vez → loop 2, el último: 50/50)
+**"Hagamos esto: la mitad ahora y la mitad a fin de mes. ¿Así sí le cuadra?"**
+*(la única flexibilidad es de FORMA — y tras esto, retirada elegante)*
 
 ### Prospecto: "mándame la info por WhatsApp"
-**"Claro, ahorita le mando. Mejor le preparo la muestra de SU página — ¿la revisamos jueves o viernes?"**
-*(sí falso: acepta + sube la apuesta CON fecha, nunca info sin cita)*
+**"Le soy sincero: la información ES la página, y se la mando ahorita. ¿A qué hora cree que la alcanza a ver?"**
+*(la evasiva se desarma sola: la info es la página ya hecha + ancla de hora)*
 
-### Prospecto: "¿y cuánto se demoran en tenerla lista?" (señal de compra)
-**"Dos semanas desde que arrancamos. ¿Le queda mejor mañana a las 10 o el jueves a las 3?"**
-*(pregunta de logística = ya compró mentalmente: responde corto y CIERRA)*
+### Prospecto: "¿y cuánto cuesta eso?" (señal de compra en el toque 1)
+**"Trescientos con IVA incluido, una sola vez. Pero véala primero — ya está hecha. ¿Se la mando?"**
+*(precio de frente, sin letra chica, y de vuelta a la página)*
 
 ### Contesta empleada: "¿de parte de quién?"
-**"De Martín, de ZerionStudio — es sobre cómo aparece el negocio en Google. ¿Me lo pasa, porfa?"**
-*(gatekeeper aliada: honesto y corto, cero pitch, siempre de usted)*
+**"De Martín, de ZerionStudio — tengo lista la página web del negocio y necesito que don [nombre] la vea antes de darla de baja. ¿A qué hora lo encuentro?"**
+*(gatekeeper aliada: la jugada pre-built, honesta y con urgencia real)*
 
 ### Prospecto: "ya le dije que no, estoy ocupado" (a punto de colgar)
-**"Quince segundos y le dejo: cuando lo buscan en Google usted no sale. ¿Le llamo hoy a las 6?"**
+**"Quince segundos y le dejo: su página ya está hecha, con sus reseñas. ¿Se la mando y la ve cuando pueda?"**
 *(UN rescate con dato suyo y sueltas — el segundo ruego quema la puerta)*
 
 ### Prospecto: "es que ya pagué una página una vez y me dejaron botado" (quemado → rescate neutro)
 **"No pasa nada… ¿y qué pasó esa vez, si puedo preguntar?"**
-*(quemado = baja la energía: desapego + pregunta curiosa, cero argumentos)*
+*(quemado = baja la energía: desapego + pregunta curiosa, cero argumentos — y después: "por eso nosotros no cobramos por adelantado")*
 
 ### Prospecto: "ya pues, hagámoslo, ¿cómo le pago?" (ya compró — CÁLLATE)
-**"Perfecto: le mando el acuerdo por WhatsApp ahorita. ¿El anticipo me lo confirma hoy o mañana?"**
-*(ni una palabra más de venta: amarra el depósito y corta en 60 segundos)*
+**"Excelente decisión. Le mando ahorita los datos — ¿maneja transferencia o De Una? — y hoy mismo queda oficial."**
+*(ni una palabra más de venta: amarra el pago y corta en 60 segundos)*
 `.trim();

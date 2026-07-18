@@ -37,8 +37,8 @@ export const BATTLECARDS: Battlecard[] = [
       /\bcar(o|os|isimo|ito)\b|mucha plata|mucho dinero|no me alcanza|fuerte el precio|esta elevado|cuesta mucho|un ojo de la cara|no tengo (para|plata|dinero)|no hay (plata|presupuesto)|fuera de (mi )?presupuesto|no estoy para (esos )?gastos|es mucho eso/,
     objection: '"Está caro / no tengo presupuesto"',
     response:
-      'Tiene toda la razón, no es barato — y justo por eso funciona. Le pregunto: ¿caro comparado con qué? ¿Cuánto le deja un cliente nuevo? Porque si la página le trae dos al mes, se pagó sola. Y se puede partir: la mitad para arrancar y la otra cuando esté lista y a usted le guste.',
-    why: 'Acuerda primero y NUNCA defiendas el precio — cuantifica el costo de NO comprar con SUS números. Cede en términos (pago partido), jamás en precio. Y tras decir un precio: SILENCIO, el primero que habla cede.',
+      'Le entiendo, trescientos de un solo no es cualquier cosa. Véalo así: es una sola vez en la vida del negocio, y la página trabaja veinticuatro horas — como una recepcionista que nunca pide permiso. Un solo cliente nuevo la paga. Y si le acomoda más, lo partimos: la mitad ahora y la mitad a fin de mes. ¿Así sí le cuadra?',
+    why: 'Acuerda primero y NUNCA defiendas el precio. El monto no baja — la única flexibilidad es de forma (50/50). Reducción al ridículo con la recepcionista 24h. Y tras decir un precio: SILENCIO, el primero que habla cede.',
   },
   {
     // Antes que 'sobrino': "un muchacho me lo hace a mitad de precio" es
@@ -52,13 +52,23 @@ export const BATTLECARDS: Battlecard[] = [
     why: 'No pelees precio contra fantasmas: mueve la conversación a resultados y a la cita. "Como en todo" conecta con su propia experiencia de competir contra baratos — el mismo argumento que él usa a diario para defender su precio.',
   },
   {
+    // La trampa del mercado: "gratis" con permanencia de 12-24 meses.
+    id: 'gratis-permanencia',
+    triggers:
+      /me la (dan|hacen|ofrecen|ofrecieron) gratis|(una|otra) (empresa|companias?).{0,20}gratis|gratis me la (dan|hacen|ofrecieron)|sin costo me (la )?ofrecieron|hay unos que la hacen gratis/,
+    objection: '"Otra empresa me la ofreció gratis"',
+    response:
+      'Sí las hay, y le digo cómo funcionan: la página es "gratis" pero firma permanencia de doce o veinticuatro meses de mensualidad — al final paga el triple y la página nunca es suya. Lo nuestro es al revés: paga una vez, la página es suya, y el mensual es opcional. Saque la cuenta y compare, con toda confianza. Y mientras tanto su página ya está hecha — ¿qué le impide verla?',
+    why: 'Jamás digas "es mentira": explica el MECANISMO de la trampa (permanencia) y deja que él saque la cuenta. El contraste con los pilares (una vez, suya, mensual opcional) hace el resto — y el remate vuelve al embudo: véala.',
+  },
+  {
     id: 'sobrino',
     triggers:
       /mi (sobrino|hijo|hija|primo|hermano|pana)( me| sabe| maneja| hace| hizo| esta| la| lo)|un (amigo|muchacho|conocido|pana)( que)? me (la |lo )?(hace|hizo|esta haciendo|ayuda|maneja|ve|iba a hacer)|ya tengo quien|ya contrate a alguien|ya estoy en eso con alguien|mi disenador|un conocido que me ayuda/,
     objection: '"Mi sobrino/hijo/amigo me hace la página"',
     response:
-      '¡Qué bueno, así no empieza de cero — y eso me dice que usted ya sabe que la necesita! Solo por curiosidad: ¿hace cuánto quedó en hacérsela? ¿Ya aparece en Google? … Hagamos algo justo: le mando gratis una muestra de cómo la haríamos nosotros, se la enseña a él, y deciden con las dos en la mano. No pierde nada.',
-    why: 'JAMÁS compitas contra la familia — pierdes siempre. "¿Hace cuánto quedó?" hace que ÉL mismo diga "uy, ya va un año": la objeción se derrumba sola. La muestra "para enseñársela" te alía con la familia en vez de atacarla.',
+      'Claro, y qué bueno que tenga quien le ayude. Pero mire: esta ya está terminada — véala primero. Si su sobrino le hace algo mejor, quédese con lo de él y no me paga nada. En los dos escenarios usted gana. ¿Le mando el enlace?',
+    why: 'JAMÁS compitas contra la familia — pierdes siempre. La página YA HECHA cambia el juego: no le pides que elija entre tú y el sobrino, le pides que COMPARE viendo. "En los dos escenarios usted gana" = riesgo cero literal.',
   },
   {
     id: 'ya-tengo-pagina',
@@ -66,8 +76,8 @@ export const BATTLECARDS: Battlecard[] = [
       /ya (tengo|tenemos) (mi |una |la )?(pagina|web|sitio)|eso ya lo hicimos|ya me hicieron una|si tenemos web|ahi esta la pagina|ya trabajo con (una agencia|alguien)/,
     objection: '"Ya tengo página web"',
     response:
-      '¡Qué bueno, eso ya es ventaja! Y dígame honestamente: ¿le llegan clientes por ahí, o está más de adorno? … Se lo pregunto porque a la mayoría le pasa lo segundo. Le hago una revisión gratis: cinco puntos concretos de qué está frenando su página, y usted decide qué hacer con eso — hasta se la puede pasar a quien se la maneja.',
-    why: '"¿Le llegan clientes o está de adorno?" desnuda el problema con humor, sin insultar su página. La revisión gratis cambia la oferta de "hacer una página" a "arreglar la suya" — y agenda la misma cita.',
+      'Verá, la vi — por eso mismo le llamo. ¿La ha abierto últimamente desde el celular? [pausa] Se corta, ¿verdad? Hoy la mayoría busca desde el celular — ábrala usted mismo ahorita y compare. La que le hicimos es de esta época: rápida, perfecta en el teléfono, con sus reseñas integradas. ¿Se la mando?',
+    why: 'Curioso, no correctivo: "¿la ha abierto desde el celular?" hace que ÉL descubra el problema en 10 segundos con su propio teléfono. La comparación en vivo contra la página nueva ya hecha vende sola — jamás insultes la vieja.',
   },
   {
     id: 'facebook',
@@ -84,8 +94,8 @@ export const BATTLECARDS: Battlecard[] = [
       /mand(a|e)(me|n)? (la |una |el |algo |todo )?(info|informacion|proforma|cotizacion|detalle|precios)|pas(a|e)(me)? (la |una |todo )?(info|informacion|cotizacion)|escrib(a|e)(me)? (mejor|al correo)|por (whatsapp|correo|interno) (y yo le aviso|mejor)|dej(a|e)(me)? (tu|su) numero y yo/,
     objection: '"Mándame la información" (el adiós educado)',
     response:
-      'Claro que sí, ahorita mismo le mando. Pero no le quiero mandar un catálogo genérico que nadie lee: mejor le preparo la muestra de cómo se vería SU página, con su nombre y sus colores. ¿La revisamos juntos el jueves en la tarde o el viernes en la mañana? Son 10 minutos.',
-    why: '"Mándame info" sin cita = lead muerto en el 95% de los casos. Acepta (nunca pelees), sube la apuesta a la muestra personalizada CON fecha de revisión, y manda algo por WhatsApp en menos de 5 minutos: la velocidad es tu primera prueba de seriedad.',
+      'Le soy sincero: la información ES la página, y se la mando ahorita mismo por WhatsApp. No hay folleto ni letra chiquita. Usted la ve y me dice: ¿le gustó o no le gustó? Más simple no se puede, ¿verdad? ¿A qué hora cree que la alcanza a ver?',
+    why: '"Mándame info" es el adiós educado — pero en demo-first la evasiva se desarma sola: la info ES la página ya hecha. La ancla de hora ("¿a qué hora la ve?") es el test de compromiso; sin hora, no cuenta como sí.',
   },
   {
     id: 'no-tiempo',
@@ -93,8 +103,8 @@ export const BATTLECARDS: Battlecard[] = [
       /no tengo tiempo|estoy ocupad|ando (ocupad|full|a mil|de carrera)|estoy (atendiendo|en algo|con un cliente|con un paciente|con gente|en la cocina|vendiendo)|llam(a|e)(me)? (luego|despues|mas tarde|la otra semana)|ahorita no puedo|justo estoy saliendo/,
     objection: '"No tengo tiempo / estoy ocupado"',
     response:
-      'Le entiendo perfecto — se nota que el negocio se mueve, y por eso no le robo ni un minuto ahora. Solo dígame: ¿le llamo hoy a las 4 o mañana a las 10? Son 10 minutos cronometrados, y corto yo.',
-    why: 'Es la objeción más honesta del nicho: de verdad está atendiendo. Pelearla es suicidio; la alternativa doble convierte el "luego" eterno en hora exacta. Y llámalo A ESA HORA EN PUNTO: la puntualidad es tu primer cierre.',
+      'Claro, usted está atendiendo. Por eso no le pido ni cinco minutos: le mando el link ahorita y usted la ve en la noche, en dos minutitos, desde su celular. Yo le escribo mañana. ¿Le parece?',
+    why: 'Es la objeción más honesta del nicho: de verdad está atendiendo. En demo-first ni siquiera necesitas re-agendar la llamada: la página se ve sola, asincrónica, cuando él pueda. El "yo le escribo mañana" mantiene el control del seguimiento.',
   },
   {
     id: 'pensarlo',
@@ -111,8 +121,39 @@ export const BATTLECARDS: Battlecard[] = [
       /(hablar|consultar|ver|conversar)(lo)? con mi (esposa|esposo|senora|socio|hermano|hijo|hija|familia)|eso lo ve mi (esposa|senora|socio|hijo|hija|hermano)|no decido (eso )?(yo )?solo|lo converso en casa|dejeme comentarle a|preguntarle al que me lleva|la que decide (esas cosas )?es mi/,
     objection: '"Tengo que consultarlo con mi esposa/socio"',
     response:
-      'Perfecto, así debe ser — esas decisiones se toman juntos. Para que no le toque a usted explicar todo de memoria, hagamos una de dos: les explico a los dos en cinco minutos, o le mando la muestra por WhatsApp para que la vean juntos con calma y hablamos el jueves. Y dígame, ¿a ella qué cree que le va a parecer?',
-    why: 'Nunca dejes que el prospecto venda por ti: vende peor y sin convicción. Valida la dinámica familiar (sagrada en negocios locales), pide acceso al decisor o arma al mensajero con la muestra. "¿Qué cree que le va a parecer?" revela si era excusa: si titubea, la objeción real es otra.',
+      'Claro que sí, consúltelo — hace bien. Es más: mándele este mismo link para que la vea él también — así deciden viendo la página de verdad y no de oídas. ¿Le parece si le escribo el jueves para ver qué dijeron los dos?',
+    why: 'Nunca dejes que el prospecto venda por ti: vende peor y sin convicción. En demo-first el mensajero va armado con la página REAL — decidir "viendo y no de oídas" quita el teléfono descompuesto. La fecha de seguimiento amarra el siguiente paso.',
+  },
+  {
+    // La herida del mercado: mensualidades escondidas. Se responde celebrando
+    // la pregunta — es LA oportunidad de decir los 4 pilares.
+    id: 'mensualidad-oculta',
+    triggers:
+      /que mensualidad|mensualidad me van a (sacar|cobrar)|me van a (cobrar|sacar) mensual|y despues cuanto (me )?cobran|cuanto es (al|el) mes despues|cobran algo mensual|hay que pagar mensual|letra (chica|chiquita)/,
+    objection: '"¿Y después qué mensualidad me van a sacar?"',
+    response:
+      'Buena pregunta, y me gusta que la haga. Los trescientos con IVA incluido son UNA vez, y la página es suya: dominio a su nombre, accesos suyos. Mensualidad obligatoria: cero. Hay un plan de mantenimiento opcional — y lo cancela cuando quiera. Si mañana se quiere ir con otra persona, se lleva todo. Eso está por escrito. Entonces, sabiendo que es una sola vez y todo queda a su nombre… ¿la dejamos oficial esta semana?',
+    why: 'Es LA herida del mercado (el "gratis" con permanencia y el hosting secuestrado). Sinceridad total sin defensividad: celebrar la pregunta + los pilares por escrito convierten la sospecha en el argumento de cierre.',
+  },
+  {
+    // La que dispara el pattern interrupt del pre-built: usamos sus fotos
+    // públicas ANTES de que nos contrate.
+    id: 'mis-fotos',
+    triggers:
+      /con que derecho|mis fotos|quien les dio permiso|de donde sacaron (mis|las) fotos|por que (tienen|usaron) mi (foto|informacion|nombre)|usaron mi (nombre|negocio|marca)|yo no (pedi|autorice) (nada|eso)/,
+    objection: '"¿Con qué derecho usaron mis fotos / mi nombre?" (o "¡yo no pedí nada!")',
+    response:
+      'Muy buena pregunta. Todo lo que ve ahí ya es público: sus reseñas de Google y las fotos que su propio negocio publicó en Maps — lo mismo que cualquier cliente ve hoy. La página es un borrador PRIVADO: solo la ve usted con ese link, no está publicada en ningún lado. Si me dice que no la quiere, se borra hoy mismo y no queda rastro. Y si la quiere, cambiamos cualquier foto que no le guste — la página se hace a su gusto.',
+    why: 'La objeción que el modo pre-built dispara solito. Transparencia celebrando la pregunta + tres desactivadores: es información pública, es borrador privado, y se borra sin rastro. Si hay pánico ("¡yo no contraté nada!"), la línea "no ha contratado nada ni me debe nada" va ANTES de describir la página.',
+  },
+  {
+    id: 'mi-numero',
+    triggers:
+      /como consiguio mi numero|quien le dio mi numero|de donde (saco|tiene|consiguio) mi numero|como tiene mi (numero|celular)|por que me llama a mi (numero|celular)/,
+    objection: '"¿Cómo consiguió mi número?"',
+    response:
+      'De su propia información pública — su negocio está en Google Maps con este número, ahí mismo donde lo encuentran sus clientes. De hecho por eso le llamo: lo que NO está en Google es su página. ¿Le muestro la que le hicimos?',
+    why: 'Transparente y sin titubear: titubear aquí = estafador confirmado. El judo: el mismo Google Maps que da el número es la prueba de que le falta la página. Y si el opt-out llega ("no me llame más"), se cumple a la primera y se borra de verdad.',
   },
   {
     id: 'desconfianza',
@@ -120,8 +161,8 @@ export const BATTLECARDS: Battlecard[] = [
       /quien (es usted|eres|habla|los conoce)|no los conozco|de donde (me )?llama|sera estafa|no sera estafa|me estafaron|puro cuento|no confio|numero desconocido|esto es serio|sinverguenza|ya me han (llamado|ofrecido) (con )?eso( mismo)?|eso mismo me dijeron|como se yo|no hago tratos por telefono/,
     objection: 'Desconfianza / "¿y ustedes quiénes son?"',
     response:
-      'Hace muy bien en desconfiar — hay mucho vendedor de humo llamando. Soy Martín, fundador de ZerionStudio, aquí mismo en Ecuador, y por eso no le pido ni un dólar hoy: le mando ahorita por WhatsApp trabajos nuestros y el número de un cliente para que le pregunte directo. Usted decide viendo, no creyendo. ¿A este número se lo mando?',
-    why: 'Acordar con la desconfianza te separa del estafador — defenderte te iguala a uno. Prueba verificable EN VIVO (no adjetivos como "somos serios") + riesgo cero es la única moneda que compra confianza en frío. Confirmar el número regala un micro-sí y deja tu WhatsApp en su teléfono.',
+      'Hace bien en desconfiar — en este rubro hay cada cosa… Somos ZerionStudio, estudio de aquí. Ahorita que le mando su página por WhatsApp, le va también el link de nuestro estudio: ahí hay páginas nuestras funcionando ahora mismo — ábralas todas, con calma. Y fíjese en el detalle: yo no le pido ni un centavo por adelantado, que es exactamente donde estafan. Usted ve su página terminada ANTES de pagar.',
+    why: 'Acordar con la desconfianza te separa del estafador — defenderte te iguala a uno. El argumento nuclear del demo-first: "no le pido plata por adelantado, que es exactamente donde estafan" — desarma la herida del anticipo con la estructura misma de la oferta.',
   },
   {
     id: 'ventas-flojas',
@@ -129,7 +170,7 @@ export const BATTLECARDS: Battlecard[] = [
       /ventas estan (bajas|flojas|malas)|esta (dura|dificil|lenta|muerta) la (cosa|situacion)|esta muerto el negocio|la economia|temporada baja|apenas (estamos )?sobreviviendo|este mes (ando|vengo) (corto|apretado)|estamos apretados|con esta economia|el (otro|proximo) (mes|ano) (vemos|hablamos|quizas)/,
     objection: '"Las ventas están flojas / la situación está dura"',
     response:
-      'Le creo, así está para muchos — y justamente por eso lo llamo: cuando las ventas están flojas es cuando más duele que el cliente que SÍ está buscando termine donde la competencia. Empecemos por lo que no cuesta nada: le hago la muestra gratis, la ve y decide sin presión. Y si arrancamos, se parte en pagos para que no le pese.',
+      'Le creo, así está para muchos — y justamente por eso lo llamo: cuando las ventas están flojas es cuando más duele que el cliente que SÍ está buscando termine donde la competencia. Empecemos por lo que no cuesta nada: su página ya está hecha, la ve y decide sin presión. Y si la quiere, se parte en dos pagos para que no le pese.',
     why: 'El judo clásico: la razón del no ES la razón del sí — en vaca flaca necesita clientes más que nunca. El primer paso gratis elimina el conflicto con la caja vacía; los términos flexibles hacen el resto.',
   },
   {
@@ -147,8 +188,8 @@ export const BATTLECARDS: Battlecard[] = [
       /(no|tampoco|ni) me interesa|no estoy interesad|no,? gracias|no necesito (nada|eso)|no quiero nada|asi (estamos|estoy) bien|estamos bien asi|eso no es para mi|no estoy buscando eso/,
     objection: '"No me interesa"',
     response:
-      'Le entiendo — yo contesto igual cuando no sé de qué se trata. Una sola pregunta y le dejo tranquilo: cuando un cliente lo busca en Google, ¿usted aparece? … Porque yo lo busqué antes de llamarlo, y le cuento lo que encontré si me regala un minuto.',
-    why: 'El "no me interesa" en los primeros segundos es REFLEJO, no decisión: aún no sabe qué rechaza. Empatiza (nunca pelees) y reabre con la pregunta que solo él puede responder + el gancho de "yo ya lo busqué". Si repite el no, agradece y suelta con fecha: ese sí es real.',
+      'Le entiendo perfectamente, y le apuesto que le llaman vendedores todas las semanas. Por eso mismo yo no le pido plata ni reunión — la página ya existe y verla no cuesta nada. Véala, y si no le gusta me manda un "no gracias" por WhatsApp y no le molesto nunca más. ¿Le parece justo?',
+    why: 'El "no me interesa" en los primeros segundos es REFLEJO, no decisión: aún no sabe qué rechaza. El demo-first le quita todo lo que está rechazando (plata, reunión, compromiso) y deja solo "mirar" — con salida fácil escrita. Si repite el no, agradece y suelta: ese sí es real.',
   },
 
   // --- Preguntas trampa del producto (matan la confianza si titubeas) ------

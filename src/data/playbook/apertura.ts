@@ -5,26 +5,36 @@
 // ============================================================================
 
 export const OPENERS = `
-## LA APERTURA MAESTRA (los primeros 12 segundos — estructura fija en 4 tiempos)
-El objetivo de la apertura NO es que te dé permiso: es que responda algo sobre SU negocio. Pedir permiso te clasifica de telemarketer y le carga el "no gracias" en la boca; la pregunta sobre SU dato lo mete a la conversación sin que se dé cuenta.
-1. GANCHO DE CONOCIDO (2s): "¡Don [nombre]! ¿Cómo le va, cómo le ha ido?" + PAUSA REAL hasta que responda. Tono de alguien que lo conoce (Gong: ~6.6x más citas — el cerebro no encuentra el patrón de call center y te regala 10 segundos mientras averigua de dónde te conoce).
-2. LA CONFESIÓN (2s): "No me conoce todavía — soy Martín, de ZerionStudio, aquí de [ciudad]." Segundo pattern interrupt: él esperaba que fingieras familiaridad (eso hace el telemarketer descubierto) y la rompes tú mismo. La honestidad desarma y compra credibilidad para el dato que viene.
-3. LA RAZÓN CON SU DATO (6s): "Y la llamo a USTED y no a otro por algo puntual: antes de marcarle busqué su negocio en Google, como haría un cliente — tiene [4.8] estrellas con [86] reseñas… y cuando buscan '[rubro] en [ciudad]', usted no aparece. Aparece su competencia." La tarea hecha ES la diferenciación (nadie más que llama la hizo), y la tensión reputación-alta-pero-invisible abre el curiosity gap.
-4. EL REMATE (1s): "¿Usted sabía eso?" + SILENCIO TOTAL. Es una pregunta sobre SU negocio, no sobre tu pitch: "no me interesa" no es respuesta coherente a "¿sabía?". Conteste lo que conteste, ya hay conversación.
-- PROHIBIDO rematar la apertura con "¿me regala 30 segundos?", "¿tiene un minutito?", "¿le puedo contar?": es el cierre del telemarketer educado y dispara el "no gracias" automático. El permiso solo existe DENTRO de la honestidad radical (abajo), como reto con salida — nunca como cortesía.
+## LAS DOS APERTURAS EN PRUEBA A/B (el briefing dicta cuál toca en esta llamada; las stats registran cuál convierte más "sí, mándela")
 
-## VARIANTES (la maestra es la default; estas entran cuando el contexto manda)
-- HONESTIDAD RADICAL (contestó seco, apurado o a la defensiva): "Don [nombre], le soy 100% honesto: esta es una llamada comercial y usted no me conoce. Puede colgarme ahora sin pena… o darme 20 segundos y le cuento qué encontré en Google de SU negocio. ¿Qué prefiere?" — aquí el permiso SÍ funciona porque primero nombraste el elefante: es un reto con salida fácil, no una súplica.
+### APERTURA A — HONESTIDAD RADICAL (la del Playbook Web Local v1.1)
+"Buenos días, ¿hablo con [don/doña|doctora] [nombre]? … Le habla Martín, de ZerionStudio, aquí en [ciudad]. Le soy honesto de entrada: esta es una llamada de ventas. Puede colgarme sin problema… o darme treinta segundos, porque le cuento que ya hicimos algo para su negocio. ¿Me da medio minutito?"
+- Por qué funciona: nombras el elefante ANTES de que él lo nombre — el permiso aquí es un reto con salida fácil, no una súplica. Sonrisa audible, cero titubeo.
+- Si suena molesto: "Entendido, no le quito más tiempo. Que le vaya bien." — y queda en cadencia de WhatsApp. Un no aquí no quema el prospecto.
+
+### APERTURA B — LA MAESTRA (4 tiempos, remate sin permiso)
+1. GANCHO DE CONOCIDO (2s): "¡Don [nombre]! ¿Cómo le va, cómo le ha ido?" + PAUSA REAL hasta que responda (Gong: ~6.6x — el cerebro no encuentra el patrón de call center).
+2. LA CONFESIÓN (2s): "No me conoce todavía — soy Martín, de ZerionStudio, aquí de [ciudad]."
+3. LA RAZÓN CON SU DATO (6s): "Y la llamo a USTED y no a otro por algo puntual: antes de marcarle busqué su negocio en Google, como haría un cliente — tiene [4.8] estrellas con [86] reseñas… y cuando buscan '[rubro] en [ciudad]', usted no aparece. Aparece su competencia."
+4. EL REMATE (1s): "¿Usted sabía eso?" + SILENCIO TOTAL. Es pregunta sobre SU negocio: "no me interesa" no es respuesta coherente a "¿sabía?".
+- En la B está PROHIBIDO rematar pidiendo permiso ("¿me regala 30 segundos?", "¿tiene un minutito?"): el permiso solo vive dentro de la A, como reto.
+
+### DESPUÉS de cualquiera de las dos: la razón verificable
+"La razón de mi llamada es bien puntual: la semana pasada busqué [rubro] por [sector] en Google… y su negocio aparece con muy buenas reseñas — lo felicito — pero sin página web. Sus clientes nuevos le encuentran de milagro. Puede que esto le sirva o puede que no — para eso le pregunto un par de cositas primero, ¿le parece?"
+- RUTA EXPRESS ("estoy ocupado / dígame rápido" — 30 segundos prometidos = 30 cumplidos): "Se lo digo en una frase y le dejo trabajar: su página web ya está hecha — con su negocio, sus servicios y las reseñas de sus clientes en Google. Verla no le cuesta nada. ¿Se la mando por WhatsApp y la ve en la noche con calma? … ¿Mañana a qué hora le escribo mejor?"
+
+### VARIANTES SITUACIONALES (cuando el contexto manda)
 - COMPETIDOR EN LA CARA: "Antes de marcarle busqué '[rubro] en [sector]' en Google, como haría cualquier cliente. ¿Sabe quién aparece primero? [Competidor]. Ustedes no salen — y ahí se van clientes todos los días."
 - RESEÑA CITADA TEXTUAL: "Leí sus reseñas y hay una que dice: '[cita real]'. Con clientes que hablan así de usted, lo que falta no es calidad — es que lo encuentren más fácil."
-- LA LISTA DE LOS MEJORES: "Ayudo a [rubro] aquí en [ciudad] a que los encuentren en Google y les escriban directo al WhatsApp. Estoy llamando SOLO a los mejor puntuados de la zona — y ustedes están en esa lista."
-- PROHIBIDO SIEMPRE: "¿le agarro en mal momento?" (invita al "sí, mal momento, chao": ~40% menos citas según Gong), "quería ofrecerle nuestros servicios", "disculpe la molestia".
-- Suena a VECINO, no a call center: "don/doña + nombre", menciona la ciudad o el sector, nombra otro negocio del rubro con el que trabajas. Guion leído o velocidad de metralleta = colgón en 3 segundos.
+- LA LISTA DE LOS MEJORES: "Estoy llamando SOLO a los mejor puntuados de la zona — y ustedes están en esa lista."
+- PROHIBIDO SIEMPRE: "¿le agarro en mal momento?" / "¿le cojo en mal momento?" (~40% menos citas según Gong), "quería ofrecerle nuestros servicios", "disculpe la molestia", dos "me regala" seguidos.
+- Suena a VECINO, no a call center. Registro FORMAL con profesionales (doctora/clínica: jamás "de ley", "full", "que le vaya bonito"); BARRIO con peluquería/restaurante. Guion leído o metralleta = colgón en 3 segundos.
 
 ## GATEKEEPER (empleado/recepcionista/familiar) — aliado, jamás obstáculo
 - Detecta en 5 segundos que NO es el dueño: contesta con el nombre del negocio en tono de atención al cliente ("Ferretería El Tornillo, ¿buenas?"), voz joven/apurada, bulla de mostrador. El dueño contesta con un "¿aló?" seco de celular personal. Verifica: "¿Con quién tengo el gusto… usted es el dueño?"
 - Pedir el pase: "Buenos días, ¿me comunica con don [nombre], por favor?" — si no sabes el nombre: "¿Con el dueño, por favor? ¿Cómo se llama él, disculpe?" (ese nombre vale oro para el intento 2).
 - "¿De parte de quién? / ¿De qué empresa?": "De Martín, de ZerionStudio, aquí de [ciudad]. Es sobre cómo aparece el negocio cuando la gente lo busca en Google — es un tema que él maneja directo. ¿Me lo pasa, porfa?" — honesto y corto: nunca un pitch que la empleada pueda rechazar por ti, y JAMÁS mentir ("es personal") — el mundo local es chico y la mentira quema el rubro.
+- LA JUGADA PRE-BUILT (cuando la página ya existe — de par a par, honestidad preparada): "Buenas, una consulta: tengo lista la página web del negocio de don [nombre] y necesito mostrársela antes de darla de baja. ¿A qué hora lo encuentro?" — "¿Él contrató eso?" → "No, no ha contratado nada ni debe nada — la hicimos nosotros como muestra, por nuestra cuenta, porque su negocio tiene muy buenas reseñas y no tiene página. Por eso necesito que la vea antes del viernes, que es cuando la doy de baja." Remate: "¿Me hace un favor? Le mando el link al WhatsApp del negocio y usted misma se la muestra — véala usted también, ahí salen las reseñas de los clientes. Si le interesa, él me escribe." NUNCA pedirle el número personal del dueño a la gatekeeper. 2 bloqueos → WhatsApp directo del negocio.
 - "No se encuentra / está ocupado": "No se preocupe. ¿A qué hora lo encuentro por aquí normalmente? … Perfecto, lo llamo mañana a las 10 entonces. ¿Y me recuerda su nombre, para agradecerle cuando vuelva a llamar?" — sales con la hora real del dueño + una aliada con nombre.
 - "Déjeme su número y él le devuelve la llamada": NUNCA aceptes (el dueño jamás devuelve llamadas a desconocidos). "Se lo agradezco, pero ando entre reuniones y es difícil que me encuentre. Mejor lo llamo yo — ¿mañana en la mañana está? Le dejo mi nombre eso sí: Martín, de ZerionStudio."
 - NO pitchees al gatekeeper. Tono casual de aliado: "¿me ayuda porfa?" activa reciprocidad. SIEMPRE de usted — tutear a una recepcionista mayor cae de confianzudo y quema a la aliada; tutea solo si la voz es claramente joven Y te tutea primero.

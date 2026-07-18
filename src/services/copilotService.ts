@@ -137,9 +137,9 @@ async function callFn(
 
 // El playbook ya NO viaja desde el navegador: vive en el servidor (generado
 // por npm run sync:playbook). Cada request baja de ~58KB a ~2-5KB de subida.
-const supaBriefing = (lead: Lead, history: string, memory: string, onDelta?: (t: string) => void, signal?: AbortSignal) =>
+const supaBriefing = (lead: Lead, history: string, memory: string, apertura: 'A' | 'B', onDelta?: (t: string) => void, signal?: AbortSignal) =>
   callFn(
-    { mode: 'briefing', lead: leadBrief(lead), history, memory, settings: settingsForPrompt() },
+    { mode: 'briefing', lead: leadBrief(lead), history, memory, apertura, settings: settingsForPrompt() },
     onDelta,
     signal
   );
@@ -339,7 +339,7 @@ const streamOut = async (text: string, onDelta?: (t: string) => void, signal?: A
   return text;
 };
 
-async function mockBriefing(lead: Lead, history: string, _memory: string, onDelta?: (t: string) => void, signal?: AbortSignal): Promise<string> {
+async function mockBriefing(lead: Lead, history: string, _memory: string, apertura: 'A' | 'B', onDelta?: (t: string) => void, signal?: AbortSignal): Promise<string> {
   const e = lead.enrichment;
   const noWeb = !lead.website.trim();
   const settings = settingsForPrompt();
@@ -347,16 +347,23 @@ async function mockBriefing(lead: Lead, history: string, _memory: string, onDelt
     ? [`**Ya tienes historia con este prospecto:** ${history.trim()}`, 'Retómala: no arranques de cero, referénciala ("La vez pasada quedamos en…").', '']
     : [];
   const settingsLine = settings ? [`**Tu oferta (úsala tal cual):** ${settings.split('\n')[0]}`, ''] : [];
+  const dato = e?.rating != null ? `tiene ${e.rating} estrellas con ${e.reviewCount} reseñas` : 'me llamó la atención lo que encontré';
+  const opener =
+    apertura === 'A'
+      ? `"Buenos días, ¿hablo con ${lead.contactName || 'el dueño'}? … Le habla Martín, de ZerionStudio. Le soy honesto de entrada: esta es una llamada de ventas. Puede colgarme sin problema… o darme treinta segundos, porque ya hicimos algo para su negocio. ¿Me da medio minutito?"`
+      : `"¡${lead.contactName || 'Buenas'}! ¿Cómo le va? … No me conoce todavía — soy Martín, de ZerionStudio. Antes de llamarle busqué su negocio en Google, como haría un cliente: ${dato}${noWeb ? '… y no le aparece página' : ''}. ¿Usted sabía eso?"`;
+  const tono =
+    apertura === 'A'
+      ? '*(sinceridad total, sonrisa audible — el permiso aquí es un reto con salida, no una súplica)*'
+      : '*(tono de conocido: saluda, PAUSA real hasta que responda, y recién ahí sigues — el remate es pregunta, no permiso)*';
   const text = [
     ...settingsLine,
     ...histLine,
-    `**Tu apertura (dila y CALLA):**`,
-    `"¡${lead.contactName || 'Buenas'}! ¿Cómo le va? … No me conoce todavía — soy Martín, de ZerionStudio. Antes de llamarle busqué su negocio en Google, como haría un cliente: ${
-      e?.rating != null ? `tiene ${e.rating} estrellas con ${e.reviewCount} reseñas` : 'me llamó la atención lo que encontré'
-    }${noWeb ? '… y no le aparece página' : ''}. ¿Usted sabía eso?"`,
-    '*(tono de conocido: saluda, PAUSA real hasta que responda, y recién ahí sigues — el remate es pregunta, no permiso)*',
+    `**Tu apertura ${apertura} (dila y CALLA):**`,
+    opener,
+    tono,
     '',
-    '**Meta:** agendar la muestra gratis de SU página en esta llamada.',
+    '**Meta:** que acepte VER su página ya hecha + la hora a la que la va a ver (link por WhatsApp).',
     '',
     '*Lo demás es turno por turno: cada frase siguiente te la soplo en vivo según lo que responda.*',
   ].join('\n');
@@ -406,6 +413,7 @@ export const copilotBriefing: (
   lead: Lead,
   history: string,
   memory: string,
+  apertura: 'A' | 'B',
   onDelta?: (t: string) => void,
   signal?: AbortSignal
 ) => Promise<string> = supabase ? supaBriefing : mockBriefing;

@@ -89,6 +89,12 @@ const OBJ_CASES: ObjCase[] = [
   ['tampoco me interesa eso', 'no-interesa'],
   ['cualquier cosa yo le aviso', 'yo-le-aviso'],
   ['listo entonces yo le llamo', 'yo-le-aviso'],
+  // cards nuevas del Playbook Web Local v1.1 (demo-first)
+  ['y que mensualidad me van a sacar despues', 'mensualidad-oculta'],
+  ['con que derecho usaron mis fotos', 'mis-fotos'],
+  ['yo no pedi nada de eso', 'mis-fotos'],
+  ['otra empresa me la ofrecieron gratis', 'gratis-permanencia'],
+  ['como consiguio mi numero', 'mi-numero'],
   // --- NEGATIVOS: no deben disparar nada -----------------------------------
   ['mi hija carolina esta de vacaciones', null],
   ['vendemos caramelos y chocolates', null],

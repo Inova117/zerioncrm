@@ -58,9 +58,21 @@ const openerSeed = (o: string): string =>
 // Qué jugada toca según cuántas veces sonó la MISMA objeción (disciplina del Árbitro).
 function loopPlay(n: number): string {
   if (n <= 1) return 'loop 1: battlecard tal cual';
-  if (n === 2) return 'loop 2: riesgo cero + prueba en vivo';
-  if (n === 3) return 'loop 3: dolor futuro con sus números';
-  return 'loop 4 NO existe: retirada elegante con fecha y hora';
+  if (n === 2) return 'loop 2 (ÚLTIMO): riesgo cero — "no ha contratado nada, véala primero" / 50-50 si es precio';
+  return 'loop 3 NO existe: retirada elegante — "la página queda prendida hasta el viernes"';
+}
+
+// Prueba A/B de aperturas (Playbook Web Local v1.1): alterna por llamada y
+// queda registrada en las stats — en ~30 llamadas la data dice cuál convierte.
+const AB_KEY = 'zerioncrm:aperturaAB';
+function nextAperturaVariant(): 'A' | 'B' {
+  try {
+    const next = localStorage.getItem(AB_KEY) === 'A' ? 'B' : 'A';
+    localStorage.setItem(AB_KEY, next);
+    return next;
+  } catch {
+    return 'A';
+  }
 }
 
 // Captura heurística de los números del prospecto (con numerals=true el
@@ -145,6 +157,7 @@ export function CopilotPage() {
   const perdidosRef = useRef<number | null>(null);
   const callStartRef = useRef(0);
   const memoryRef = useRef(''); // memoria del nicho (lecciones acumuladas)
+  const aperturaRef = useRef<'A' | 'B'>('A'); // variante A/B de esta llamada
   const openerRef = useRef(''); // la apertura del briefing (se siembra en vivo)
   const wantOpenerSeedRef = useRef(false); // escucha activada antes de extraerla
 
@@ -192,6 +205,7 @@ export function CopilotPage() {
       .map(([id, n]) => (n > 1 ? `${id}×${n}` : id))
       .join(', ');
     return [
+      `Apertura ${aperturaRef.current}`,
       mins ? `${mins} min` : '',
       momentsSeenRef.current.length ? `Ruta: ${momentsSeenRef.current.join(' → ')}` : '',
       objs ? `Objeciones: ${objs}` : '',
@@ -413,6 +427,7 @@ export function CopilotPage() {
     briefAbortRef.current?.abort();
     const briefCtrl = new AbortController();
     briefAbortRef.current = briefCtrl;
+    aperturaRef.current = nextAperturaVariant();
     setLead(l);
     leadRef.current = l;
     setPhase('brief');
@@ -442,6 +457,7 @@ export function CopilotPage() {
         l,
         historyRef.current,
         memoryRef.current,
+        aperturaRef.current,
         (chunk) => {
           if (briefCtrl.signal.aborted) return; // stream zombi: no interlinea
           acc += chunk;

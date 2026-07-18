@@ -1,49 +1,41 @@
 // ============================================================================
-// Cierres, precio, second money y el después de la llamada.
-// La regla madre: vender de más DESPUÉS de la señal de compra mata más ventas
-// que cualquier objeción. Detectar el sí y callarse es una habilidad.
+// Cierres del modelo demo-first: el cierre del TOQUE 1 (que acepte VER la
+// página + ancla de hora) y el guion del dinero del TOQUE 2 (24-72h después).
+// La regla madre sigue: vender de más DESPUÉS de la señal de compra mata más
+// ventas que cualquier objeción. Detectar el sí y callarse es una habilidad.
 // ============================================================================
 
 export const CLOSES = `
-## SEÑALES DE COMPRA (cierra AL INSTANTE cuando escuches)
+## SEÑALES DE COMPRA (reacciona AL INSTANTE cuando escuches)
 "¿cuánto cuesta?" · "¿qué incluye?" · "¿cuánto se demoran?" · "¿cómo sería el pago?" · "¿qué necesitan de mí?" · "¿tienen ejemplos?" · "¿me pueden poner el menú/las fotos?" · "¿y si después quiero cambiar algo?"
-→ Dejó de evaluarte: está imaginándose CON la página. Responde en UNA frase y convierte en cita. Cada feature extra que agregues ahora es una nueva razón para dudar.
+→ En el TOQUE 1: responde en UNA frase y convierte en "se la mando ahorita — ¿a qué hora la alcanza a ver?". En el TOQUE 2 (ya la vio): cobra. Cada feature extra que agregues ahora es una nueva razón para dudar.
+- Si pregunta PRECIO en el toque 1: se dice de frente y se vuelve a la página — "Trescientos con IVA incluido, una sola vez — pero no me crea a mí: véala primero, que ya está hecha, y decide con la página en la mano. ¿Se la mando?"
 
-## YA COMPRÓ MENTALMENTE (señales de que hay que CALLARSE y agendar)
-- Repite el beneficio con SUS palabras ("o sea que me escribirían directo al WhatsApp").
-- Pregunta de proceso: "¿cuándo empezamos?", "¿cómo le pago?", "¿le digo a mi hija que mande las fotos?"
-- Te llama por tu nombre ("ya pues, Martín"), usa futuro posesivo ("mi página", "cuando tenga la página"), tono relajado, se ríe.
-→ "Perfecto, entonces lo dejamos así: nos vemos el jueves a las 3 y arrancamos. Le mando el detalle por WhatsApp ahora mismo, ¿a este número?" — y cierra la llamada en menos de 60 segundos. El que sigue vendiendo después del sí, compra de vuelta su propio producto.
-- ALERTA ROJA: dos señales de compra seguidas y sigues explicando = estás matando la venta. AGENDA YA.
+## EL CIERRE DEL TOQUE 1 (el trato — micro-compromiso, no dinero)
+"El trato es así de simple: yo le mando el link por WhatsApp, usted la ve con calma — sola, sin mí encima. Si le encanta, conversamos. Y si no le gusta, me lo dice, la borro, y aquí no ha pasado nada: usted no paga ni un centavo por mirar. ¿Le parece justo? … Perfecto. ¿Este mismo número tiene WhatsApp? … ¿Y a qué hora cree que la alcanza a ver — hoy en la noche, más o menos? Listo, entonces mañana tipo nueve le escribo y me cuenta."
+- LA ANCLA DE HORA es el test de compromiso: "mándeme un WhatsApp" SIN hora = evasiva, NO cuenta como aceptación — vuelve a pedir la hora una vez ("¿como a qué hora, para no caerle en mal momento?").
+- YA COMPRÓ EL VERLA (repite el beneficio, pregunta de proceso, tono relajado) → deja de vender y amarra hora + WhatsApp en menos de 60 segundos. Dos señales seguidas y sigues explicando = estás matando la venta.
 
-## LOS CIERRES (usa uno distinto en cada re-cierre)
-- ALTERNATIVO (el rey para agendar): "¿Le queda mejor mañana a las 10 o el jueves a las 3? Le llevo ejemplos de [su rubro]." Nunca preguntes SI quiere — pregunta CUÁL.
-- ASUMIDO: "Para dejarle la página lista en dos semanas, ¿el logo me lo pasa usted o se lo diseñamos?" Si responde lo del logo, ya compró sin decir sí. (Plazo canónico ÚNICO: dos semanas desde el anticipo — el mismo en toda conversación; tres plazos distintos destruyen la certeza de empresa.)
-- RIESGO CERO / MUESTRA GRATIS (el eje de esta venta): "Le preparo una muestra gratis de cómo se vería SU página, con su nombre y sus colores. Si no le encanta, ahí muere y usted no pierde nada. ¿La vemos el martes o el miércoles?" — pasas de vendedor que pide a alguien que trae un regalo con el nombre del negocio puesto.
-- URGENCIA HONESTA (escasez susurrada, UNA vez por llamada, solo si es verdad — la MISMA línea y el MISMO número que la tonalidad de escasez, nunca dos versiones): "Le soy honesto… este mes solo tomo tres proyectos porque yo mismo los superviso, y me queda un cupo. ¿Se lo separo?"
-- ORIENTADO AL NO (para el indeciso): "¿Hay algún problema si le preparo la muestra y me da cinco minutos el jueves?" / "¿Es mala idea que le enseñe lo que ya están haciendo otras [clínicas] aquí?"
-- RESUMEN DE VALOR: "Quedamos así: página lista en dos semanas, aparece en Google, los clientes le escriben directo al WhatsApp. ¿Arrancamos?"
+## EL GUION DEL DINERO (toque 2, 24-72h después de que la vio — máx 2 loops)
+1. "¿La pudo ver, [don|doctora] [nombre]? … ¿Y qué tal? ¿Le gustó cómo quedó con sus reseñas?" [si hay peros: "eso se cambia en el día"]
+2. QUE LO DIGA ÉL: "Y viéndola así, con sus reseñas y sus servicios… ¿usted siente que esto podría ser… lo que le está faltando para que le lleguen más clientes?" [ESPERAR — que el sí lo verbalice él]
+3. STACK DE VALOR antes del precio: "Entonces hagamos una cosa: la página queda a su nombre — su dominio, sus accesos, todo suyo — funcionando esta misma semana. Una página hecha a medida como esta, con los textos redactados y sus reseñas integradas, en Ecuador le cotizan entre trescientos y ochocientos dólares."
+4. EL PRECIO, de frente y UNA vez (voz de locutor nocturno): "Como la suya ya está construida, queda en TRESCIENTOS, con IVA incluido, con todo — se lo digo de frente porque aquí no hay letra chica. Una sola vez, no es mensualidad. Menos de lo que le deja un solo cliente nuevo. ¿Le parece justo?" → SILENCIO TOTAL, cuenta 4. (Si MI NEGOCIO define otro precio, se usa ESE, dicho igual de seco.)
+5. TRAS EL SÍ: "Excelente decisión. Le mando ahorita los datos — ¿maneja transferencia o De Una? — y hoy mismo su página queda oficial."
+6. EL PLAN MENSUAL, opt-out DESPUÉS del sí (jamás antes): "La página incluye el primer mes de mantenimiento. De ahí en adelante son unos cuarenta al mes con IVA, todo incluido: el dominio, que nunca se caiga, y los cambios que necesite por WhatsApp. La mayoría lo deja así para no preocuparse de nada. ¿Lo dejamos activo?"
+- El monto NO se negocia. Piden rebaja → forma, no monto: "Lo que sí puedo hacer es partírselo: la mitad ahora y la mitad a fin de mes. ¿Así sí le cuadra?"
+- Reducción al ridículo (con el precio REAL dividido antes de decirla): "menos de un dólar al día — con un cliente que le traiga al mes, se pagó sola."
 
-## EL PRECIO (el momento de máxima disciplina)
-- ANTES del número, ancla el valor con SU pérdida ya calculada ("usted dijo que se le van unos 200 al mes…").
-- Tres opciones de mayor a menor, en palabras y de corrido (cifras de EJEMPLO — si MI NEGOCIO define precios, usa ESOS, dichos igual de secos): "El completo, con página, pedidos y WhatsApp automático, en setecientos cincuenta. El intermedio en quinientos. El básico en trescientos cincuenta. La mayoría de negocios como el suyo arranca con el intermedio." Placeholder solo para datos del prospecto, JAMÁS para tus precios: al momento del precio no se leen letras de álgebra.
-- Di el número SECO, con voz de locutor nocturno (lento, grave, hacia abajo), UNA vez: "Son quinientos, todo incluido." Y SILENCIO TOTAL — cuenta 4. El primero que habla después del precio, cede.
-- Piden rebaja → cambia términos o alcance, JAMÁS solo el número: "Lo que sí puedo hacer es dividírselo: la mitad para arrancar y la mitad cuando la vea funcionando. ¿Así le cuadra?" / "Podemos arrancar con una versión más sencilla y crecerla después."
-- Reducción al ridículo (calcula SIEMPRE el precio real ÷ 365 ANTES de decirla — una división que no cuadra te caza en 3 segundos): "Es un dólar con algo al día — con un almuerzo que venda al día, ya la pagó. Y con un cliente nuevo al mes, se pagó sola."
-- En frío sin valor construido, NO des cifra: "Depende de lo que su negocio necesite; hay opciones bien accesibles. Por eso la muestra es gratis: la ve primero y hablamos de números con algo concreto en la mano. ¿Martes o miércoles?"
+## ESCASEZ HONESTA (solo si duda, solo en el cierre — power whisper suave)
+"Le comento una cosita, y esto sí es en serio: como las páginas las hago yo mismo, las demos que no se concretan las doy de baja el viernes, para hacerle campo al siguiente negocio." — "¿Y si me decido la otra semana?" → "Sí se la puedo volver a armar, eso no se pierde — pero le toca hacer fila detrás de los negocios nuevos de esa semana. Por eso mejor véala antes del viernes, que ya está lista."
+- Con prospectos que ya mostraron desconfianza explícita: omitir el viernes en el cierre hablado; usarlo solo en el mensaje de despedida escrito.
+- La escasez SE CUMPLE: las demos muertas se dan de baja de verdad — escasez contradicha = guion expuesto.
 
-## SECOND MONEY (solo tras el sí AL PROYECTO — anticipo aceptado — NUNCA tras el sí a la cita de la muestra)
-"Excelente decisión. Ya que arrancamos: la mayoría de mis clientes agrega el mantenimiento con WhatsApp automático — le contesta a los clientes hasta dormido — por cuarenta al mes. ¿Se lo dejo incluido?" (Cifra de ejemplo: usa la de MI NEGOCIO si está definida.) En la MISMA llamada del sí al proyecto, presentado como completar la decisión, no como venta nueva.
+## LA RETIRADA ELEGANTE (tras 2 loops — hombre razonable, soltando la cuerda)
+"Mire, no le insisto más, porque usted sabe lo que le conviene a su negocio mejor que yo. La página queda prendida hasta el viernes; si se anima, un mensajito y el mismo día queda funcionando. Y si no, igual gracias por su tiempo, que ha sido muy amable. ¿Estamos?"
 
-## WHATSAPP POST-LLAMADA (antes de 5 minutos de colgar — tu primera prueba de seriedad)
-- Con cita — plantilla: "Hola don [nombre], un gusto 👋 Soy Martín de ZerionStudio, recién hablamos. Quedamos así: *[martes 10:00]* le muestro el diseño de muestra de la página de *[Negocio]* (sin costo y sin compromiso). Cualquier cosa me escribe por aquí. ¡Buen día!"
-- 1 minuto después, el micro-compromiso anti-plantón: "Ah, y para que la muestra salga con la identidad de su negocio: ¿me manda su logo o una foto del local? Así el [martes] lo ve con sus propios colores 🙌" — si invierte 30 segundos mandando el logo, ya es parte del proyecto: los plantones se desploman.
-- Día antes de la cita: recordatorio corto reconfirmando la hora.
-- Sin cita: mensaje corto con tu nombre + el dato del negocio que encontraste + una pregunta.
-
-## SEGUNDA LLAMADA (seguimiento agendado — donde está el dinero)
-- Apertura: "Don [nombre], le habla Martín, el de las páginas web — quedamos en hablar hoy. Le mandé el ejemplo por WhatsApp, ¿lo alcanzó a ver? … No se preocupe, se lo resumo en un minuto: así se vería su negocio en Google."
-- Re-cierre directo (ya hubo valor y tiempo): "Usted ya vio cómo quedaría. La pregunta no es si le sirve — es cuánto más quiere esperar mientras la competencia sí aparece. ¿Arrancamos con la mitad hoy y en dos semanas la tiene?"
-- Si vuelve el no: salida elegante + tercera llamada agendada con valor nuevo. El seguimiento se acaba cuando compra o te lo prohíbe — no antes (la mayoría de estas ventas cae después del quinto contacto).
-- Sin venta hoy: "Perfecto, no le insisto. Le mando la muestra gratis de su página por WhatsApp y lo llamo el jueves a esta hora, dos minutos. ¿Este número tiene WhatsApp?" — el micro-sí del WhatsApp mantiene el trato vivo.
+## WHATSAPP POST-LLAMADA (a los 5 minutos, o a la hora prometida — tu primera prueba de seriedad)
+- Con sí en el toque 1 — el link: "Buenas tardes [don|doctora] [nombre], le saluda Martín — hablamos hace un ratito. Aquí está su página: [link]. Fíjese en la parte de sus servicios y en las reseñas de sus clientes, que salen ahí mismo. Si algo no le gusta, se cambia — la página es suya, se hace a su gusto." + recuerda SU problema textual: "Acuérdese de lo que me contaba: [su dolor]. Véala pensando en eso, y me contará con confianza si le convence o no."
+- Sin link todavía (demo comprometida): captura o video de 30-45s navegándola "como la vería un cliente" + UNA pregunta de problema.
+- La fecha prometida SE CUMPLE: si dijiste "mañana a esta hora", llega mañana a esa hora.
 `.trim();

@@ -52,7 +52,7 @@ const KIMI_MODEL = Deno.env.get('KIMI_MODEL') ?? 'kimi-k3';
 // Versión visible en las cabeceras de TODA respuesta (incluido el preflight):
 //   curl -sI -X OPTIONS <url>/functions/v1/copilot | grep x-copilot-version
 // Súbela en cada cambio relevante — es la forma de verificar qué está deployado.
-const VERSION = '2026-07-17.6-dos-pilares';
+const VERSION = '2026-07-17.7-web-local-v11';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -61,11 +61,11 @@ const CORS = {
   'x-copilot-version': VERSION,
 };
 
-const PERSONA = `Eres "el Closer" de ZerionStudio. Vendes con UNA sola voz — directa, cálida, con certeza tranquila — siguiendo EL SISTEMA (la columna vertebral del playbook). Tu framework es LA LÍNEA RECTA (el mapa de toda la llamada) y todo pitch sigue EL PITCH DE CONTRASTE (dolor → contraste → retirada); lo demás son jugadas puntuales que el sistema invoca — JAMÁS cambias de personalidad a mitad de llamada y JAMÁS citas metodologías ni gurús. Le susurras al oído a un vendedor DURANTE una llamada en frío real. Él vende páginas web y automatizaciones a negocios locales (ZerionStudio). Esta es una venta CHICA (1-2 llamadas): el cierre se pide directo y más de una vez, y en frío el vendedor LLEVA la llamada. Tu único trabajo: que cierre ESTA llamada.
+const PERSONA = `Eres "el Closer" de ZerionStudio. Vendes con UNA sola voz — directa, cálida, con certeza tranquila — siguiendo EL SISTEMA (la columna vertebral del playbook). Tu framework es LA LÍNEA RECTA (el mapa de toda la llamada) y todo pitch sigue EL PITCH DE CONTRASTE (dolor → contraste → retirada); lo demás son jugadas puntuales que el sistema invoca — JAMÁS cambias de personalidad a mitad de llamada y JAMÁS citas metodologías ni gurús. Le susurras al oído a un vendedor DURANTE una llamada en frío real. Él vende páginas web a negocios locales (ZerionStudio) con el modelo DEMO-FIRST: la página se construye ANTES de cobrar, el prospecto la ve terminada por WhatsApp, y solo si la quiere paga ($300 con IVA incluido, una vez — salvo que MI NEGOCIO diga otro precio). La venta del TOQUE 1 es que acepte VER su página + la hora a la que la va a ver; el dinero se cierra en el TOQUE 2, cuando ya la vio. El paso se pide directo y más de una vez, y en frío el vendedor LLEVA la llamada. Tu único trabajo: que esta llamada termine con su paso amarrado.
 
 CÓMO PIENSAS (proceso interno — jamás lo expliques en la respuesta):
 1. Detecta el MOMENTO de la llamada: gatekeeper, apertura, descubrimiento, pitch, objeción, precio, señal de compra, peligro de colgar, cierre. El cliente puede mandarte su detección: confírmala o corrígela leyendo la transcripción.
-2. Juega LA jugada de ESE momento según el playbook: objeción → acordar + loop (nunca contradecir); señal de compra → dejar de presentar y cerrar YA con alternativa; peligro → rescate de 15 segundos con un dato SUYO; descubrimiento → la siguiente pregunta que cuantifica el dolor; precio → cuantificar retorno con SUS números, jamás defender ni bajar el precio de una; gatekeeper → aliado, nombre y hora, sin pitchear.
+2. Juega LA jugada de ESE momento según el playbook: objeción → acordar + loop hacia "véala primero" (máx 2, nunca contradecir); señal de compra → en T1 link + hora YA, en T2 cobrar YA; peligro → rescate de 15 segundos con un dato SUYO; descubrimiento → la siguiente pregunta que cuantifica el dolor; precio → de frente ($300 con IVA, una vez) y de vuelta a la página, el monto jamás baja (solo 50/50); gatekeeper → aliado, y si la página existe, la jugada pre-built ("necesito mostrársela antes de darla de baja").
 3. Personaliza SIEMPRE con la ficha y el historial del prospecto, y con la oferta real del vendedor (MI NEGOCIO tiene prioridad sobre el playbook).
 
 CONTRATO DE VERDAD (anti-alucinación — esto es INVIOLABLE):
@@ -99,6 +99,8 @@ interface CopilotBody {
   memory?: string;
   /** Stats de la llamada (para el debrief). */
   stats?: string;
+  /** Variante de apertura de esta llamada (prueba A/B): 'A' honestidad radical | 'B' maestra. */
+  apertura?: string;
 }
 
 // --- Llamada a Anthropic (raw HTTP; streaming SSE → texto plano) ------------
@@ -360,6 +362,7 @@ async function handle(req: Request): Promise<Response> {
   const callState = str(body.callState).slice(0, 600);
   const memory = str(body.memory).slice(0, 5000);
   const stats = str(body.stats).slice(0, 800);
+  const apertura = str(body.apertura) === 'B' ? 'B' : 'A';
 
   // -------------------------------------------------------------------- warm
   // Precalienta el cache del system (PERSONA + playbook, por modelo) para que
@@ -384,8 +387,14 @@ async function handle(req: Request): Promise<Response> {
     const sys = buildSystem(lead, playbook, history, settings, memory);
     // SOLO la apertura: la llamada es turno por turno y cada frase siguiente
     // la sopla el coach EN VIVO según lo que el prospecto responda de verdad.
+    // Prueba A/B de aperturas: el cliente alterna la variante por llamada y
+    // queda registrada en las stats — la data decide cuál convierte más.
+    const aperturaSpec =
+      apertura === 'A'
+        ? 'la APERTURA A — HONESTIDAD RADICAL del playbook: saludo con su nombre + "Le habla Martín, de ZerionStudio" + "Le soy honesto de entrada: esta es una llamada de ventas. Puede colgarme sin problema… o darme treinta segundos, porque le cuento que ya hicimos algo para su negocio. ¿Me da medio minutito?" — adaptada con los datos REALES de la ficha (registro formal si es profesional/clínica)'
+        : 'la APERTURA B — LA MAESTRA del playbook, con los datos REALES de la ficha: gancho de conocido con pausa ("¡Don/Doña [nombre]! ¿Cómo le va?…"), la confesión ("no me conoce todavía — soy Martín, de ZerionStudio"), la razón con SU dato (estrellas/reseñas/no aparece en Google) y el remate "¿usted sabía eso?". PROHIBIDO rematarla pidiendo permiso';
     const userMsg =
-      'Dame SOLO el arranque de la llamada. Formato EXACTO:\n\n**Tu apertura (dila y CALLA):**\nLA frase exacta entre comillas siguiendo LA APERTURA MAESTRA del playbook, con los datos REALES de la ficha: gancho de conocido con pausa ("¡Don/Doña [nombre]! ¿Cómo le va?…"), la confesión ("no me conoce todavía — soy Martín, de ZerionStudio"), la razón con SU dato (estrellas/reseñas/no aparece en Google) y el remate "¿usted sabía eso?". Decible en 10-12 segundos. PROHIBIDO rematarla pidiendo permiso ("¿me regala 30 segundos?", "¿tiene un minutito?").\nUna nota de tonalidad en cursiva, de una sola línea.\n\n**Meta:** una línea — qué cita vas a agendar en esta llamada.\n\nNADA MÁS. Ni pasos siguientes, ni objeciones, ni el resto del guion: cada frase siguiente me la soplas EN VIVO según lo que el prospecto responda.';
+      `Dame SOLO el arranque de la llamada. Esta llamada usa ${aperturaSpec}. Decible en 10-12 segundos.\n\nFormato EXACTO:\n\n**Tu apertura ${apertura} (dila y CALLA):**\nLA frase exacta entre comillas.\nUna nota de tonalidad en cursiva, de una sola línea.\n\n**Meta:** una línea — el objetivo del toque 1: que acepte VER su página ya hecha + la hora a la que la va a ver.\n\nNADA MÁS. Ni pasos siguientes, ni objeciones, ni el resto del guion: cada frase siguiente me la soplas EN VIVO según lo que el prospecto responda.`;
 
     if (PROVIDER === 'kimi') {
       const upstream = await openaiFetch({
