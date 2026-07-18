@@ -52,17 +52,29 @@ export function useSpeech({ lang = 'es-EC', onFinal, onInterim }: UseSpeechOptio
   const onInterimRef = useRef(onInterim);
   onInterimRef.current = onInterim;
 
+  const netErrsRef = useRef(0); // errores 'network' seguidos → backoff del restart
+
   const start = useCallback(() => {
     const Ctor = getRecognitionCtor();
     if (!Ctor || activeRef.current) return;
     activeRef.current = true;
+    netErrsRef.current = 0;
 
     const rec = new Ctor();
     rec.lang = lang;
     rec.continuous = true;
     rec.interimResults = true;
+    // Guardia de instancia en TODOS los handlers: rec.stop() dispara onend
+    // ASÍNCRONO (~100-300ms después). Sin esto, un stop→start rápido (pausar y
+    // reanudar el micrófono) deja al onend tardío de la instancia VIEJA viendo
+    // activeRef=true y resucitándola — dos reconocedores vivos = todo se
+    // transcribe DOBLE (líneas, contadores de objeción, coach) el resto de la
+    // llamada. La instancia vigente es siempre recRef.current.
+    const isCurrent = () => recRef.current === rec;
 
     rec.onresult = (e) => {
+      if (!isCurrent()) return;
+      netErrsRef.current = 0; // el motor volvió a entregar: resetea el backoff
       let interimText = '';
       for (let i = e.resultIndex; i < e.results.length; i++) {
         const r = e.results[i]!;
@@ -77,21 +89,32 @@ export function useSpeech({ lang = 'es-EC', onFinal, onInterim }: UseSpeechOptio
     };
 
     // El motor corta sesiones largas / silencios: re-arrancamos mientras activo.
+    // Con backoff si está fallando en caliente (p.ej. Chrome sin conexión emite
+    // error→end→start→error en bucle caliente sin pausa).
     rec.onend = () => {
+      if (!isCurrent()) return;
       setInterim('');
-      if (activeRef.current) {
+      if (!activeRef.current) {
+        setListening(false);
+        return;
+      }
+      const restart = () => {
+        if (!isCurrent() || !activeRef.current) return;
         try {
           rec.start();
         } catch {
           setListening(false);
           activeRef.current = false;
         }
-      } else {
-        setListening(false);
-      }
+      };
+      const delay = Math.min(netErrsRef.current * 1000, 5000);
+      if (delay > 0) setTimeout(restart, delay);
+      else restart();
     };
     rec.onerror = (e) => {
+      if (!isCurrent()) return;
       // 'no-speech'/'aborted' son normales en continuo; 'not-allowed' es fatal.
+      if (e.error === 'network') netErrsRef.current += 1;
       if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
         activeRef.current = false;
         setListening(false);
@@ -109,14 +132,18 @@ export function useSpeech({ lang = 'es-EC', onFinal, onInterim }: UseSpeechOptio
 
   const stop = useCallback(() => {
     activeRef.current = false;
-    recRef.current?.stop();
+    const rec = recRef.current;
+    recRef.current = null; // invalida los handlers tardíos de esta instancia
+    rec?.stop();
     setListening(false);
     setInterim('');
   }, []);
 
   useEffect(() => () => {
     activeRef.current = false;
-    recRef.current?.stop();
+    const rec = recRef.current;
+    recRef.current = null;
+    rec?.stop();
   }, []);
 
   return { supported, listening, interim, start, stop };

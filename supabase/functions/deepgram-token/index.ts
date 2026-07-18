@@ -24,9 +24,11 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 const DEEPGRAM_API_KEY = Deno.env.get('DEEPGRAM_API_KEY') ?? '';
-// Vida del token temporal en segundos (máx. 3600). 60s basta: solo debe estar
+// Vida del token temporal en segundos (10-3600). 60s basta: solo debe estar
 // vivo durante el handshake del WebSocket; luego la conexión se mantiene sola.
-const TTL_SECONDS = Number(Deno.env.get('DEEPGRAM_TOKEN_TTL') ?? '60');
+// Un secret malformado ("60s" → NaN) cae a 60 en vez de mandar null a Deepgram.
+const rawTtl = Number(Deno.env.get('DEEPGRAM_TOKEN_TTL') ?? '60');
+const TTL_SECONDS = Number.isFinite(rawTtl) ? Math.min(Math.max(rawTtl, 10), 3600) : 60;
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -34,7 +36,17 @@ const CORS = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
+// Excepciones no manejadas (red caída hacia Deepgram, etc.) salen como JSON
+// CON CORS — el 500 pelado de Deno.serve el navegador lo disfraza de error CORS.
 Deno.serve(async (req) => {
+  try {
+    return await handle(req);
+  } catch (e) {
+    return json({ error: 'Error interno de deepgram-token', detail: String(e).slice(0, 200) }, 500);
+  }
+});
+
+async function handle(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
@@ -46,11 +58,13 @@ Deno.serve(async (req) => {
   if (!auth?.user) return json({ error: 'No autenticado — vuelve a iniciar sesión' }, 401);
 
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
-  const { data: caller } = await admin
+  const { data: caller, error: dbErr } = await admin
     .from('profiles')
     .select('id, active')
     .eq('id', auth.user.id)
     .maybeSingle();
+  // Un blip de la DB no es lo mismo que una cuenta inactiva: 503 ≠ 403.
+  if (dbErr) return json({ error: 'No se pudo verificar la cuenta — reintenta' }, 503);
   if (!caller || caller.active === false) return json({ error: 'Cuenta inactiva' }, 403);
 
   // Sin master key configurada → el front usa Web Speech (fallback).
@@ -92,7 +106,7 @@ Deno.serve(async (req) => {
       Authorization: `Token ${DEEPGRAM_API_KEY}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ ttl_seconds: Math.min(Math.max(TTL_SECONDS, 10), 3600) }),
+    body: JSON.stringify({ ttl_seconds: TTL_SECONDS }),
   });
 
   if (!grant.ok) {
@@ -104,7 +118,7 @@ Deno.serve(async (req) => {
   if (!data.access_token) return json({ available: false, error: 'Deepgram no devolvió token' }, 502);
 
   return json({ available: true, access_token: data.access_token, expires_in: data.expires_in ?? TTL_SECONDS });
-});
+}
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {

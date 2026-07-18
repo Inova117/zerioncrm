@@ -84,6 +84,11 @@ const OBJ_CASES: ObjCase[] = [
   ['mejor empiece y yo le voy pagando', 'fiado'],
   ['dejeme ver mi semana y yo le escribo', 'yo-le-aviso'],
   ['uy verdad era hoy se me olvido por completo', 'planton'],
+  // regresiones de la auditoría (jul 2026): sombras entre cards y variantes
+  ['ya tengo mi pagina web', 'ya-tengo-pagina'],
+  ['tampoco me interesa eso', 'no-interesa'],
+  ['cualquier cosa yo le aviso', 'yo-le-aviso'],
+  ['listo entonces yo le llamo', 'yo-le-aviso'],
   // --- NEGATIVOS: no deben disparar nada -----------------------------------
   ['mi hija carolina esta de vacaciones', null],
   ['vendemos caramelos y chocolates', null],
@@ -116,9 +121,23 @@ const MOM_CASES: MomCase[] = [
   ['si con el mismo', 'apertura'],
   ['gracias por llamar que este bien', 'despedida'],
   ['no me interesa nada de eso', 'objecion'],
+  // regresiones de la auditoría (jul 2026): el momento CIERRE (prioridad 97)
+  // secuestraba objeciones — un "de acuerdo pero…" NO es un sí.
+  ['si de acuerdo pero esta muy caro', 'precio'],
+  ['de acuerdo hagamoslo asi', 'cierre'],
+  ['tampoco me interesa senor', 'objecion'],
+  ['ya tengo mi pagina web', 'objecion'],
+  ['cuanto es lo menos que me deja', 'precio'],
+  ['cuanto es la mensualidad', 'senal-compra'],
+  ['ya pues lo voy a pensar', 'objecion'],
+  ['me parece bien pero dejeme pensarlo', 'objecion'],
+  ['cuando estaria lista mi pagina', 'cierre'],
+  [' alo buenas', 'apertura'],
+  ['yo le aviso que llamo mas tarde', 'gatekeeper'],
   // negativos
   ['aja', null],
   ['mmm ya veo', null],
+  ['en que le puedo ayudar', null],
 ];
 
 let pass = 0;

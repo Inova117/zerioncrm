@@ -63,7 +63,7 @@ export const BATTLECARDS: Battlecard[] = [
   {
     id: 'ya-tengo-pagina',
     triggers:
-      /ya (tengo|tenemos) (pagina|web|sitio|mi sitio|una pagina)|eso ya lo hicimos|ya me hicieron una|si tenemos web|ahi esta la pagina|ya trabajo con (una agencia|alguien)/,
+      /ya (tengo|tenemos) (mi |una |la )?(pagina|web|sitio)|eso ya lo hicimos|ya me hicieron una|si tenemos web|ahi esta la pagina|ya trabajo con (una agencia|alguien)/,
     objection: '"Ya tengo página web"',
     response:
       '¡Qué bueno, eso ya es ventaja! Y dígame honestamente: ¿le llegan clientes por ahí, o está más de adorno? … Se lo pregunto porque a la mayoría le pasa lo segundo. Le hago una revisión gratis: cinco puntos concretos de qué está frenando su página, y usted decide qué hacer con eso — hasta se la puede pasar a quien se la maneja.',
@@ -99,7 +99,7 @@ export const BATTLECARDS: Battlecard[] = [
   {
     id: 'pensarlo',
     triggers:
-      /dejame pensarlo|lo voy a pensar|dejeme pensar|tengo que pensarlo|deme unos dias|yo le aviso|ahi le aviso|le aviso cualquier cosa|con la almohada|dejeme analizarlo|dejeme verlo con calma|mas adelante (vemos|quizas)|despues vemos|yo le llamo despues/,
+      /dejame pensarlo|lo voy a pensar|dejeme pensar|tengo que pensarlo|deme unos dias|con la almohada|dejeme analizarlo|dejeme verlo con calma|mas adelante (vemos|quizas)|despues vemos/,
     objection: '"Déjame pensarlo"',
     response:
       'Le entiendo perfecto, y está bien pensarlo… pero déjeme hacerle una sola pregunta: la idea como tal, ¿le gusta? Que lo encuentren en Google y le escriban solos. … Perfecto. ¿Y qué le hace dudar: el precio, o si de verdad le va a traer clientes? Cualquiera de las dos se la aclaro en un minuto.',
@@ -144,7 +144,7 @@ export const BATTLECARDS: Battlecard[] = [
   {
     id: 'no-interesa',
     triggers:
-      /no me interesa|no estoy interesad|no,? gracias|no necesito (nada|eso)|no quiero nada|asi (estamos|estoy) bien|estamos bien asi|eso no es para mi|no estoy buscando eso/,
+      /(no|tampoco|ni) me interesa|no estoy interesad|no,? gracias|no necesito (nada|eso)|no quiero nada|asi (estamos|estoy) bien|estamos bien asi|eso no es para mi|no estoy buscando eso/,
     objection: '"No me interesa"',
     response:
       'Le entiendo — yo contesto igual cuando no sé de qué se trata. Una sola pregunta y le dejo tranquilo: cuando un cliente lo busca en Google, ¿usted aparece? … Porque yo lo busqué antes de llamarlo, y le cuento lo que encontré si me regala un minuto.',
@@ -238,7 +238,7 @@ export const BATTLECARDS: Battlecard[] = [
   {
     id: 'yo-le-aviso',
     triggers:
-      /yo (lo|le) llamo (despues|luego)?|dejeme ver mi semana|yo le escribo|deme unos dias y le confirmo|yo me comunico con usted|cualquier cosa yo le (aviso|digo)/,
+      /yo (lo|le) llamo( despues| luego)?|yo le aviso|ahi le aviso|le aviso cualquier cosa|dejeme ver mi semana|yo le escribo|deme unos dias y le confirmo|yo me comunico con usted|cualquier cosa yo le (aviso|digo)/,
     objection: '"Yo le aviso / déjeme ver y le digo"',
     response:
       'Claro que sí. Y para no estarle cayendo a cada rato, dejémoslo apuntado de una vez: ¿martes en la mañana o miércoles en la tarde? Si algo se le cruza, lo movemos sin problema.',

@@ -55,7 +55,7 @@ export const MOMENTS: MomentInfo[] = [
     label: 'Ya compró — CÁLLATE y agenda',
     emoji: '🤝',
     priority: 97,
-    cues: /cuando (empezamos|empezariamos|podriamos empezar|arrancamos)|como le pago|como seria el pago|que necesitan? de mi|mandeme los datos|para el deposito|hagamoslo|hagamos eso|de una,? pues|dale pues|ya,? pues(?!,? ?(digame|cuenteme|hable))|listo,? (hagamos|mandame|de una)|(?<!no )(?<!no le )me interesa|esta bien,? (hagamos|mandame|veamos)|de acuerdo|me parece bien|ahi nos vemos|venga y conversamos|el (lunes|martes|miercoles|jueves|viernes|sabado) (si )?puedo|mi pagina|cuando tenga la pagina/,
+    cues: /cuando (empezamos|empezariamos|podriamos empezar|arrancamos)|como le pago|como seria el pago|que necesitan? de mi|mandeme los datos|para el deposito|hagamoslo|hagamos eso|de una,? pues|dale pues|ya,? pues(?!,? ?(digame|cuenteme|hable|pero|no |lo voy|dejeme|tengo que))|listo,? (hagamos|mandame|de una)|(?<!no )(?<!no le )(?<!tampoco )(?<!ni )(?<!nada )me interesa|esta bien,? (hagamos|mandame|veamos)|de acuerdo(?!,? ?pero)|me parece bien(?!,? ?pero)|ahi nos vemos|venga y conversamos|el (lunes|martes|miercoles|jueves|viernes|sabado) (si )?puedo|cuando (estaria|esta|tendria) (lista )?(mi|la) pagina|cuando tenga la pagina/,
     bestMove:
       'YA COMPRÓ mentalmente: cada palabra de venta extra solo puede reabrir dudas. Confirma TODO en una frase y corta en menos de 60 segundos: "Perfecto, entonces lo dejamos así: nos vemos el jueves a las 3 y arrancamos. Le mando el detalle por WhatsApp ahorita, ¿a este número?" Único agregado permitido — y SOLO si el sí es al PROYECTO (anticipo), no a la cita de la muestra: el second money ("la mayoría agrega el mantenimiento con WhatsApp automático, ¿se lo dejo incluido?"). NUNCA menciones otro plan, otra feature ni vuelvas a tocar el precio.',
   },
@@ -64,7 +64,7 @@ export const MOMENTS: MomentInfo[] = [
     label: 'Señal de compra — CIERRA',
     emoji: '🟢',
     priority: 95,
-    cues: /cuanto (cuesta|vale|sale|es|cobran?|me sale|se demoran?)|que incluye|en cuanto tiempo|cuanto (tiempo )?se demoran?|estaria list[ao]|como seria|tienen ejemplos|trabajos (hechos|anteriores)|han trabajado con|donde puedo ver|me pueden poner (el menu|las fotos)|ustedes tambien manejan|y si despues quiero cambiar|suena (bien|interesante)|estaria bueno/,
+    cues: /cuanto (cuesta|vale|sale|es(?! lo (menos|minimo))|cobran?|me sale|se demoran?)|que incluye|en cuanto tiempo|cuanto (tiempo )?se demoran?|estaria list[ao]|como seria|tienen ejemplos|trabajos (hechos|anteriores)|han trabajado con|donde puedo ver|me pueden poner (el menu|las fotos)|ustedes tambien manejan|y si despues quiero cambiar|suena (bien|interesante)|estaria bueno/,
     bestMove:
       'Dejó de evaluarte: está imaginándose CON la página. Responde en UNA frase y convierte en cita con alternativa: "Claro, le explico todo con ejemplos de su mismo rubro. ¿Le va mejor mañana a las 10 o el jueves a las 3?" Si pregunta precio en frío: "Depende de lo que necesite — por eso la muestra es gratis: la ve primero y hablamos de números con algo concreto en la mano. ¿Martes o miércoles?" DOS señales seguidas y sigues explicando = estás matando la venta.',
   },
@@ -82,7 +82,7 @@ export const MOMENTS: MomentInfo[] = [
     label: 'Objeción',
     emoji: '🛡️',
     priority: 80,
-    cues: /no me interesa|no estoy interesad|no necesito|asi (estamos|estoy) bien|ya tengo (pagina|web|facebook|face|instagram|quien)|mi (sobrino|hijo|hija|primo|hermano)|un (amigo|muchacho|conocido) me|no tengo tiempo|estoy ocupad|dejame pensarlo|lo voy a pensar|dejeme pensar|tengo que (consultar|hablar con|pensarlo)|lo consulto|manda(me)? (la )?info|mandeme (la |una )?(informacion|proforma|cotizacion)|con (el )?facebook|no necesito publicidad|me estafaron|puro cuento|no confio|esta dura la (cosa|situacion)|las ventas estan|temporada baja|mas barato/,
+    cues: /(no|tampoco|ni) me interesa|no estoy interesad|no necesito|asi (estamos|estoy) bien|ya tengo (mi |una |la )?(pagina|web|facebook|face|instagram|quien)|mi (sobrino|hijo|hija|primo|hermano)|un (amigo|muchacho|conocido) me|no tengo tiempo|estoy ocupad|dejame pensarlo|lo voy a pensar|dejeme pensar|tengo que (consultar|hablar con|pensarlo)|lo consulto|manda(me)? (la )?info|mandeme (la |una )?(informacion|proforma|cotizacion)|con (el )?facebook|no necesito publicidad|me estafaron|puro cuento|no confio|esta dura la (cosa|situacion)|las ventas estan|temporada baja|mas barato|yo le aviso(?! que llam)|le aviso cualquier cosa/,
     bestMove:
       'Secuencia fija (Cardone + Belfort): 1) ACUERDA ("tiene toda la razón / le entiendo perfecto") — nunca contradigas ni digas "pero" de frente. 2) AÍSLA o deflecta ("¿es eso lo único que lo detiene?" / "la idea como tal, ¿le gusta?"). 3) Responde SOLO esa objeción con SU dato. 4) RE-CIERRA con alternativa ("¿mañana o el jueves?"). Máximo 3 loops y sueltas con fecha. La battlecard te da la respuesta exacta.',
   },
@@ -91,7 +91,7 @@ export const MOMENTS: MomentInfo[] = [
     label: 'Gatekeeper — no es el dueño',
     emoji: '🚪',
     priority: 75,
-    cues: /de parte de quien|quien l(o|a) (busca|llama)|de que empresa|para que lo (necesita|busca)|no se encuentra|no esta (el|la) (dueno|duena|doctor|ingeniero|senor|senora)|el dueno no (esta|viene)|esta ocupado atendiendo|le doy el recado|deje su (mensaje|numero)|dejeme su numero y el le|yo le aviso que llamo|en que le puedo ayudar|yo solo trabajo aqui/,
+    cues: /de parte de quien|quien l(o|a) (busca|llama)|de que empresa|para que lo (necesita|busca)|no se encuentra|no esta (el|la) (dueno|duena|doctor|ingeniero|senor|senora)|el dueno no (esta|viene)|esta ocupado atendiendo|le doy el recado|deje su (mensaje|numero)|dejeme su numero y el le|yo le aviso que llamo|yo solo trabajo aqui/,
     bestMove:
       'NO pitchees al gatekeeper — trátalo como aliado, siempre de usted (tutea solo si la voz es claramente joven y te tutea primero): "¿Me ayuda porfa? Necesito hablar con el dueño sobre cómo aparece el negocio en Google. ¿Se encuentra?" Si no está: consigue ORO — "¿A qué hora lo encuentro seguro? ¿Y cómo se llama él? ¿Y me recuerda su nombre, para agradecerle cuando vuelva a llamar?" JAMÁS dejes tu número "para que él devuelva la llamada" (nunca llama): "mejor lo llamo yo, ¿mañana en la mañana está?"',
   },

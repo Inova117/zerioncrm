@@ -113,8 +113,13 @@ export const colorFromString = (s: string): string => {
 // Contact deep-links (open the user's mail/phone/WhatsApp app).
 export const mailLink = (email: string) => `mailto:${email.trim()}`;
 export const telLink = (phone: string) => `tel:${phone.replace(/[^\d+]/g, '')}`;
-export const waLink = (phone: string, text?: string) =>
-  `https://wa.me/${phone.replace(/[^\d]/g, '')}${text ? `?text=${encodeURIComponent(text)}` : ''}`;
+export const waLink = (phone: string, text?: string) => {
+  let digits = phone.replace(/[^\d]/g, '');
+  // Formato local ecuatoriano ("0983175145"): wa.me exige código de país y el
+  // 0 inicial lo rompe — se convierte a 593 + número sin el cero.
+  if (digits.length === 10 && digits.startsWith('09')) digits = `593${digits.slice(1)}`;
+  return `https://wa.me/${digits}${text ? `?text=${encodeURIComponent(text)}` : ''}`;
+};
 export const webLink = (site: string) =>
   /^https?:\/\//i.test(site) ? site : `https://${site}`;
 

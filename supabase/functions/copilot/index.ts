@@ -52,7 +52,7 @@ const KIMI_MODEL = Deno.env.get('KIMI_MODEL') ?? 'kimi-k3';
 // Versión visible en las cabeceras de TODA respuesta (incluido el preflight):
 //   curl -sI -X OPTIONS <url>/functions/v1/copilot | grep x-copilot-version
 // Súbela en cada cambio relevante — es la forma de verificar qué está deployado.
-const VERSION = '2026-07-17.4-apertura-maestra';
+const VERSION = '2026-07-17.5-hardening';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -124,23 +124,57 @@ const effortFor = (model: string): Record<string, unknown> =>
 const thinkingFor = (model: string): Record<string, unknown> =>
   /sonnet-5/.test(model) ? { thinking: { type: 'disabled' } } : {};
 
+// Un solo reintento ante rate-limit/sobrecarga transitoria: en el suggest en
+// vivo, 400ms extra le ganan por goleada a dejar al vendedor sin jugada.
+const RETRYABLE = new Set([429, 500, 502, 503, 529]);
+
 async function anthropicFetch(req: AnthropicRequest): Promise<Response> {
-  return await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'x-api-key': ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify(req),
-  });
+  const call = () =>
+    fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify(req),
+    });
+  let res = await call();
+  if (RETRYABLE.has(res.status)) {
+    await res.body?.cancel();
+    await new Promise((r) => setTimeout(r, 400));
+    res = await call();
+  }
+  return res;
 }
 
-/** Convierte el SSE de Anthropic en un stream de texto plano (solo text_delta). */
+/** Convierte el SSE de Anthropic en un stream de texto plano (solo text_delta).
+ * Si Anthropic emite un evento `error` DESPUÉS del 200 (p.ej. overloaded a
+ * mitad de stream), se marca visible: media frase sin señal parece completa. */
 function sseToTextStream(upstream: ReadableStream<Uint8Array>): ReadableStream<Uint8Array> {
   const decoder = new TextDecoder();
   const encoder = new TextEncoder();
   let buffer = '';
+
+  const handleLine = (line: string, controller: TransformStreamDefaultController<Uint8Array>) => {
+    if (!line.startsWith('data: ')) return;
+    const payload = line.slice(6).trim();
+    if (!payload || payload === '[DONE]') return;
+    try {
+      const evt = JSON.parse(payload) as {
+        type?: string;
+        delta?: { type?: string; text?: string };
+        error?: { type?: string };
+      };
+      if (evt.type === 'content_block_delta' && evt.delta?.type === 'text_delta' && evt.delta.text) {
+        controller.enqueue(encoder.encode(evt.delta.text));
+      } else if (evt.type === 'error') {
+        controller.enqueue(encoder.encode(`\n⚠️ (respuesta cortada: ${evt.error?.type ?? 'error'} — toca Ayuda para reintentar)`));
+      }
+    } catch {
+      /* línea SSE parcial/no-JSON: ignorar */
+    }
+  };
 
   return upstream.pipeThrough(
     new TransformStream<Uint8Array, Uint8Array>({
@@ -148,22 +182,11 @@ function sseToTextStream(upstream: ReadableStream<Uint8Array>): ReadableStream<U
         buffer += decoder.decode(chunk, { stream: true });
         const lines = buffer.split('\n');
         buffer = lines.pop() ?? '';
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          const payload = line.slice(6).trim();
-          if (!payload || payload === '[DONE]') continue;
-          try {
-            const evt = JSON.parse(payload) as {
-              type?: string;
-              delta?: { type?: string; text?: string };
-            };
-            if (evt.type === 'content_block_delta' && evt.delta?.type === 'text_delta' && evt.delta.text) {
-              controller.enqueue(encoder.encode(evt.delta.text));
-            }
-          } catch {
-            /* línea SSE parcial/no-JSON: ignorar */
-          }
-        }
+        for (const line of lines) handleLine(line, controller);
+      },
+      flush(controller) {
+        // Último trozo sin \n final (upstream cortado a media línea).
+        if (buffer) handleLine(buffer, controller);
       },
     })
   );
@@ -180,24 +203,32 @@ interface OpenAIRequest {
 }
 
 async function openaiFetch(req: OpenAIRequest): Promise<Response> {
-  return await fetch(`${KIMI_BASE_URL}/chat/completions`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${KIMI_API_KEY}`,
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: req.model,
-      max_tokens: req.max_tokens,
-      stream: req.stream ?? false,
-      temperature: 0.6,
-      ...(req.json ? { response_format: { type: 'json_object' } } : {}),
-      messages: [
-        { role: 'system', content: req.system },
-        { role: 'user', content: req.user },
-      ],
-    }),
-  });
+  const call = () =>
+    fetch(`${KIMI_BASE_URL}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${KIMI_API_KEY}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: req.model,
+        max_tokens: req.max_tokens,
+        stream: req.stream ?? false,
+        temperature: 0.6,
+        ...(req.json ? { response_format: { type: 'json_object' } } : {}),
+        messages: [
+          { role: 'system', content: req.system },
+          { role: 'user', content: req.user },
+        ],
+      }),
+    });
+  let res = await call();
+  if (RETRYABLE.has(res.status)) {
+    await res.body?.cancel();
+    await new Promise((r) => setTimeout(r, 400));
+    res = await call();
+  }
+  return res;
 }
 
 /** Convierte el SSE OpenAI-compatible en un stream de texto plano. */
@@ -205,26 +236,34 @@ function oaiSseToTextStream(upstream: ReadableStream<Uint8Array>): ReadableStrea
   const decoder = new TextDecoder();
   const encoder = new TextEncoder();
   let buffer = '';
+
+  const handleLine = (line: string, controller: TransformStreamDefaultController<Uint8Array>) => {
+    if (!line.startsWith('data: ')) return;
+    const payload = line.slice(6).trim();
+    if (!payload || payload === '[DONE]') return;
+    try {
+      const evt = JSON.parse(payload) as {
+        choices?: Array<{ delta?: { content?: string } }>;
+        error?: { message?: string };
+      };
+      const text = evt.choices?.[0]?.delta?.content;
+      if (text) controller.enqueue(encoder.encode(text));
+      else if (evt.error) controller.enqueue(encoder.encode('\n⚠️ (respuesta cortada — toca Ayuda para reintentar)'));
+    } catch {
+      /* línea parcial: ignorar */
+    }
+  };
+
   return upstream.pipeThrough(
     new TransformStream<Uint8Array, Uint8Array>({
       transform(chunk, controller) {
         buffer += decoder.decode(chunk, { stream: true });
         const lines = buffer.split('\n');
         buffer = lines.pop() ?? '';
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          const payload = line.slice(6).trim();
-          if (!payload || payload === '[DONE]') continue;
-          try {
-            const evt = JSON.parse(payload) as {
-              choices?: Array<{ delta?: { content?: string } }>;
-            };
-            const text = evt.choices?.[0]?.delta?.content;
-            if (text) controller.enqueue(encoder.encode(text));
-          } catch {
-            /* línea parcial: ignorar */
-          }
-        }
+        for (const line of lines) handleLine(line, controller);
+      },
+      flush(controller) {
+        if (buffer) handleLine(buffer, controller);
       },
     })
   );
@@ -264,7 +303,18 @@ function buildSystem(lead: string, playbook: string, history: string, settings: 
   ];
 }
 
+// Toda excepción no manejada (red caída hacia Anthropic, body malformado…)
+// debe salir como JSON CON CORS: el 500 pelado de Deno.serve no lleva CORS y
+// el navegador lo disfraza de "blocked by CORS policy" — indescifrable.
 Deno.serve(async (req) => {
+  try {
+    return await handle(req);
+  } catch (e) {
+    return json({ error: 'Error interno del copilot', detail: String(e).slice(0, 200) }, 500);
+  }
+});
+
+async function handle(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
@@ -276,11 +326,13 @@ Deno.serve(async (req) => {
   if (!auth?.user) return json({ error: 'No autenticado — vuelve a iniciar sesión' }, 401);
 
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
-  const { data: caller } = await admin
+  const { data: caller, error: dbErr } = await admin
     .from('profiles')
     .select('id, active')
     .eq('id', auth.user.id)
     .maybeSingle();
+  // Un blip de la DB no es lo mismo que una cuenta inactiva: 503 ≠ 403.
+  if (dbErr) return json({ error: 'No se pudo verificar la cuenta — reintenta' }, 503);
   if (!caller || caller.active === false) return json({ error: 'Cuenta inactiva' }, 403);
 
   if (PROVIDER === 'kimi') {
@@ -290,20 +342,24 @@ Deno.serve(async (req) => {
   }
 
   const body = (await req.json().catch(() => ({}))) as CopilotBody;
-  const mode = body.mode ?? 'suggest';
-  const lead = (body.lead ?? '').slice(0, 4000);
-  // El playbook vive AQUÍ (generado por npm run sync:playbook) — el cliente ya
-  // no lo sube en cada request (~58KB menos de payload). body.playbook queda
-  // como override de compatibilidad/experimentos.
-  const playbook = (body.playbook && body.playbook.length > 0 ? body.playbook : PLAYBOOK).slice(0, 90000);
-  const transcript = (body.transcript ?? '').slice(-6000);
-  const trigger = (body.trigger ?? '').slice(0, 500);
-  const settings = (body.settings ?? '').slice(0, 4000);
-  const history = (body.history ?? '').slice(0, 4000);
-  const moment = (body.moment ?? '').slice(0, 600);
-  const callState = (body.callState ?? '').slice(0, 600);
-  const memory = (body.memory ?? '').slice(0, 5000);
-  const stats = (body.stats ?? '').slice(0, 800);
+  // Coerción defensiva: un body con {"lead": 123} no debe tumbar la función
+  // (los números no tienen .slice y el TypeError saldría como 500 sin CORS).
+  const str = (v: unknown): string => (typeof v === 'string' ? v : '');
+  const mode = typeof body.mode === 'string' ? body.mode : 'suggest';
+  const lead = str(body.lead).slice(0, 4000);
+  // El playbook vive SOLO aquí (generado por npm run sync:playbook). No se
+  // acepta override del cliente: un playbook único por request rompería el
+  // cache (cada uno sería un cache-write de ~23k tokens a 1.25x) y dejaría
+  // usar la key de Anthropic con contenido arbitrario.
+  const playbook = PLAYBOOK;
+  const transcript = str(body.transcript).slice(-6000);
+  const trigger = str(body.trigger).slice(0, 500);
+  const settings = str(body.settings).slice(0, 4000);
+  const history = str(body.history).slice(0, 4000);
+  const moment = str(body.moment).slice(0, 600);
+  const callState = str(body.callState).slice(0, 600);
+  const memory = str(body.memory).slice(0, 5000);
+  const stats = str(body.stats).slice(0, 800);
 
   // -------------------------------------------------------------------- warm
   // Precalienta el cache del system (PERSONA + playbook, por modelo) para que
@@ -568,7 +624,7 @@ Deno.serve(async (req) => {
   }
 
   return json({ error: `Modo desconocido: ${mode}` }, 400);
-});
+}
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {

@@ -119,6 +119,8 @@ export function CopilotPage() {
   const [waText, setWaText] = useState('');
   const [pastCalls, setPastCalls] = useState<CopilotCallRecord[]>([]);
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [ttftMs, setTtftMs] = useState<number | null>(null); // latencia real del coach
   const [numbers, setNumbers] = useState<{ ticket: number | null; perdidos: number | null }>({
@@ -150,13 +152,35 @@ export function CopilotPage() {
     suggestionRef.current = suggestion;
   }, [suggestion]);
 
+  // Memoria de eco: las últimas jugadas REEMPLAZADAS. El vendedor suele seguir
+  // leyendo la jugada anterior en voz alta justo cuando una nueva la pisa — si
+  // el filtro solo mirara la actual, esa lectura pasaría como voz del prospecto
+  // y dispararía battlecards/contadores falsos (bucle de retroalimentación).
+  const recentEchoRef = useRef<string[]>([]);
+  // Generación de llamada: invalida resúmenes/debriefs viejos que llegan tarde
+  // (p.ej. "Llamar de nuevo" con el resumen de la llamada 1 aún en vuelo).
+  const callGenRef = useRef(0);
+  const briefAbortRef = useRef<AbortController | null>(null);
+
   // Antes de que una jugada nueva pise a la visible, la visible baja al
-  // historial ("jugadas anteriores") en vez de desaparecer.
-  const archiveSuggestion = useCallback(() => {
+  // historial ("jugadas anteriores") en vez de desaparecer. Si era un stream
+  // cortado a medias (supersede), va solo a la memoria de eco — media frase
+  // no sirve como jugada, pero el vendedor pudo alcanzar a leerla.
+  const archiveSuggestion = useCallback((wasPartial = false) => {
     const cur = suggestionRef.current.trim();
-    if (cur && !cur.startsWith('⚠️')) {
+    if (!cur) return;
+    recentEchoRef.current = [cur, ...recentEchoRef.current].slice(0, 3);
+    if (!cur.startsWith('⚠️') && !wasPartial) {
       setPastSuggestions((h) => (h[0] === cur ? h : [cur, ...h].slice(0, 12)));
     }
+  }, []);
+
+  // ¿Esta frase del transcript es el vendedor leyendo una jugada (actual o
+  // recién reemplazada) en voz alta?
+  const isEcho = useCallback((text: string): boolean => {
+    const norm = normForEcho(text);
+    if (sharesWindow(norm, normForEcho(suggestionRef.current))) return true;
+    return recentEchoRef.current.some((s) => sharesWindow(norm, normForEcho(s)));
   }, []);
 
   // Stats legibles de la llamada (para el debrief, el comentario y el registro).
@@ -212,6 +236,8 @@ export function CopilotPage() {
   // queda visible hasta que llega el primer token del refinamiento.
   const runSuggest = useCallback(
     async (l: Lead, trigger?: string) => {
+      // Si pisamos un stream aún en vuelo, lo visible es una jugada PARCIAL.
+      const prevPartial = suggestingRef.current;
       suggestAbortRef.current?.abort();
       const ctrl = new AbortController();
       suggestAbortRef.current = ctrl;
@@ -236,7 +262,7 @@ export function CopilotPage() {
             if (ctrl.signal.aborted) return;
             if (!acc) {
               setTtftMs(Date.now() - t0); // primer token: latencia real
-              archiveSuggestion(); // la jugada anterior baja al historial, no se pierde
+              archiveSuggestion(prevPartial); // la anterior baja al historial, no se pierde
             }
             acc += chunk;
             setSuggestion(acc);
@@ -245,7 +271,7 @@ export function CopilotPage() {
         );
       } catch (e) {
         if (!ctrl.signal.aborted) {
-          archiveSuggestion();
+          archiveSuggestion(prevPartial);
           setSuggestion(`⚠️ ${e instanceof Error ? e.message : 'Coach no disponible'}`);
         }
       } finally {
@@ -264,10 +290,10 @@ export function CopilotPage() {
       transcriptRef.current = `${transcriptRef.current} ${text}`.trim().slice(-6000);
       setLines((prev) => [...prev, text]);
 
-      // 0) Filtro de eco: si es el vendedor leyendo el consejo en voz alta,
-      //    entra al transcript pero NO re-dispara detección ni coach.
+      // 0) Filtro de eco: si es el vendedor leyendo un consejo (actual o recién
+      //    reemplazado) en voz alta, entra al transcript pero NO re-dispara nada.
       const norm = normalizeSpeech(text);
-      if (sharesWindow(normForEcho(text), normForEcho(suggestionRef.current))) return;
+      if (isEcho(text)) return;
 
       // 0b) Números del prospecto (ticket / clientes perdidos): el ancla de
       //     toda la matemática. Solo sobre finales (texto estable).
@@ -313,7 +339,7 @@ export function CopilotPage() {
         runSuggest(lead);
       }
     },
-    [lead, runSuggest, archiveSuggestion]
+    [lead, runSuggest, archiveSuggestion, isEcho]
   );
 
   // Cada resultado PARCIAL (~300ms tras hablar): detección instantánea local.
@@ -324,8 +350,8 @@ export function CopilotPage() {
   // corrige; si coincide, ganamos ~0.5-1.5s.
   const onInterim = useCallback(
     (text: string) => {
-      // Filtro de eco: el vendedor leyendo el consejo no dispara nada.
-      if (sharesWindow(normForEcho(text), normForEcho(suggestionRef.current))) return;
+      // Filtro de eco: el vendedor leyendo un consejo (actual o reciente) no dispara nada.
+      if (isEcho(text)) return;
       const hit = detectObjection(text);
       if (hit && hit.id !== cardIdRef.current) {
         cardIdRef.current = hit.id;
@@ -347,7 +373,7 @@ export function CopilotPage() {
         }
       }
     },
-    [runSuggest, archiveSuggestion]
+    [runSuggest, archiveSuggestion, isEcho]
   );
 
   // Dos motores de transcripción; misma interfaz. Deepgram (premium) si está
@@ -381,6 +407,12 @@ export function CopilotPage() {
 
   // --- Flujo -----------------------------------------------------------------
   async function startBriefing(l: Lead) {
+    // Nueva llamada = nueva generación: cualquier stream/promesa de la llamada
+    // anterior (briefing a medias, resumen lento) queda invalidado y abortado.
+    callGenRef.current += 1;
+    briefAbortRef.current?.abort();
+    const briefCtrl = new AbortController();
+    briefAbortRef.current = briefCtrl;
     setLead(l);
     leadRef.current = l;
     setPhase('brief');
@@ -406,25 +438,34 @@ export function CopilotPage() {
       // briefing termine — y se siembra en el panel del coach al escuchar.
       openerRef.current = '';
       let acc = '';
-      await copilotBriefing(l, historyRef.current, memoryRef.current, (chunk) => {
-        acc += chunk;
-        setBriefing((s) => s + chunk);
-        if (!openerRef.current) {
-          const m = /"([^"\n]{40,400})"/.exec(acc);
-          if (m) {
-            openerRef.current = m[1]!;
-            // Si la escucha ya está activa (usuario rápido), siembra ahora.
-            if (wantOpenerSeedRef.current) {
-              wantOpenerSeedRef.current = false;
-              setSuggestion(openerSeed(openerRef.current));
+      await copilotBriefing(
+        l,
+        historyRef.current,
+        memoryRef.current,
+        (chunk) => {
+          if (briefCtrl.signal.aborted) return; // stream zombi: no interlinea
+          acc += chunk;
+          setBriefing((s) => s + chunk);
+          if (!openerRef.current) {
+            const m = /"([^"\n]{40,400})"/.exec(acc);
+            if (m) {
+              openerRef.current = m[1]!;
+              // Si la escucha ya está activa (usuario rápido), siembra ahora.
+              if (wantOpenerSeedRef.current) {
+                wantOpenerSeedRef.current = false;
+                setSuggestion(openerSeed(openerRef.current));
+              }
             }
           }
-        }
-      });
+        },
+        briefCtrl.signal
+      );
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo generar el briefing.');
+      if (!briefCtrl.signal.aborted) {
+        setError(e instanceof Error ? e.message : 'No se pudo generar el briefing.');
+      }
     } finally {
-      setBriefLoading(false);
+      if (briefAbortRef.current === briefCtrl) setBriefLoading(false);
     }
   }
 
@@ -434,6 +475,7 @@ export function CopilotPage() {
       return;
     }
     degradedRef.current = false;
+    recentEchoRef.current = [];
     setPhase('live');
     setLines([]);
     setSuggestion('');
@@ -469,8 +511,13 @@ export function CopilotPage() {
     dg.stop();
     ws.stop();
     suggestAbortRef.current?.abort();
+    wantOpenerSeedRef.current = false; // un opener tardío no debe pintar en wrap
     setPhase('wrap');
     if (!lead) return;
+    // Guarda de generación: si el usuario hace "Llamar de nuevo" mientras este
+    // resumen/debrief sigue en vuelo, sus resultados llegan tarde y se DESCARTAN
+    // (sin esto, el wrap de la llamada 2 mostraba datos de la llamada 1).
+    const gen = callGenRef.current;
     setSummarizing(true);
     setSaved(false);
     setDebrief(null);
@@ -485,56 +532,71 @@ export function CopilotPage() {
       memory: memoryRef.current,
     })
       .then((d) => {
+        if (gen !== callGenRef.current) return;
         setDebrief(d);
         setWaText(d?.whatsapp ?? '');
       })
-      .catch(() => setDebrief(null))
-      .finally(() => setDebriefing(false));
+      .catch(() => gen === callGenRef.current && setDebrief(null))
+      .finally(() => gen === callGenRef.current && setDebriefing(false));
     try {
-      setSummary(await copilotSummary(lead, transcriptRef.current));
+      const s = await copilotSummary(lead, transcriptRef.current);
+      if (gen === callGenRef.current) setSummary(s);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo generar el resumen.');
+      if (gen === callGenRef.current) {
+        setError(e instanceof Error ? e.message : 'No se pudo generar el resumen.');
+      }
     } finally {
-      setSummarizing(false);
+      if (gen === callGenRef.current) setSummarizing(false);
     }
   }
 
   async function saveToLead() {
-    if (!lead || !summary || saved) return;
+    // savingRef, no estado: dos clicks en el mismo tick pasarían un guard de
+    // useState (el re-render llega después) y duplicarían comentario + tarea.
+    if (!lead || !summary || saved || savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
     const statsLine = buildStatsLine();
     const body = `📞 Llamada (Copilot) — ${summary.summary}${summary.nextAction ? `\n➡️ Próxima acción: ${summary.nextAction}` : ''}${statsLine ? `\n📊 ${statsLine}` : ''}`;
-    // La llamada completa (transcript + coaching) queda revisable, y la
-    // memoria del nicho actualizada alimenta TODAS las llamadas siguientes.
-    saveCopilotCall({
-      leadId: lead.id,
-      transcript: transcriptRef.current,
-      summary: summary.summary,
-      temperature: summary.temperature,
-      nextAction: summary.nextAction,
-      stats: statsLine,
-      coaching: debrief?.coaching ?? '',
-    }).catch(() => {});
-    if (debrief?.lessons && debrief.lessons !== memoryRef.current) {
-      memoryRef.current = debrief.lessons;
-      saveCopilotMemory(debrief.lessons).catch(() => {});
-    }
-    await addComment(lead.id, body);
-    if (summary.temperature !== lead.temperature) {
-      await moveLead(lead.id, summary.temperature);
-    }
-    if (summary.nextAction) {
-      await createTask({
-        title: `Seguimiento: ${lead.company}`,
-        notes: summary.nextAction,
-        cadence: 'daily',
-        assignedTo: lead.assignedTo || user!.id,
+    try {
+      // La llamada completa (transcript + coaching) queda revisable, y la
+      // memoria del nicho actualizada alimenta TODAS las llamadas siguientes.
+      saveCopilotCall({
         leadId: lead.id,
-        dueDate: null,
-        recurring: false,
-        target: 0,
-      });
+        transcript: transcriptRef.current,
+        summary: summary.summary,
+        temperature: summary.temperature,
+        nextAction: summary.nextAction,
+        stats: statsLine,
+        coaching: debrief?.coaching ?? '',
+      }).catch(() => {});
+      if (debrief?.lessons && debrief.lessons !== memoryRef.current) {
+        memoryRef.current = debrief.lessons;
+        saveCopilotMemory(debrief.lessons).catch(() => {});
+      }
+      await addComment(lead.id, body);
+      if (summary.temperature !== lead.temperature) {
+        await moveLead(lead.id, summary.temperature);
+      }
+      if (summary.nextAction) {
+        await createTask({
+          title: `Seguimiento: ${lead.company}`,
+          notes: summary.nextAction,
+          cadence: 'daily',
+          assignedTo: lead.assignedTo || user!.id,
+          leadId: lead.id,
+          dueDate: null,
+          recurring: false,
+          target: 0,
+        });
+      }
+      setSaved(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo guardar en el prospecto — reintenta.');
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
     }
-    setSaved(true);
   }
 
   // Volver a llamar al MISMO prospecto sin dar la vuelta por Prospectos:
@@ -547,6 +609,7 @@ export function CopilotPage() {
     ws.stop();
     suggestAbortRef.current?.abort();
     degradedRef.current = false;
+    recentEchoRef.current = [];
     setLines([]);
     setSuggestion('');
     setPastSuggestions([]);
@@ -574,7 +637,11 @@ export function CopilotPage() {
     dg.stop();
     ws.stop();
     suggestAbortRef.current?.abort();
+    briefAbortRef.current?.abort();
+    callGenRef.current += 1; // invalida resúmenes/debriefs en vuelo
+    wantOpenerSeedRef.current = false;
     degradedRef.current = false;
+    recentEchoRef.current = [];
     setPhase('pick');
     setLead(null);
     leadRef.current = null;
@@ -942,8 +1009,8 @@ export function CopilotPage() {
                         <Save className="h-4 w-4" /> Guardado en el prospecto
                       </span>
                     ) : (
-                      <button className="btn-primary w-full py-3" onClick={saveToLead} disabled={!summary}>
-                        <Save className="h-4 w-4" /> Guardar en el prospecto
+                      <button className="btn-primary w-full py-3" onClick={saveToLead} disabled={!summary || saving}>
+                        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Guardar en el prospecto
                       </button>
                     )}
                     <div className="flex gap-2">

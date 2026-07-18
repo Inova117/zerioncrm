@@ -144,25 +144,46 @@ export function useDeepgram({ lang = 'es-EC', onFinal, onInterim }: UseDeepgramO
     streamRef.current = null;
   }, []);
 
+  // Generación de sesión: cada start() toma un número; stop() lo invalida.
+  // Un booleano compartido no basta — stop() durante un `await` de la sesión 1
+  // seguido de un start() (sesión 2) dejaba a la sesión 1 viendo "activo" de
+  // nuevo: dos micrófonos + dos WebSockets vivos, finales duplicados, y la
+  // limpieza de la vieja destruyendo los recursos de la nueva.
+  const sessionRef = useRef(0);
+
   const start = useCallback(async () => {
     if (activeRef.current || !supported) return;
     activeRef.current = true;
-    try {
-      const tk = await fetchToken(false);
-      if (!activeRef.current) return; // se canceló mientras pedíamos el token
-      if (!tk.available || !tk.access_token) {
-        setAvailable(false);
-        activeRef.current = false;
-        return;
-      }
+    const session = ++sessionRef.current;
+    const isCurrent = () => activeRef.current && sessionRef.current === session;
 
+    // Recursos LOCALES de esta sesión: si queda obsoleta a mitad de arranque,
+    // se limpian estos — jamás los refs (pueden ser ya de una sesión nueva).
+    let stream: MediaStream | null = null;
+    let ctx: AudioContext | null = null;
+    let ws: WebSocket | null = null;
+    const cleanupLocal = () => {
+      try {
+        ws?.close();
+      } catch { /* noop */ }
+      try {
+        void ctx?.close();
+      } catch { /* noop */ }
+      stream?.getTracks().forEach((t) => t.stop());
+    };
+
+    try {
+      // 1) Micrófono PRIMERO. El prompt de permiso puede tardar minutos (el
+      //    vendedor además está marcando el teléfono) — si pidiéramos el token
+      //    antes, su TTL de ~60s llegaría vencido al handshake del WS.
+      //
       // Audio CRUDO: el DSP del navegador está afinado para videollamadas —
       // el cancelador de eco y el supresor de ruido tratan la voz que sale del
       // PARLANTE del celular (la del cliente, chillona y lejana) como
       // interferencia y la borran antes de que llegue al WebSocket. Sin ellos,
       // Deepgram recibe las dos voces y separa mejor que Chrome. AGC se queda:
       // sube la voz lejana del parlante cuando el vendedor calla.
-      const stream = await navigator.mediaDevices.getUserMedia({
+      stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: false,
           noiseSuppression: false,
@@ -170,15 +191,28 @@ export function useDeepgram({ lang = 'es-EC', onFinal, onInterim }: UseDeepgramO
           channelCount: 1,
         },
       });
-      if (!activeRef.current) {
-        stream.getTracks().forEach((t) => t.stop());
+      if (!isCurrent()) {
+        cleanupLocal();
         return;
       }
       streamRef.current = stream;
 
+      // 2) Token fresco recién ahora, justo antes de abrir el WS.
+      const tk = await fetchToken(false);
+      if (!isCurrent()) {
+        cleanupLocal();
+        return;
+      }
+      if (!tk.available || !tk.access_token) {
+        cleanupLocal();
+        streamRef.current = null;
+        activeRef.current = false;
+        setAvailable(false);
+        return;
+      }
+
       // AudioContext a 16kHz (si el navegador lo ignora, usamos su rate real
       // y se lo declaramos a Deepgram en sample_rate).
-      let ctx: AudioContext;
       try {
         ctx = new AudioContext({ sampleRate: 16000 });
       } catch {
@@ -186,12 +220,16 @@ export function useDeepgram({ lang = 'es-EC', onFinal, onInterim }: UseDeepgramO
       }
       audioCtxRef.current = ctx;
       await ctx.audioWorklet.addModule(getWorkletUrl());
-      if (!activeRef.current) {
-        teardown();
+      if (!isCurrent()) {
+        cleanupLocal();
         return;
       }
 
       const language = lang.split('-')[0] || 'es';
+      // Alias no-nulos para los closures de abajo (TS no arrastra el narrowing
+      // de las variables `let` dentro de callbacks).
+      const ctxOk = ctx;
+      const streamOk = stream;
       const params = new URLSearchParams({
         model: DG_MODEL,
         language,
@@ -201,28 +239,29 @@ export function useDeepgram({ lang = 'es-EC', onFinal, onInterim }: UseDeepgramO
         endpointing: '300',
         utterance_end_ms: '1000',
         encoding: 'linear16',
-        sample_rate: String(ctx.sampleRate),
+        sample_rate: String(ctxOk.sampleRate),
         channels: '1',
         // El JWT temporal por query param es lo más robusto en el navegador
         // (evita el límite de longitud del header Sec-WebSocket-Protocol).
         access_token: tk.access_token,
       });
-      const ws = new WebSocket(`wss://api.deepgram.com/v1/listen?${params.toString()}`);
-      ws.binaryType = 'arraybuffer';
-      wsRef.current = ws;
+      const sock = new WebSocket(`wss://api.deepgram.com/v1/listen?${params.toString()}`);
+      ws = sock;
+      sock.binaryType = 'arraybuffer';
+      wsRef.current = sock;
 
-      ws.onopen = () => {
-        if (!activeRef.current) {
-          ws.close();
+      sock.onopen = () => {
+        if (!isCurrent()) {
+          sock.close();
           return;
         }
         // Captura → PCM int16 en buffers de ~50ms.
-        const source = ctx.createMediaStreamSource(stream);
-        const node = new AudioWorkletNode(ctx, 'pcm-forwarder');
-        const target = Math.max(1, Math.round(ctx.sampleRate * 0.05)); // ~50ms
+        const source = ctxOk.createMediaStreamSource(streamOk);
+        const node = new AudioWorkletNode(ctxOk, 'pcm-forwarder');
+        const target = Math.max(1, Math.round(ctxOk.sampleRate * 0.05)); // ~50ms
         let acc = new Float32Array(0);
         node.port.onmessage = (e: MessageEvent<Float32Array>) => {
-          if (ws.readyState !== WebSocket.OPEN) return;
+          if (sock.readyState !== WebSocket.OPEN) return;
           const chunk = e.data;
           const merged = new Float32Array(acc.length + chunk.length);
           merged.set(acc);
@@ -234,20 +273,21 @@ export function useDeepgram({ lang = 'es-EC', onFinal, onInterim }: UseDeepgramO
             const s = Math.max(-1, Math.min(1, acc[i]!));
             pcm[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
           }
-          ws.send(pcm.buffer);
+          sock.send(pcm.buffer);
           acc = new Float32Array(0);
         };
         source.connect(node); // sin conectar a destination: no queremos eco
 
         // Red de seguridad: sin audio ni KeepAlive por 10s Deepgram cierra.
         keepAliveRef.current = setInterval(() => {
-          if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'KeepAlive' }));
+          if (sock.readyState === WebSocket.OPEN) sock.send(JSON.stringify({ type: 'KeepAlive' }));
         }, 5000);
 
         setListening(true);
       };
 
-      ws.onmessage = (ev) => {
+      sock.onmessage = (ev) => {
+        if (!isCurrent()) return; // mensajes tardíos de una sesión invalidada
         try {
           const msg = JSON.parse(ev.data as string) as {
             type?: string;
@@ -267,29 +307,40 @@ export function useDeepgram({ lang = 'es-EC', onFinal, onInterim }: UseDeepgramO
         } catch { /* keep-alive / metadata: ignorar */ }
       };
 
-      ws.onerror = () => {
+      sock.onerror = () => {
         // El fallo se maneja en onclose (evita marcar no-disponible dos veces).
       };
-      ws.onclose = () => {
-        if (activeRef.current) {
-          // Se cayó en pleno uso: cerramos limpio (CopilotPage degrada a Web Speech).
-          activeRef.current = false;
-          teardown();
-          setListening(false);
-          setInterim('');
-          setAvailable(false);
-        }
+      sock.onclose = () => {
+        if (!isCurrent()) return;
+        // Se cayó en pleno uso: cerramos limpio (CopilotPage degrada a Web
+        // Speech al ver available=false) — y re-probamos en segundo plano:
+        // si fue un blip transitorio, la PRÓXIMA llamada vuelve a Deepgram
+        // en vez de quedarse degradada para siempre.
+        activeRef.current = false;
+        sessionRef.current += 1;
+        teardown();
+        setListening(false);
+        setInterim('');
+        setAvailable(false);
+        setTimeout(() => {
+          fetchToken(true)
+            .then((r) => setAvailable(r.available))
+            .catch(() => {});
+        }, 3000);
       };
     } catch {
-      activeRef.current = false;
-      teardown();
-      setListening(false);
-      setAvailable(false);
+      cleanupLocal();
+      if (sessionRef.current === session) {
+        activeRef.current = false;
+        setListening(false);
+        setAvailable(false);
+      }
     }
   }, [supported, lang, teardown]);
 
   const stop = useCallback(() => {
     activeRef.current = false;
+    sessionRef.current += 1; // invalida cualquier start() aún en vuelo
     // Cierre elegante: avisa a Deepgram que no hay más audio.
     try {
       if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -303,6 +354,7 @@ export function useDeepgram({ lang = 'es-EC', onFinal, onInterim }: UseDeepgramO
 
   useEffect(() => () => {
     activeRef.current = false;
+    sessionRef.current += 1;
     teardown();
   }, [teardown]);
 

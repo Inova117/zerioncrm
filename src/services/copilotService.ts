@@ -124,15 +124,24 @@ async function callFn(
     full += chunk;
     onDelta?.(chunk);
   }
+  // Flush final: si el último chunk de red cortó una secuencia UTF-8 a la
+  // mitad (tildes y emojis son multibyte), esos bytes quedan retenidos en el
+  // decoder — sin esto, el JSON del debrief llega truncado y no parsea.
+  const tail = decoder.decode();
+  if (tail) {
+    full += tail;
+    onDelta?.(tail);
+  }
   return full;
 }
 
 // El playbook ya NO viaja desde el navegador: vive en el servidor (generado
 // por npm run sync:playbook). Cada request baja de ~58KB a ~2-5KB de subida.
-const supaBriefing = (lead: Lead, history: string, memory: string, onDelta?: (t: string) => void) =>
+const supaBriefing = (lead: Lead, history: string, memory: string, onDelta?: (t: string) => void, signal?: AbortSignal) =>
   callFn(
     { mode: 'briefing', lead: leadBrief(lead), history, memory, settings: settingsForPrompt() },
-    onDelta
+    onDelta,
+    signal
   );
 
 const supaSuggest = (args: SuggestArgs, onDelta: (t: string) => void, signal?: AbortSignal) =>
@@ -267,14 +276,32 @@ async function supaListCalls(leadId: string): Promise<CopilotCallRecord[]> {
     createdAt: r.created_at as string,
   }));
 }
+// Un valor corrupto en localStorage no debe romper guardar/listar para siempre.
+function readMockCalls(): CopilotCallRecord[] {
+  try {
+    const all = JSON.parse(localStorage.getItem(CALLS_KEY) ?? '[]');
+    return Array.isArray(all) ? (all as CopilotCallRecord[]) : [];
+  } catch {
+    return [];
+  }
+}
 async function mockSaveCall(rec: NewCallRecord): Promise<void> {
-  const all = JSON.parse(localStorage.getItem(CALLS_KEY) ?? '[]') as CopilotCallRecord[];
-  all.unshift({ ...rec, id: `call-${Date.now()}`, createdAt: new Date().toISOString() });
-  localStorage.setItem(CALLS_KEY, JSON.stringify(all.slice(0, 50)));
+  const all = readMockCalls();
+  // Transcript acotado: 50 llamadas sin tope reventarían la cuota (~5MB).
+  all.unshift({
+    ...rec,
+    transcript: rec.transcript.slice(-6000),
+    id: `call-${Date.now()}`,
+    createdAt: new Date().toISOString(),
+  });
+  try {
+    localStorage.setItem(CALLS_KEY, JSON.stringify(all.slice(0, 50)));
+  } catch {
+    /* cuota llena: el mock no debe tumbar el guardado (paridad con supa) */
+  }
 }
 async function mockListCalls(leadId: string): Promise<CopilotCallRecord[]> {
-  const all = JSON.parse(localStorage.getItem(CALLS_KEY) ?? '[]') as CopilotCallRecord[];
-  return all.filter((c) => c.leadId === leadId).slice(0, 10);
+  return readMockCalls().filter((c) => c.leadId === leadId).slice(0, 10);
 }
 export const saveCopilotCall: (rec: NewCallRecord) => Promise<void> =
   supabase ? supaSaveCall : mockSaveCall;
@@ -300,17 +327,19 @@ async function supaSummary(lead: Lead, transcript: string): Promise<CallSummary>
 // ===========================================================================
 // Mock — playbook + streaming simulado (demo sin API)
 // ===========================================================================
-const streamOut = async (text: string, onDelta?: (t: string) => void): Promise<string> => {
+const streamOut = async (text: string, onDelta?: (t: string) => void, signal?: AbortSignal): Promise<string> => {
   if (!onDelta) return text;
   const words = text.split(' ');
   for (let i = 0; i < words.length; i += 3) {
+    // Paridad con el fetch real: un stream abortado deja de emitir tokens.
+    if (signal?.aborted) return text;
     onDelta(words.slice(i, i + 3).join(' ') + ' ');
     await new Promise((r) => setTimeout(r, 40));
   }
   return text;
 };
 
-async function mockBriefing(lead: Lead, history: string, _memory: string, onDelta?: (t: string) => void): Promise<string> {
+async function mockBriefing(lead: Lead, history: string, _memory: string, onDelta?: (t: string) => void, signal?: AbortSignal): Promise<string> {
   const e = lead.enrichment;
   const noWeb = !lead.website.trim();
   const settings = settingsForPrompt();
@@ -332,10 +361,10 @@ async function mockBriefing(lead: Lead, history: string, _memory: string, onDelt
     '*Lo demás es turno por turno: cada frase siguiente te la soplo en vivo según lo que responda.*',
   ].join('\n');
   await new Promise((r) => setTimeout(r, 400));
-  return streamOut(text, onDelta);
+  return streamOut(text, onDelta, signal);
 }
 
-async function mockSuggest(args: SuggestArgs, onDelta: (t: string) => void, _signal?: AbortSignal): Promise<string> {
+async function mockSuggest(args: SuggestArgs, onDelta: (t: string) => void, signal?: AbortSignal): Promise<string> {
   const card = args.trigger ? detectObjection(args.trigger) : detectObjection(args.transcript.slice(-300));
   let text: string;
   if (card) {
@@ -350,7 +379,7 @@ async function mockSuggest(args: SuggestArgs, onDelta: (t: string) => void, _sig
       '**Siguiente pregunta (SPIN):** "¿Hoy cómo les llega la gente nueva — puro boca a boca, o también por internet?" Escucha su respuesta y cuantifica: ¿cuántos clientes al mes? ¿cuánto vale cada uno? El que pregunta, controla.';
   }
   await new Promise((r) => setTimeout(r, 350));
-  return streamOut(text, onDelta);
+  return streamOut(text, onDelta, signal);
 }
 
 async function mockSummary(lead: Lead, transcript: string): Promise<CallSummary> {
@@ -377,7 +406,8 @@ export const copilotBriefing: (
   lead: Lead,
   history: string,
   memory: string,
-  onDelta?: (t: string) => void
+  onDelta?: (t: string) => void,
+  signal?: AbortSignal
 ) => Promise<string> = supabase ? supaBriefing : mockBriefing;
 export const copilotSuggest: (
   args: SuggestArgs,
