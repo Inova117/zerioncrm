@@ -21,7 +21,7 @@ export const CLOSES = `
 - ASUMIDO: "Para dejarle la página lista en dos semanas, ¿el logo me lo pasa usted o se lo diseñamos?" Si responde lo del logo, ya compró sin decir sí. (Plazo canónico ÚNICO: dos semanas desde el anticipo — el mismo en toda conversación; tres plazos distintos destruyen la certeza de empresa.)
 - RIESGO CERO / MUESTRA GRATIS (el eje de esta venta): "Le preparo una muestra gratis de cómo se vería SU página, con su nombre y sus colores. Si no le encanta, ahí muere y usted no pierde nada. ¿La vemos el martes o el miércoles?" — pasas de vendedor que pide a alguien que trae un regalo con el nombre del negocio puesto.
 - URGENCIA HONESTA (escasez susurrada, UNA vez por llamada, solo si es verdad — la MISMA línea y el MISMO número que la tonalidad de escasez, nunca dos versiones): "Le soy honesto… este mes solo tomo tres proyectos porque yo mismo los superviso, y me queda un cupo. ¿Se lo separo?"
-- ORIENTADO AL NO (Voss, para el indeciso): "¿Hay algún problema si le preparo la muestra y me da cinco minutos el jueves?" / "¿Es mala idea que le enseñe lo que ya están haciendo otras [clínicas] aquí?"
+- ORIENTADO AL NO (para el indeciso): "¿Hay algún problema si le preparo la muestra y me da cinco minutos el jueves?" / "¿Es mala idea que le enseñe lo que ya están haciendo otras [clínicas] aquí?"
 - RESUMEN DE VALOR: "Quedamos así: página lista en dos semanas, aparece en Google, los clientes le escriben directo al WhatsApp. ¿Arrancamos?"
 
 ## EL PRECIO (el momento de máxima disciplina)

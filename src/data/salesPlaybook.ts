@@ -1,15 +1,15 @@
 // ============================================================================
 // Sales Playbook — la base de conocimiento del Copilot.
 //
-// Construido con investigación profunda de las metodologías (Belfort/Way of
-// the Wolf, Cardone/Sell or Be Sold + Closer's Survival Guide, Voss/Never
-// Split the Difference, SPIN/Rackham, Challenger/Dixon-Adamson) + datos de
+// Consolidado (jul 2026) en DOS pilares nombrados — LA LÍNEA RECTA (el mapa
+// de toda la llamada) + EL PITCH DE CONTRASTE (dolor → contraste → retirada) —
+// con las demás técnicas destiladas como jugadas sin marca, sobre datos de
 // llamadas reales (Gong, 300M) + la práctica del nicho: vender web y
 // automatizaciones a negocios locales latinos por teléfono.
 //
 // Módulos (src/data/playbook/):
-//  • metodologias — tonalidades, línea recta, looping, acordar, empatía
-//    táctica, SPIN comprimido, Challenger con datos verificados
+//  • metodologias — tonalidades, los dos pilares, matemática del dolor,
+//    precio, herramientas de tono, y el Árbitro
 //  • apertura     — aperturas probadas, gatekeeper, buzón/WhatsApp, horarios
 //  • cierres      — señales de compra, anti-oversell, precio, second money,
 //    WhatsApp post-llamada, segunda llamada

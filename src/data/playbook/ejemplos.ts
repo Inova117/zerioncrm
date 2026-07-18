@@ -1,7 +1,7 @@
 // ============================================================================
 // Ejemplos calibrados (few-shots) — el modelo aprende MÁS de 10 respuestas
 // perfectas que de 100 instrucciones. Fijan formato (frase primero, ≤15
-// palabras), registro (NEPQ vs certeza), longitud y disciplina de loops.
+// palabras), registro (rescate neutro vs certeza), longitud y disciplina de loops.
 // Van dentro del bloque cacheado del system: costo marginal ~0.
 // ============================================================================
 
@@ -40,7 +40,7 @@ export const EJEMPLOS = `
 **"Quince segundos y le dejo: cuando lo buscan en Google usted no sale. ¿Le llamo hoy a las 6?"**
 *(UN rescate con dato suyo y sueltas — el segundo ruego quema la puerta)*
 
-### Prospecto: "es que ya pagué una página una vez y me dejaron botado" (quemado → registro NEPQ)
+### Prospecto: "es que ya pagué una página una vez y me dejaron botado" (quemado → rescate neutro)
 **"No pasa nada… ¿y qué pasó esa vez, si puedo preguntar?"**
 *(quemado = baja la energía: desapego + pregunta curiosa, cero argumentos)*
 

@@ -1,9 +1,9 @@
 // ============================================================================
 // Battlecards — respuesta instantánea a objeciones (sin esperar al LLM).
 //
-// Síntesis de la investigación profunda: cada card combina lo mejor de
-// Cardone (acordar primero), Voss (etiqueta + calibrada), Belfort (deflector
-// + loop) y el conocimiento del nicho (vender web a negocios locales latinos).
+// Síntesis de la investigación profunda: cada card combina las jugadas del
+// sistema (acordar primero, etiqueta + calibrada, deflector + loop) con el
+// conocimiento del nicho (vender web a negocios locales latinos).
 // Los triggers usan el habla REAL de un dueño de negocio por teléfono
 // (normalizados: lowercase, sin acentos — ver normalizeSpeech).
 // ============================================================================
@@ -29,7 +29,7 @@ export const BATTLECARDS: Battlecard[] = [
     objection: 'Regateo: "hágame un descuentito"',
     response:
       'Buena pregunta. ¿Y cómo hago yo para darle la página completa a ese precio? … Mejor hagamos esto: la mitad ahora y la mitad cuando la vea funcionando — o ajustamos qué incluye. ¿Cuál le cuadra?',
-    why: 'El "¿cómo hago yo…?" (Voss) lo pone en tus zapatos sin confrontar. Nunca bajes el precio sin cambiar nada: cambia alcance o términos — bajar "porque sí" le enseña que tu precio era mentira.',
+    why: 'La calibrada "¿cómo hago yo…?" lo pone en tus zapatos sin confrontar. Nunca bajes el precio sin cambiar nada: cambia alcance o términos — bajar "porque sí" le enseña que tu precio era mentira.',
   },
   {
     id: 'caro',
@@ -38,7 +38,7 @@ export const BATTLECARDS: Battlecard[] = [
     objection: '"Está caro / no tengo presupuesto"',
     response:
       'Tiene toda la razón, no es barato — y justo por eso funciona. Le pregunto: ¿caro comparado con qué? ¿Cuánto le deja un cliente nuevo? Porque si la página le trae dos al mes, se pagó sola. Y se puede partir: la mitad para arrancar y la otra cuando esté lista y a usted le guste.',
-    why: 'Cardone: acuerda primero y NUNCA defiendas el precio — cuantifica el costo de NO comprar con SUS números. Cede en términos (pago partido), jamás en precio. Y tras decir un precio: SILENCIO, el primero que habla cede.',
+    why: 'Acuerda primero y NUNCA defiendas el precio — cuantifica el costo de NO comprar con SUS números. Cede en términos (pago partido), jamás en precio. Y tras decir un precio: SILENCIO, el primero que habla cede.',
   },
   {
     // Antes que 'sobrino': "un muchacho me lo hace a mitad de precio" es
@@ -103,7 +103,7 @@ export const BATTLECARDS: Battlecard[] = [
     objection: '"Déjame pensarlo"',
     response:
       'Le entiendo perfecto, y está bien pensarlo… pero déjeme hacerle una sola pregunta: la idea como tal, ¿le gusta? Que lo encuentren en Google y le escriban solos. … Perfecto. ¿Y qué le hace dudar: el precio, o si de verdad le va a traer clientes? Cualquiera de las dos se la aclaro en un minuto.',
-    why: 'Belfort: "pensarlo" es cortina de humo — falta una de las 3 certezas. El deflector ("¿le gusta la idea?") mide el producto sin pelear; la binaria fuerza la objeción real, que sí se puede cerrar. Solo la incertidumbre se piensa; la certeza se firma.',
+    why: 'Línea Recta: "pensarlo" es cortina de humo — falta uno de los tres dieces. El deflector ("¿le gusta la idea?") mide el producto sin pelear; la binaria fuerza la objeción real, que sí se puede cerrar. Solo la incertidumbre se piensa; la certeza se firma.',
   },
   {
     id: 'consultar',
@@ -222,7 +222,7 @@ export const BATTLECARDS: Battlecard[] = [
     objection: '"Eso suena muy robot, mis clientes quieren personas"',
     response:
       'Tiene toda la razón, y por eso el sistema no reemplaza a nadie: solo contesta lo repetido — precios, horarios, ubicación — y al instante. Apenas el cliente quiere algo más, se lo pasa a usted con toda la conversación adelantada. Y le digo algo: peor que un robot amable es un WhatsApp que no contesta hasta el otro día.',
-    why: 'Acuerda primero (Cardone), nunca discutas. El reencuadre clave: la comparación real es respuesta instantánea vs. silencio en visto — no bot vs. humano.',
+    why: 'Acuerda primero, nunca discutas. El reencuadre clave: la comparación real es respuesta instantánea vs. silencio en visto — no bot vs. humano.',
   },
 
   // --- El dinero (cierre y cobro) ------------------------------------------
@@ -251,6 +251,6 @@ export const BATTLECARDS: Battlecard[] = [
     objection: 'Se disculpa por el plantón',
     response:
       'No se preocupe, así es esto — uno no para en el negocio. ¿Lo dejamos mejor para mañana a las 10 o el jueves a las 4?',
-    why: 'Absuelve rápido y sin drama (etiqueta Voss: el avergonzado no reagenda, desaparece) y encadena la alternativa doble DE INMEDIATO: la disculpa se convierte en cita nueva antes de que cuelgue con la culpa a cuestas.',
+    why: 'Absuelve rápido y sin drama (etiqueta: el avergonzado no reagenda, desaparece) y encadena la alternativa doble DE INMEDIATO: la disculpa se convierte en cita nueva antes de que cuelgue con la culpa a cuestas.',
   },
 ];

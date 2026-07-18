@@ -84,7 +84,7 @@ export const MOMENTS: MomentInfo[] = [
     priority: 80,
     cues: /(no|tampoco|ni) me interesa|no estoy interesad|no necesito|asi (estamos|estoy) bien|ya tengo (mi |una |la )?(pagina|web|facebook|face|instagram|quien)|mi (sobrino|hijo|hija|primo|hermano)|un (amigo|muchacho|conocido) me|no tengo tiempo|estoy ocupad|dejame pensarlo|lo voy a pensar|dejeme pensar|tengo que (consultar|hablar con|pensarlo)|lo consulto|manda(me)? (la )?info|mandeme (la |una )?(informacion|proforma|cotizacion)|con (el )?facebook|no necesito publicidad|me estafaron|puro cuento|no confio|esta dura la (cosa|situacion)|las ventas estan|temporada baja|mas barato|yo le aviso(?! que llam)|le aviso cualquier cosa/,
     bestMove:
-      'Secuencia fija (Cardone + Belfort): 1) ACUERDA ("tiene toda la razón / le entiendo perfecto") — nunca contradigas ni digas "pero" de frente. 2) AÍSLA o deflecta ("¿es eso lo único que lo detiene?" / "la idea como tal, ¿le gusta?"). 3) Responde SOLO esa objeción con SU dato. 4) RE-CIERRA con alternativa ("¿mañana o el jueves?"). Máximo 3 loops y sueltas con fecha. La battlecard te da la respuesta exacta.',
+      'Secuencia fija de la Línea Recta: 1) ACUERDA ("tiene toda la razón / le entiendo perfecto") — nunca contradigas ni digas "pero" de frente. 2) AÍSLA o deflecta ("¿es eso lo único que lo detiene?" / "la idea como tal, ¿le gusta?"). 3) Responde SOLO esa objeción con SU dato. 4) RE-CIERRA con alternativa ("¿mañana o el jueves?"). Máximo 3 loops y sueltas con fecha. La battlecard te da la respuesta exacta.',
   },
   {
     id: 'gatekeeper',
@@ -111,7 +111,7 @@ export const MOMENTS: MomentInfo[] = [
     priority: 40,
     cues: /por recomendacion me llegan|puro boca a boca|la mayoria viene por|los clientes (me )?llegan|tenemos facebook nomas|el face casi no|puro whatsapp trabajo|el whatsapp lo contesto yo|pagina no (tengo|tenemos)|ni se como me encuentran|me preguntan si tengo pagina|se me pierden pedidos|no se mucho de (eso de )?internet|eso lo ve mi hija a veces|al mes (llegan|vienen|atiendo)|depende de la temporada|antes (venia|llegaba) mas gente|contesto cuando puedo/,
     bestMove:
-      'Está soltando información — escalera SPIN sin interrogatorio (máx. 6-7 preguntas en toda la llamada): Problema ("¿le ha pasado que contesta el WhatsApp tarde y ya compraron en otro lado?") → Implicación con números ("¿cuántos se le van al mes: dos, cinco, diez? ¿y cuánto deja cada uno?") → multiplica EN VOZ ALTA ("5 por 40 son 200 al mes… 2,400 al año. ¿Le cuadra o me paso?"). Cuando admita el dolor con anécdota o número: DEJA de preguntar y pasa al pitch.',
+      'Está soltando información — la matemática del dolor sin interrogatorio (máx. 6-7 preguntas en toda la llamada): Problema ("¿le ha pasado que contesta el WhatsApp tarde y ya compraron en otro lado?") → Implicación con números ("¿cuántos se le van al mes: dos, cinco, diez? ¿y cuánto deja cada uno?") → multiplica EN VOZ ALTA ("5 por 40 son 200 al mes… 2,400 al año. ¿Le cuadra o me paso?"). Cuando admita el dolor con anécdota o número: DEJA de preguntar y pasa al pitch.',
   },
   {
     id: 'apertura',
