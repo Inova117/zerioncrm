@@ -7,9 +7,9 @@
 export const OPENERS = `
 ## LAS DOS APERTURAS EN PRUEBA A/B (el briefing dicta cuál toca en esta llamada; las stats registran cuál convierte más "sí, mándela")
 
-### APERTURA A — HONESTIDAD RADICAL (la del Playbook Web Local v1.1)
-"Buenos días, ¿hablo con [don/doña|doctora] [nombre]? … Le habla Martín, de ZerionStudio, aquí en [ciudad]. Le soy honesto de entrada: esta es una llamada de ventas. Puede colgarme sin problema… o darme treinta segundos, porque le cuento que ya hicimos algo para su negocio. ¿Me da medio minutito?"
-- Por qué funciona: nombras el elefante ANTES de que él lo nombre — el permiso aquí es un reto con salida fácil, no una súplica. Sonrisa audible, cero titubeo.
+### APERTURA A — HONESTIDAD RADICAL ASUNTIVA (v1.2 — sin verificar el número, sin pedir permiso)
+"¡[Don/Doña|Doctora] [nombre]! ¿Cómo le va? … Martín, de ZerionStudio, aquí en [ciudad]. Le soy honesto de entrada: esta es una llamada de ventas — y aun así le va a interesar, porque ya hicimos algo para su negocio: su página web ya está hecha. ¿Sabía que cuando buscan [rubro] en Google, usted no aparece?"
+- Por qué funciona: SIEMPRE asume que es él y que el número es correcto — arrancar con "¿hablo con don…?" es la firma del telemarketer y regala el control. Nombras el elefante ANTES de que él lo nombre (la honestidad radical es tu diferenciador), pero el remate es DATO + PREGUNTA sobre SU negocio — jamás permiso: pedir "medio minutito" convierte el reto en súplica. Sonrisa audible, cero titubeo.
 - Si suena molesto: "Entendido, no le quito más tiempo. Que le vaya bien." — y queda en cadencia de WhatsApp. Un no aquí no quema el prospecto.
 
 ### APERTURA B — LA MAESTRA (4 tiempos, remate sin permiso)
@@ -17,7 +17,7 @@ export const OPENERS = `
 2. LA CONFESIÓN (2s): "No me conoce todavía — soy Martín, de ZerionStudio, aquí de [ciudad]."
 3. LA RAZÓN CON SU DATO (6s): "Y la llamo a USTED y no a otro por algo puntual: antes de marcarle busqué su negocio en Google, como haría un cliente — tiene [4.8] estrellas con [86] reseñas… y cuando buscan '[rubro] en [ciudad]', usted no aparece. Aparece su competencia."
 4. EL REMATE (1s): "¿Usted sabía eso?" + SILENCIO TOTAL. Es pregunta sobre SU negocio: "no me interesa" no es respuesta coherente a "¿sabía?".
-- En la B está PROHIBIDO rematar pidiendo permiso ("¿me regala 30 segundos?", "¿tiene un minutito?"): el permiso solo vive dentro de la A, como reto.
+- En AMBAS aperturas está PROHIBIDO rematar pidiendo permiso ("¿me regala 30 segundos?", "¿tiene un minutito?", "¿me da medio minutito?") y PROHIBIDO arrancar verificando el número ("¿hablo con don…?"): siempre asuntivo — "¡Don [nombre]!" — y el remate siempre es dato + pregunta sobre SU negocio.
 
 ### DESPUÉS de cualquiera de las dos: la razón verificable
 "La razón de mi llamada es bien puntual: la semana pasada busqué [rubro] por [sector] en Google… y su negocio aparece con muy buenas reseñas — lo felicito — pero sin página web. Sus clientes nuevos le encuentran de milagro. Puede que esto le sirva o puede que no — para eso le pregunto un par de cositas primero, ¿le parece?"

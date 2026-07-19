@@ -308,6 +308,11 @@ export const saveCopilotCall: (rec: NewCallRecord) => Promise<void> =
 export const listCopilotCalls: (leadId: string) => Promise<CopilotCallRecord[]> =
   supabase ? supaListCalls : mockListCalls;
 
+// El resultado alimenta moveLead directo: una temperatura fuera del union (el
+// proveedor Kimi va solo por prompt, sin schema) sacaría al lead de todas las
+// columnas del Kanban. Se valida contra la lista real antes de devolver.
+const VALID_TEMPS: readonly string[] = ['nuevo', 'frio', 'tibio', 'caliente', 'reunion', 'cliente', 'perdido'];
+
 async function supaSummary(lead: Lead, transcript: string): Promise<CallSummary> {
   const raw = await callFn({
     mode: 'summary',
@@ -317,7 +322,8 @@ async function supaSummary(lead: Lead, transcript: string): Promise<CallSummary>
   });
   try {
     const j = JSON.parse(raw) as CallSummary;
-    if (j.summary && j.temperature) return j;
+    if (j.summary && VALID_TEMPS.includes(j.temperature)) return j;
+    if (j.summary) return { ...j, temperature: lead.temperature };
   } catch {
     /* cae al fallback */
   }
@@ -350,11 +356,11 @@ async function mockBriefing(lead: Lead, history: string, _memory: string, apertu
   const dato = e?.rating != null ? `tiene ${e.rating} estrellas con ${e.reviewCount} reseñas` : 'me llamó la atención lo que encontré';
   const opener =
     apertura === 'A'
-      ? `"Buenos días, ¿hablo con ${lead.contactName || 'el dueño'}? … Le habla Martín, de ZerionStudio. Le soy honesto de entrada: esta es una llamada de ventas. Puede colgarme sin problema… o darme treinta segundos, porque ya hicimos algo para su negocio. ¿Me da medio minutito?"`
+      ? `"¡${lead.contactName || 'Buenas'}! ¿Cómo le va? … Martín, de ZerionStudio. Le soy honesto de entrada: esta es una llamada de ventas — y aun así le va a interesar, porque su página web ya está hecha. ¿Sabía que cuando lo buscan en Google usted no aparece?"`
       : `"¡${lead.contactName || 'Buenas'}! ¿Cómo le va? … No me conoce todavía — soy Martín, de ZerionStudio. Antes de llamarle busqué su negocio en Google, como haría un cliente: ${dato}${noWeb ? '… y no le aparece página' : ''}. ¿Usted sabía eso?"`;
   const tono =
     apertura === 'A'
-      ? '*(sinceridad total, sonrisa audible — el permiso aquí es un reto con salida, no una súplica)*'
+      ? '*(sinceridad total, sonrisa audible, postura asuntiva — el remate es dato + pregunta sobre SU negocio, jamás permiso)*'
       : '*(tono de conocido: saluda, PAUSA real hasta que responda, y recién ahí sigues — el remate es pregunta, no permiso)*';
   const text = [
     ...settingsLine,
@@ -380,10 +386,10 @@ async function mockSuggest(args: SuggestArgs, onDelta: (t: string) => void, sign
     text = `**${args.moment.split(':')[0]}** — ${args.moment.split(':').slice(1).join(':').trim()}`;
   } else if (/cuanto (cuesta|vale|sale)|precio|que incluye|cuanto se demora/i.test(args.transcript.slice(-200))) {
     text =
-      '🟢 **SEÑAL DE COMPRA** — deja de presentar y cierra: "Le propongo esto: le preparo el diseño de muestra y lo vemos el jueves. Si le encanta, arrancamos con el plan de $X al mes. ¿Jueves a las 10 o a las 4?"';
+      '🟢 **SEÑAL DE COMPRA** — deja de presentar y cierra: "Trescientos con IVA incluido, una sola vez. Pero véala primero — ya está hecha. ¿Se la mando? ¿A qué hora la alcanza a ver?"';
   } else {
     text =
-      '**Siguiente pregunta (SPIN):** "¿Hoy cómo les llega la gente nueva — puro boca a boca, o también por internet?" Escucha su respuesta y cuantifica: ¿cuántos clientes al mes? ¿cuánto vale cada uno? El que pregunta, controla.';
+      '**Siguiente pregunta:** "¿Hoy cómo les llega la gente nueva — puro boca a boca, o también por internet?" Escucha su respuesta y cuantifica: ¿cuántos clientes al mes? ¿cuánto deja cada uno? El que pregunta, controla.';
   }
   await new Promise((r) => setTimeout(r, 350));
   return streamOut(text, onDelta, signal);
@@ -394,7 +400,12 @@ async function mockSummary(lead: Lead, transcript: string): Promise<CallSummary>
   const t = transcript.toLowerCase();
   let temperature: Temperature = 'frio';
   let nextAction = 'Volver a llamar en 3 días con el dato del negocio.';
-  if (/jueves|manana|lunes|martes|miercoles|viernes|agend|cita|reunion|demo/i.test(t)) {
+  // "ya LE pagué" (a nosotros) — el "le" es obligatorio: "ya pagué publicidad
+  // en Facebook" es una queja de gasto pasado, no un pago confirmado.
+  if (/transferencia (hecha|enviada|lista)|ya le (pague|deposite|transferi)|(mande|envie) (la transferencia|el comprobante|el deposito)|pago (confirmado|recibido)|recibido el pago/i.test(t)) {
+    temperature = 'cliente';
+    nextAction = 'Publicar la página HOY, mandar accesos y confirmar la llamada de entrega de mañana.';
+  } else if (/jueves|manana|lunes|martes|miercoles|viernes|agend|cita|reunion|demo/i.test(t)) {
     temperature = 'caliente';
     nextAction = 'Preparar el diseño de muestra y confirmar la cita agendada.';
   } else if (/interes|cuanto|precio|informacion|whatsapp/i.test(t)) {

@@ -5,6 +5,8 @@
 // ventas que cualquier objeción. Detectar el sí y callarse es una habilidad.
 // ============================================================================
 
+import { GARANTIA_ENTREGA } from './garantia';
+
 export const CLOSES = `
 ## SEÑALES DE COMPRA (reacciona AL INSTANTE cuando escuches)
 "¿cuánto cuesta?" · "¿qué incluye?" · "¿cuánto se demoran?" · "¿cómo sería el pago?" · "¿qué necesitan de mí?" · "¿tienen ejemplos?" · "¿me pueden poner el menú/las fotos?" · "¿y si después quiero cambiar algo?"
@@ -19,9 +21,9 @@ export const CLOSES = `
 ## EL GUION DEL DINERO (toque 2, 24-72h después de que la vio — máx 2 loops)
 1. "¿La pudo ver, [don|doctora] [nombre]? … ¿Y qué tal? ¿Le gustó cómo quedó con sus reseñas?" [si hay peros: "eso se cambia en el día"]
 2. QUE LO DIGA ÉL: "Y viéndola así, con sus reseñas y sus servicios… ¿usted siente que esto podría ser… lo que le está faltando para que le lleguen más clientes?" [ESPERAR — que el sí lo verbalice él]
-3. STACK DE VALOR antes del precio: "Entonces hagamos una cosa: la página queda a su nombre — su dominio, sus accesos, todo suyo — funcionando esta misma semana. Una página hecha a medida como esta, con los textos redactados y sus reseñas integradas, en Ecuador le cotizan entre trescientos y ochocientos dólares."
-4. EL PRECIO, de frente y UNA vez (voz de locutor nocturno): "Como la suya ya está construida, queda en TRESCIENTOS, con IVA incluido, con todo — se lo digo de frente porque aquí no hay letra chica. Una sola vez, no es mensualidad. Menos de lo que le deja un solo cliente nuevo. ¿Le parece justo?" → SILENCIO TOTAL, cuenta 4. (Si MI NEGOCIO define otro precio, se usa ESE, dicho igual de seco.)
-5. TRAS EL SÍ: "Excelente decisión. Le mando ahorita los datos — ¿maneja transferencia o De Una? — y hoy mismo su página queda oficial."
+3. EL REPLAY DEL DOLOR con SUS números, ANTES del precio (el ancla es SU pérdida, no el mercado): "Acuérdese de lo que me contaba: se le van unos [5] al mes y cada uno le deja [40] — son [2,400] al año yéndose donde su competencia. Esta página queda a su nombre, funcionando esta misma semana, trabajando las 24 horas para agarrar justo esos clientes." [FALLBACK — solo si el T1 no capturó TICKET/PERDIDOS: "una página hecha a medida como esta, con los textos redactados y sus reseñas integradas, en Ecuador le cotizan entre trescientos y ochocientos dólares."]
+4. EL PRECIO, de frente y UNA vez (voz de locutor nocturno): "Como la suya ya está construida, queda en TRESCIENTOS, con IVA incluido, con todo — se lo digo de frente porque aquí no hay letra chica. Una sola vez, no es mensualidad. Menos que UN mes de lo que se le está yendo. Y esto se lo pongo por escrito en el mismo WhatsApp: ${GARANTIA_ENTREGA}. ¿Le parece justo?" → SILENCIO TOTAL, cuenta 4. (Si MI NEGOCIO define otro precio, se usa ESE, dicho igual de seco.)
+5. TRAS EL SÍ: "Excelente decisión. Le mando ahorita los datos — ¿maneja transferencia o De Una? — y hoy mismo su página queda oficial." Y ANTES de colgar, el próximo paso amarrado (la venta no termina en el pago): "Mañana lo llamo dos minutitos para entregarle sus claves y enseñarle cómo pedir cambios — ¿a las cinco le va bien?"
 6. EL PLAN MENSUAL, opt-out DESPUÉS del sí (jamás antes): "La página incluye el primer mes de mantenimiento. De ahí en adelante son unos cuarenta al mes con IVA, todo incluido: el dominio, que nunca se caiga, y los cambios que necesite por WhatsApp. La mayoría lo deja así para no preocuparse de nada. ¿Lo dejamos activo?"
 - El monto NO se negocia. Piden rebaja → forma, no monto: "Lo que sí puedo hacer es partírselo: la mitad ahora y la mitad a fin de mes. ¿Así sí le cuadra?"
 - Reducción al ridículo (con el precio REAL dividido antes de decirla): "menos de un dólar al día — con un cliente que le traiga al mes, se pagó sola."

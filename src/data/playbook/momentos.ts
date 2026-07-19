@@ -36,6 +36,10 @@ export interface MomentInfo {
   cues: RegExp;
   /** La mejor jugada de este momento: instrucción corta + qué decir. */
   bestMove: string;
+  /** Variante si la hora de lectura AÚN no está amarrada (hoy solo despedida).
+   *  Vive aquí — no en la UI — para que el playbook siga siendo la única
+   *  fuente de verdad de las jugadas (sync:playbook la propaga al server). */
+  bestMoveNoHora?: string;
   /** Si varias matchean en la misma frase, gana la de mayor prioridad. */
   priority: number;
 }
@@ -57,16 +61,16 @@ export const MOMENTS: MomentInfo[] = [
     priority: 97,
     cues: /cuando (empezamos|empezariamos|podriamos empezar|arrancamos)|como le pago|como seria el pago|que necesitan? de mi|mandeme los datos|para el deposito|hagamoslo|hagamos eso|de una,? pues|dale pues|ya,? pues(?!,? ?(digame|cuenteme|hable|pero|no |lo voy|dejeme|tengo que))|listo,? (hagamos|mandame|de una)|(?<!no )(?<!no le )(?<!tampoco )(?<!ni )(?<!nada )me interesa|esta bien,? (hagamos|mandame|veamos)|de acuerdo(?!,? ?pero)|me parece bien(?!,? ?pero)|ahi nos vemos|venga y conversamos|el (lunes|martes|miercoles|jueves|viernes|sabado) (si )?puedo|cuando (estaria|esta|tendria) (lista )?(mi|la) pagina|cuando tenga la pagina/,
     bestMove:
-      'YA COMPRÓ mentalmente: cada palabra de venta extra solo puede reabrir dudas. En el TOQUE 1: amarra link + hora en una frase y corta — "Perfecto: le mando el link ahorita mismo, ¿a este número? ¿Y a qué hora la alcanza a ver?" En el TOQUE 2 (ya la vio y dijo sí): cobra — "Excelente decisión. Le mando los datos — ¿maneja transferencia o De Una? — y hoy mismo queda oficial." Único agregado permitido tras el sí AL PAGO: el plan mensual opt-out ("el primer mes de mantenimiento va incluido… ¿lo dejamos activo?"). NUNCA menciones otra feature ni vuelvas a tocar el precio.',
+      'YA COMPRÓ mentalmente: cada palabra de venta extra solo puede reabrir dudas. En el TOQUE 1: amarra link + hora en una frase y corta — "Perfecto: le mando el link ahorita mismo, ¿a este número? ¿Y a qué hora la alcanza a ver?" En el TOQUE 2 (ya la vio y dijo sí): cobra — "Excelente decisión. Le mando los datos — ¿maneja transferencia o De Una? — y hoy mismo queda oficial." Único agregado permitido tras el sí AL PAGO: el plan mensual opt-out ("el primer mes de mantenimiento va incluido… ¿lo dejamos activo?") y la LLAMADA DE ENTREGA amarrada antes de colgar ("mañana lo llamo dos minutitos para entregarle sus claves — ¿a las cinco le va bien?"). NUNCA menciones otra feature ni vuelvas a tocar el precio.',
   },
   {
     id: 'senal-compra',
     label: 'Señal de compra — CIERRA',
     emoji: '🟢',
     priority: 95,
-    cues: /cuanto (cuesta|vale|sale|es(?! lo (menos|minimo))|cobran?|me sale|se demoran?)|que incluye|en cuanto tiempo|cuanto (tiempo )?se demoran?|estaria list[ao]|como seria|tienen ejemplos|trabajos (hechos|anteriores)|han trabajado con|donde puedo ver|me pueden poner (el menu|las fotos)|ustedes tambien manejan|y si despues quiero cambiar|suena (bien|interesante)|estaria bueno/,
+    cues: /cuanto (cuesta|vale|sale|es(?! lo (menos|minimo))|cobran?|me sale|se demoran?)|que incluye|en cuanto tiempo|cuanto (tiempo )?se demoran?|estaria list[ao]|como seria|tienen ejemplos|trabajos (hechos|anteriores)|han trabajado con|donde puedo ver|me pueden poner (el menu|las fotos)|ustedes tambien manejan|y si despues quiero cambiar|suena (bien|interesante)|estaria bueno|le pago cuando (la vea|este|la tenga)|cuando este list[ao] le pago/,
     bestMove:
-      'Dejó de evaluarte: está imaginándose CON la página. Responde en UNA frase y convierte en "se la mando ahorita": "Claro — y mejor que explicárselo, véala: ya está hecha, con sus reseñas. ¿Este número tiene WhatsApp? ¿A qué hora la alcanza a ver?" Si pregunta precio: de frente y de vuelta a la página — "Trescientos con IVA incluido, una sola vez. Pero no me crea a mí: véala primero y decide con la página en la mano." DOS señales seguidas y sigues explicando = estás matando la venta.',
+      'Dejó de evaluarte: está imaginándose CON la página. Responde en UNA frase y convierte en "se la mando ahorita": "Claro — y mejor que explicárselo, véala: ya está hecha, con sus reseñas, lista para mandarle clientes al WhatsApp. ¿Este número tiene WhatsApp? ¿A qué hora la alcanza a ver?" Si pregunta precio: de frente y de vuelta a la página — "Trescientos con IVA incluido, una sola vez. Pero no me crea a mí: véala primero y decide con la página en la mano." DOS señales seguidas y sigues explicando = estás matando la venta.',
   },
   {
     id: 'precio',
@@ -102,7 +106,7 @@ export const MOMENTS: MomentInfo[] = [
     priority: 60,
     cues: /que (es lo que )?hacen (ustedes)?|y ustedes que hacen|como funciona( eso)?|como trabajan|explique(me)?|a ver,? expliqueme|que me ofrece|que ofrece exactamente|para que me sirve( eso)?|eso de las paginas como es|que harian con mi negocio|de que se trata|ya,? (pues,? )?digame|a ver,? digame|cuenteme( rapidito| pues)?|tiene un minuto,? hable/,
     bestMove:
-      'LA REVELACIÓN demo-first, con pausa de misterio antes de "ya está hecha": "Yo no le llamo a ofrecerle una página… le llamo porque su página YA ESTÁ HECHA. Y ojo — usted no ha contratado nada ni me debe nada: la hicimos por nuestra cuenta, como muestra, con sus reseñas de Google. Está lista para que la vea ahorita desde su celular." (Sin pre-built: "mañana a esta misma hora le llega por WhatsApp, YA HECHA, sin que pague ni mueva un dedo.") Remata con el trato: "La ve con calma, y si no le gusta la borro. ¿Le parece justo?" PROHIBIDO: tecnicismos, precio antes de que la vea (si pregunta: de frente y de vuelta a la página), hablar mal de la competencia.',
+      'Pidió el pitch — pero verifica el GATE: si aún no admitió ningún problema, UNA frase de sello antes ("O sea: hoy los clientes le llegan por recomendación y en Google no aparece… ¿así es?") y con su sí, LA REVELACIÓN demo-first con pausa de misterio antes de "ya está hecha": "Yo no le llamo a ofrecerle una página… le llamo porque su página YA ESTÁ HECHA — armada para que el que lo busca en Google le escriba directo a su WhatsApp. Y ojo — usted no ha contratado nada ni me debe nada: la hicimos por nuestra cuenta, como muestra, con sus reseñas. Está lista para que la vea ahorita desde su celular." (Sin pre-built: "mañana a esta misma hora le llega por WhatsApp, YA HECHA, sin que pague ni mueva un dedo.") Remata con el trato: "La ve con calma, y si no le gusta la borro. ¿Le parece justo?" PROHIBIDO: tecnicismos, precio antes de que la vea (si pregunta: de frente y de vuelta a la página), hablar mal de la competencia.',
   },
   {
     id: 'descubrimiento',
@@ -111,7 +115,7 @@ export const MOMENTS: MomentInfo[] = [
     priority: 40,
     cues: /por recomendacion me llegan|puro boca a boca|la mayoria viene por|los clientes (me )?llegan|tenemos facebook nomas|el face casi no|puro whatsapp trabajo|el whatsapp lo contesto yo|pagina no (tengo|tenemos)|ni se como me encuentran|me preguntan si tengo pagina|se me pierden pedidos|no se mucho de (eso de )?internet|eso lo ve mi hija a veces|al mes (llegan|vienen|atiendo)|depende de la temporada|antes (venia|llegaba) mas gente|contesto cuando puedo/,
     bestMove:
-      'Está soltando información — la matemática del dolor sin interrogatorio (máx. 6-7 preguntas en toda la llamada): Problema ("¿le ha pasado que contesta el WhatsApp tarde y ya compraron en otro lado?") → Implicación con números ("¿cuántos se le van al mes: dos, cinco, diez? ¿y cuánto deja cada uno?") → multiplica EN VOZ ALTA ("5 por 40 son 200 al mes… 2,400 al año. ¿Le cuadra o me paso?"). Cuando admita el dolor con anécdota o número: DEJA de preguntar y pasa al pitch.',
+      'Está soltando información — la matemática del dolor sin interrogatorio (máx. 6-7 preguntas en toda la llamada): Lo ya intentado ("¿y ya probó resolverlo — página, publicidad? ¿le funcionó?") → Problema ("¿le ha pasado que contesta el WhatsApp tarde y ya compraron en otro lado?") → Implicación con números ("¿cuántos se le van al mes: dos, cinco, diez? ¿y cuánto deja cada uno?") → multiplica EN VOZ ALTA ("5 por 40 son 200 al mes… 2,400 al año. ¿Le cuadra o me paso?") → el porqué del ahora ("¿y por qué le interesa resolverlo justo ahora?" — guarda su respuesta textual). Cuando admita el dolor con anécdota o número: SELLA en una frase ("o sea que… ¿así es?"), DEJA de preguntar y pasa al pitch.',
   },
   {
     id: 'apertura',
@@ -120,7 +124,7 @@ export const MOMENTS: MomentInfo[] = [
     priority: 35,
     cues: /^alo\b|hola,? buen(a|o)s|buenos dias|buenas tardes|quien habla|con quien (hablo|tengo el gusto)|que desea|que se le ofrece|como consiguio mi numero|quien le dio mi numero|es una venta|digame\b|si,? diga|si,? con el( mismo)?\b|con el mismo|el habla|ella habla|mucho gusto|para servirle/,
     bestMove:
-      'Los primeros 12 segundos deciden la llamada. Usa la apertura que dictó el briefing (A/B en prueba): A — honestidad radical: "le soy honesto de entrada: esta es una llamada de ventas. Puede colgarme sin problema… o darme treinta segundos, porque ya hicimos algo para su negocio. ¿Me da medio minutito?" · B — la maestra: gancho de conocido + PAUSA ("¡Don [nombre]! ¿Cómo le va?…"), confesión ("no me conoce todavía — soy Martín, de ZerionStudio"), SU dato ("lo busqué en Google: [4.8] estrellas… y usted no aparece") y "¿usted sabía eso?" + SILENCIO. Si confirma que es el dueño ("sí, con él") → ventana de oro: lánzala YA, sin relleno. Si pregunta "¿es una venta?": en la A ya lo dijiste; en la B: "Es una llamada de negocio: ya hicimos algo para su negocio y se lo puedo mostrar." Energía arriba, cero "disculpe la molestia".',
+      'Los primeros 12 segundos deciden la llamada. Usa la apertura que dictó el briefing (A/B en prueba, AMBAS asuntivas — jamás "¿hablo con…?" ni pedir permiso): A — honestidad radical asuntiva: "¡Don [nombre]! ¿Cómo le va? … Martín, de ZerionStudio. Le soy honesto: esta es una llamada de ventas — y aun así le va a interesar, porque su página ya está hecha. ¿Sabía que en Google usted no aparece?" · B — la maestra: gancho de conocido + PAUSA ("¡Don [nombre]! ¿Cómo le va?…"), confesión ("no me conoce todavía — soy Martín, de ZerionStudio"), SU dato ("lo busqué en Google: [4.8] estrellas… y usted no aparece") y "¿usted sabía eso?" + SILENCIO. Si confirma que es el dueño ("sí, con él") → ventana de oro: lánzala YA, sin relleno. Si pregunta "¿es una venta?": en la A ya lo dijiste; en la B: "Es una llamada de negocio: ya hicimos algo para su negocio y se lo puedo mostrar." Energía arriba, cero "disculpe la molestia".',
   },
   {
     id: 'despedida',
@@ -130,8 +134,31 @@ export const MOMENTS: MomentInfo[] = [
     cues: /que este bien|igualmente|gracias por llamar|buen dia entonces|buenas tardes entonces|nos vemos el|quedamos asi|ya quedamos|ahi hablamos|esperamos su mensaje|dale,? me avisa|bueno,? hablamos/,
     bestMove:
       'Antes de colgar, verifica el próximo paso: si NO quedó la HORA a la que va a ver la página, la llamada NO terminó. Recap de una frase: "Perfecto: le mando el link ahorita mismo a este WhatsApp, usted la ve tipo [noche], y mañana a las nueve le escribo y me cuenta. ¿Estamos?" Y el WhatsApp SALE en menos de 5 minutos — la velocidad es tu primera prueba de seriedad. "Mándemela y yo le aviso" SIN hora = evasiva: pide la hora una vez más antes de soltar.',
+    bestMoveNoHora:
+      'NO CUELGUES SIN LA HORA — "Perfecto. Última cosita: ¿como a qué hora la alcanza a ver, para escribirle mañana sin caerle en mal momento?"',
   },
 ];
+
+// ---------------------------------------------------------------------------
+// Hora de lectura amarrada — el test de compromiso del T1.
+// "Mándemela y yo le aviso" NO cuenta (es la antesala del ghosting, ver la
+// battlecard yo-le-aviso): solo compromisos con verbo de VER + momento, o la
+// respuesta corta y directa a "¿a qué hora la ve?" (solo el momento, sin verbo).
+// ---------------------------------------------------------------------------
+const NUM = String.raw`(?:\d{1,2}|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce)`;
+const RE_HORA_FULL = new RegExp(
+  String.raw`(la (veo|reviso|miro|checo)|alcanzo a ver(la)?|la puedo ver)\D{0,25}(en la (noche|tarde|manana)|al mediodia|al almuerzo|tipo ${NUM}|como a las ${NUM}|a las ${NUM}|despues de las ${NUM})` +
+    String.raw`|(en la (noche|tarde|manana)|tipo ${NUM}|como a las ${NUM}|a las ${NUM})\D{0,15}la (veo|reviso|miro|checo)`
+);
+const RE_HORA_SHORT = new RegExp(
+  String.raw`^(si,? )?(de pronto |quizas )?(hoy |esta )?(en la (noche|tarde|manana)|al mediodia|como a las ${NUM}|a las ${NUM}|tipo ${NUM})( (esta bien|puede ser|me cuadra|de pronto|si puedo))?$`
+);
+
+/** ¿Esta frase del prospecto amarra la hora de lectura? (texto ya crudo; se normaliza aquí) */
+export function detectHora(text: string): boolean {
+  const t = normalizeSpeech(text).trim();
+  return RE_HORA_FULL.test(t) || (t.length <= 45 && RE_HORA_SHORT.test(t));
+}
 
 /**
  * Detecta el momento de la llamada según la última frase del prospecto.
@@ -148,5 +175,9 @@ export function detectMoment(text: string): MomentInfo | null {
 
 /** Los momentos como guía de texto para el system prompt del coach. */
 export function momentsForPrompt(): string {
-  return MOMENTS.map((m) => `### ${m.emoji} ${m.label}\nMejor jugada: ${m.bestMove}`).join('\n\n');
+  return MOMENTS.map(
+    (m) =>
+      `### ${m.emoji} ${m.label}\nMejor jugada: ${m.bestMove}` +
+      (m.bestMoveNoHora ? `\nSi la hora de lectura AÚN no está amarrada: ${m.bestMoveNoHora}` : '')
+  ).join('\n\n');
 }

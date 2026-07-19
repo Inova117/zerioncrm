@@ -52,7 +52,7 @@ const KIMI_MODEL = Deno.env.get('KIMI_MODEL') ?? 'kimi-k3';
 // Versión visible en las cabeceras de TODA respuesta (incluido el preflight):
 //   curl -sI -X OPTIONS <url>/functions/v1/copilot | grep x-copilot-version
 // Súbela en cada cambio relevante — es la forma de verificar qué está deployado.
-const VERSION = '2026-07-17.7-web-local-v11';
+const VERSION = '2026-07-19.1-hormozi-gates';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -65,13 +65,14 @@ const PERSONA = `Eres "el Closer" de ZerionStudio. Vendes con UNA sola voz — d
 
 CÓMO PIENSAS (proceso interno — jamás lo expliques en la respuesta):
 1. Detecta el MOMENTO de la llamada: gatekeeper, apertura, descubrimiento, pitch, objeción, precio, señal de compra, peligro de colgar, cierre. El cliente puede mandarte su detección: confírmala o corrígela leyendo la transcripción.
-2. Juega LA jugada de ESE momento según el playbook: objeción → acordar + loop hacia "véala primero" (máx 2, nunca contradecir); señal de compra → en T1 link + hora YA, en T2 cobrar YA; peligro → rescate de 15 segundos con un dato SUYO; descubrimiento → la siguiente pregunta que cuantifica el dolor; precio → de frente ($300 con IVA, una vez) y de vuelta a la página, el monto jamás baja (solo 50/50); gatekeeper → aliado, y si la página existe, la jugada pre-built ("necesito mostrársela antes de darla de baja").
-3. Personaliza SIEMPRE con la ficha y el historial del prospecto, y con la oferta real del vendedor (MI NEGOCIO tiene prioridad sobre el playbook).
+2. Juega LA jugada de ESE momento según el playbook: objeción → acordar + loop hacia "véala primero" (máx 2, nunca contradecir; si MI NEGOCIO trae CASOS REALES, injerta la anécdota de una frase del rubro más parecido); señal de compra → en T1 link + hora YA, en T2 cobrar YA; peligro → rescate de 15 segundos con un dato SUYO; descubrimiento → la siguiente pregunta que cuantifica el dolor (y el porqué del AHORA); precio → de frente ($300 con IVA, una vez) y de vuelta a la página, el monto jamás baja (solo 50/50); gatekeeper → aliado, y si la página existe, la jugada pre-built ("necesito mostrársela antes de darla de baja").
+3. VERIFICA LOS GATES antes de subir de etapa: sin problema admitido (o resumen confirmado con "¿así es?") NO soplas el pitch — soplas el sello del problema; sin dolor re-articulado con SUS números NO soplas el precio — soplas el replay del dolor; y una llamada nunca termina sin próximo paso amarrado (hora de lectura, fecha o llamada de entrega).
+4. Personaliza SIEMPRE con la ficha y el historial del prospecto, y con la oferta real del vendedor (MI NEGOCIO tiene prioridad sobre el playbook).
 
 CONTRATO DE VERDAD (anti-alucinación — esto es INVIOLABLE):
 - Datos del PROSPECTO: usa SOLO lo que está en la FICHA o lo que él dijo en la transcripción. Si no sabes su rating, reseñas, nombre o rubro exacto — NO lo inventes: usa la versión sin dato ("vi su negocio en Google" en vez de "sus 4.8 estrellas").
 - Precios, plazos, garantías y formas de pago: usa SOLO los de MI NEGOCIO. Si MI NEGOCIO no los define, usa los del playbook marcados como ejemplo o difiere ("eso lo vemos con la muestra en la mano") — JAMÁS inventes una cifra, una garantía o una promesa que Martín no pueda cumplir.
-- Casos de éxito y clientes: NUNCA inventes nombres de clientes, negocios ni resultados ("le hicimos la página a X y ganó Y"). Si no hay caso real en MI NEGOCIO o el historial, ofrece la muestra gratis como prueba.
+- Casos de éxito y clientes: NUNCA inventes nombres de clientes, negocios ni resultados ("le hicimos la página a X y ganó Y"). Las anécdotas salen SOLO de los CASOS REALES de MI NEGOCIO o del historial; si no hay ninguno, ofrece la muestra gratis como prueba (la página ya hecha ES la prueba).
 - Transcripción ambigua o con ruido: prefiere una PREGUNTA sobre una afirmación. Ante la duda de qué dijo, la jugada segura es un espejo o una calibrada.
 - Números del prospecto (ticket, clientes perdidos): si él ya los dijo, repítelos EXACTOS; no los redondees hacia arriba ni "mejores" su matemática.
 
@@ -356,7 +357,8 @@ async function handle(req: Request): Promise<Response> {
   const playbook = PLAYBOOK;
   const transcript = str(body.transcript).slice(-6000);
   const trigger = str(body.trigger).slice(0, 500);
-  const settings = str(body.settings).slice(0, 4000);
+  // 6000: los ajustes ahora incluyen MIS CASOS REALES (la munición de anécdotas)
+  const settings = str(body.settings).slice(0, 6000);
   const history = str(body.history).slice(0, 4000);
   const moment = str(body.moment).slice(0, 600);
   const callState = str(body.callState).slice(0, 600);
@@ -391,7 +393,7 @@ async function handle(req: Request): Promise<Response> {
     // queda registrada en las stats — la data decide cuál convierte más.
     const aperturaSpec =
       apertura === 'A'
-        ? 'la APERTURA A — HONESTIDAD RADICAL del playbook: saludo con su nombre + "Le habla Martín, de ZerionStudio" + "Le soy honesto de entrada: esta es una llamada de ventas. Puede colgarme sin problema… o darme treinta segundos, porque le cuento que ya hicimos algo para su negocio. ¿Me da medio minutito?" — adaptada con los datos REALES de la ficha (registro formal si es profesional/clínica)'
+        ? 'la APERTURA A — HONESTIDAD RADICAL ASUNTIVA del playbook: gancho asuntivo ("¡Don/Doña [nombre]! ¿Cómo le va?" — JAMÁS "¿hablo con…?") + "Martín, de ZerionStudio" + "Le soy honesto de entrada: esta es una llamada de ventas — y aun así le va a interesar, porque su página web ya está hecha" + remate con SU dato en pregunta ("¿Sabía que cuando buscan [rubro] en Google usted no aparece?"). PROHIBIDO pedir permiso ("¿me da medio minutito?") — adaptada con los datos REALES de la ficha (registro formal si es profesional/clínica)'
         : 'la APERTURA B — LA MAESTRA del playbook, con los datos REALES de la ficha: gancho de conocido con pausa ("¡Don/Doña [nombre]! ¿Cómo le va?…"), la confesión ("no me conoce todavía — soy Martín, de ZerionStudio"), la razón con SU dato (estrellas/reseñas/no aparece en Google) y el remate "¿usted sabía eso?". PROHIBIDO rematarla pidiendo permiso';
     const userMsg =
       `Dame SOLO el arranque de la llamada. Esta llamada usa ${aperturaSpec}. Decible en 10-12 segundos.\n\nFormato EXACTO:\n\n**Tu apertura ${apertura} (dila y CALLA):**\nLA frase exacta entre comillas.\nUna nota de tonalidad en cursiva, de una sola línea.\n\n**Meta:** una línea — el objetivo del toque 1: que acepte VER su página ya hecha + la hora a la que la va a ver.\n\nNADA MÁS. Ni pasos siguientes, ni objeciones, ni el resto del guion: cada frase siguiente me la soplas EN VIVO según lo que el prospecto responda.`;
@@ -554,6 +556,10 @@ async function handle(req: Request): Promise<Response> {
   }
 
   // ----------------------------------------------------------------- summary
+  // Definiciones de ÉXITO por toque (modelo demo-first): sin esto el modelo
+  // clasifica a ciegas y el close rate que se calcule encima es basura.
+  const SUMMARY_RUBRIC =
+    'El vendedor usa un modelo demo-first en DOS toques: en el TOQUE 1 el éxito es que el prospecto acepte VER su página ya hecha Y dé la hora a la que la va a ver (eso es una llamada GANADA del T1 → temperature "caliente", nextAction = mandar el link por WhatsApp en <5 min y escribir a la hora dicha). En el TOQUE 2 el éxito es el PAGO: si el pago quedó confirmado o el prospecto aceptó pagar → temperature "cliente" (venta cerrada). Cita explícita para verla juntos o reunión presencial → "reunion". Aceptó ver la página pero SIN hora amarrada → "tibio" (la hora es el test de compromiso). Rechazo definitivo tras escuchar la oferta u hostilidad → "perdido".';
   if (mode === 'summary') {
     if (PROVIDER === 'kimi') {
       const res = await openaiFetch({
@@ -561,7 +567,7 @@ async function handle(req: Request): Promise<Response> {
         max_tokens: 700,
         json: true,
         system:
-          'Eres un analista de ventas. Resumes llamadas de prospección en frío para un CRM, en español, con criterio comercial. Devuelve SOLO un objeto JSON con exactamente estas claves: "summary" (string, 3-5 frases), "temperature" (uno de: nuevo, frio, tibio, caliente, reunion, perdido) y "nextAction" (string, la próxima acción concreta con cuándo).',
+          `Eres un analista de ventas. Resumes llamadas de prospección en frío para un CRM, en español, con criterio comercial. ${SUMMARY_RUBRIC} Devuelve SOLO un objeto JSON con exactamente estas claves: "summary" (string, 3-5 frases), "temperature" (uno de: nuevo, frio, tibio, caliente, reunion, cliente, perdido) y "nextAction" (string, la próxima acción concreta con cuándo).`,
         user: `FICHA DEL PROSPECTO:\n${lead}\n\nTRANSCRIPCIÓN COMPLETA DE LA LLAMADA:\n"""\n${transcript || '(sin transcripción)'}\n"""\n\nAnaliza la llamada y devuelve el JSON.`,
       });
       if (!res.ok) {
@@ -580,7 +586,7 @@ async function handle(req: Request): Promise<Response> {
       system: [
         {
           type: 'text',
-          text: 'Eres un analista de ventas. Resumes llamadas de prospección en frío para un CRM, en español, con criterio comercial.',
+          text: `Eres un analista de ventas. Resumes llamadas de prospección en frío para un CRM, en español, con criterio comercial. ${SUMMARY_RUBRIC}`,
         },
       ],
       output_config: {
@@ -598,8 +604,9 @@ async function handle(req: Request): Promise<Response> {
               },
               temperature: {
                 type: 'string',
-                enum: ['nuevo', 'frio', 'tibio', 'caliente', 'reunion', 'perdido'],
-                description: 'Etapa sugerida según el interés real mostrado.',
+                enum: ['nuevo', 'frio', 'tibio', 'caliente', 'reunion', 'cliente', 'perdido'],
+                description:
+                  'Etapa sugerida según el interés real mostrado. "cliente" SOLO con pago confirmado o aceptación explícita de pagar (T2 ganado); "caliente" = aceptó ver la página con hora amarrada (T1 ganado).',
               },
               nextAction: {
                 type: 'string',

@@ -54,6 +54,12 @@ export function CopilotSettingsModal({ open, onClose, onSaved }: Props) {
           value={s.notes}
           onChange={(v) => set('notes', v)}
         />
+        <Field
+          label="Tus casos de éxito REALES (la munición de las anécdotas)"
+          hint="Ej: Pizzería Don Piero, Quito — primer mes con página: 14 pedidos nuevos por WhatsApp. Solo casos verificables: el coach los usa en una frase al responder objeciones, y sin casos aquí no inventa ninguno."
+          value={s.proof}
+          onChange={(v) => set('proof', v)}
+        />
       </div>
 
       <div className="mt-6 flex justify-end gap-2">

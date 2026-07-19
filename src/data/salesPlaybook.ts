@@ -13,7 +13,8 @@
 //  • apertura     — aperturas probadas, gatekeeper, buzón/WhatsApp, horarios
 //  • cierres      — señales de compra, anti-oversell, precio, second money,
 //    WhatsApp post-llamada, segunda llamada
-//  • battlecards  — 14 objeciones con triggers del habla real (regex)
+//  • battlecards  — 30 objeciones con triggers del habla real (regex)
+//    (el número se actualiza en el mismo commit que toque el array)
 //  • momentos     — el GPS: detecta el momento de la llamada en tiempo real
 //
 // Este módulo alimenta:
@@ -33,6 +34,7 @@ export { BATTLECARDS, type Battlecard } from './playbook/battlecards';
 export { normalizeSpeech } from './playbook/normalize';
 export {
   detectMoment,
+  detectHora,
   momentsForPrompt,
   MOMENTS,
   type CallMoment,

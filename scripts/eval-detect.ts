@@ -9,10 +9,11 @@
 // esto lo caza en segundos. Salida: precisión por categoría + fallos exactos.
 // Sale con código 1 si algo falla (sirve de gate en CI).
 // ============================================================================
-import { detectObjection, detectMoment } from '../src/data/salesPlaybook';
+import { detectObjection, detectMoment, detectHora } from '../src/data/salesPlaybook';
 
 type ObjCase = [text: string, expected: string | null];
 type MomCase = [text: string, expected: string | null];
+type HoraCase = [text: string, expected: boolean];
 
 // --- Objeciones: variantes del habla real (expected = id de battlecard) -----
 const OBJ_CASES: ObjCase[] = [
@@ -89,6 +90,10 @@ const OBJ_CASES: ObjCase[] = [
   ['tampoco me interesa eso', 'no-interesa'],
   ['cualquier cosa yo le aviso', 'yo-le-aviso'],
   ['listo entonces yo le llamo', 'yo-le-aviso'],
+  // card nueva de la auditoría Hormozi (jul 2026): extrapola el fracaso pasado
+  ['ya pague publicidad en facebook y no me sirvio de nada', 'ya-intente'],
+  ['ya intente con una pagina y no me funciono', 'ya-intente'],
+  ['puse plata en anuncios y nada', 'ya-intente'],
   // cards nuevas del Playbook Web Local v1.1 (demo-first)
   ['y que mensualidad me van a sacar despues', 'mensualidad-oculta'],
   ['con que derecho usaron mis fotos', 'mis-fotos'],
@@ -135,6 +140,7 @@ const MOM_CASES: MomCase[] = [
   ['ya tengo mi pagina web', 'objecion'],
   ['cuanto es lo menos que me deja', 'precio'],
   ['cuanto es la mensualidad', 'senal-compra'],
+  ['le pago cuando la vea funcionando', 'senal-compra'],
   ['ya pues lo voy a pensar', 'objecion'],
   ['me parece bien pero dejeme pensarlo', 'objecion'],
   ['cuando estaria lista mi pagina', 'cierre'],
@@ -144,6 +150,22 @@ const MOM_CASES: MomCase[] = [
   ['aja', null],
   ['mmm ya veo', null],
   ['en que le puedo ayudar', null],
+];
+
+// --- Hora de lectura amarrada (el test de compromiso del T1) ----------------
+const HORA_CASES: HoraCase[] = [
+  ['la veo en la noche', true],
+  ['ahorita no puedo pero la reviso como a las 8', true],
+  ['como a las 8 esta bien', true],
+  ['en la noche puede ser', true],
+  ['a las ocho la reviso', true],
+  ['si a las 8', true],
+  // negativos: la evasiva clásica NO cuenta como hora amarrada
+  ['cualquier cosa yo le aviso en la noche', false],
+  ['manana le aviso', false],
+  ['yo le aviso', false],
+  ['abrimos a las 8 de la manana', false],
+  ['no tengo tiempo ahorita', false],
 ];
 
 let pass = 0;
@@ -164,6 +186,14 @@ for (const [text, expected] of MOM_CASES) {
   else {
     fail++;
     failures.push(`[momento]  "${text}" → ${got ?? '∅'} (esperado ${expected ?? '∅'})`);
+  }
+}
+for (const [text, expected] of HORA_CASES) {
+  const got = detectHora(text);
+  if (got === expected) pass++;
+  else {
+    fail++;
+    failures.push(`[hora]     "${text}" → ${got} (esperado ${expected})`);
   }
 }
 

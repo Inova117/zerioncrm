@@ -18,19 +18,25 @@ import {
   getCopilotMemory, saveCopilotMemory, saveCopilotCall, listCopilotCalls,
   type CallSummary, type CallDebrief, type CopilotCallRecord,
 } from '../services/copilotService';
-import { detectObjection, detectMoment, normalizeSpeech, type Battlecard, type MomentInfo } from '../data/salesPlaybook';
+import { detectObjection, detectMoment, detectHora, normalizeSpeech, type Battlecard, type MomentInfo } from '../data/salesPlaybook';
 import type { Lead } from '../types';
 import { cn, colorFromString, initials, telLink, waLink, webLink, googleMapsUrl, fmtDate } from '../lib/utils';
 import { stageLabel } from '../lib/constants';
 
 type Phase = 'pick' | 'brief' | 'live' | 'wrap';
-// Coach reactivo: responde tras CADA frase final del prospecto, con un colchón
-// mínimo para no ametrallar el API cuando la conversación fluye normal.
-// Los momentos urgentes y las objeciones se saltan el colchón.
-const SUGGEST_GAP_MS = 5000;
+// Coach por EVENTO, no por goteo: objeciones, momentos urgentes y CAMBIOS de
+// momento disparan a 0ms; el goteo de fondo solo cada SUGGEST_GAP_MS. Una
+// jugada nueva cada 5 segundos entrenaba al vendedor a leer la pantalla en vez
+// de escuchar al prospecto — el coach es el terapeuta que calla, no el que
+// interrumpe. (El goteo NO se filtra por momento: momentRef guarda el ÚLTIMO
+// momento detectado, no el actual — filtrar por él dejaba mudo al coach tras
+// una objeción durante todo el resto de la llamada.)
+const SUGGEST_GAP_MS = 20000;
 // 'pitch' es urgente: "ya, dígame" / "¿de qué se trata?" es TU turno — el
 // coach debe soplar el pitch al instante, no en el próximo ciclo.
-const URGENT_MOMENTS = ['senal-compra', 'peligro', 'gatekeeper', 'precio', 'cierre', 'pitch'];
+// 'despedida' es urgente: si va a colgar SIN hora amarrada, el rescate tiene
+// que llegar ANTES del clic, no 5 segundos después.
+const URGENT_MOMENTS = ['senal-compra', 'peligro', 'gatekeeper', 'precio', 'cierre', 'pitch', 'despedida'];
 
 // Filtro de eco: si una línea del transcript comparte una ventana de N palabras
 // con la sugerencia actual, casi seguro es el VENDEDOR leyendo el consejo en
@@ -79,6 +85,8 @@ function nextAperturaVariant(): 'A' | 'B' {
 // transcriptor entrega dígitos). Son el ancla de toda la matemática del coach.
 const RE_TICKET = /(?:me deja|deja (?:como|unos)|me queda|queda como|gano (?:como|unos)|cobro (?:como|unos)|vale (?:como|unos)|cada cliente(?: me)? deja)\D{0,8}(\d{1,4})/;
 const RE_PERDIDOS = /(?:se me van|se van como|pierdo|se pierden|se me escapan|se me pierden)\D{0,8}(\d{1,3})\b/;
+// La detección de "hora de lectura amarrada" vive en el playbook (detectHora,
+// cubierta por el eval harness) — aquí solo se consume.
 
 /** Condensa el historial del prospecto (comentarios/llamadas) para el coach. */
 function buildHistory(
@@ -155,6 +163,7 @@ export function CopilotPage() {
   const momentsSeenRef = useRef<string[]>([]);
   const ticketRef = useRef<number | null>(null);
   const perdidosRef = useRef<number | null>(null);
+  const horaRef = useRef(false); // ¿ya dio la hora de lectura? (cierre del T1)
   const callStartRef = useRef(0);
   const memoryRef = useRef(''); // memoria del nicho (lecciones acumuladas)
   const aperturaRef = useRef<'A' | 'B'>('A'); // variante A/B de esta llamada
@@ -196,6 +205,18 @@ export function CopilotPage() {
     return recentEchoRef.current.some((s) => sharesWindow(norm, normForEcho(s)));
   }, []);
 
+  // La jugada instantánea de un momento — ÚNICA para onFinal y onInterim (una
+  // variante añadida a un solo handler se pierde en el otro: los interims
+  // llegan primero y pisan la detección del final). La variante sin-hora viene
+  // del playbook (bestMoveNoHora), no de un string hardcodeado aquí.
+  const instantPlay = useCallback(
+    (m: MomentInfo): string =>
+      m.bestMoveNoHora && !horaRef.current
+        ? `⚡ **${m.label}** — ${m.bestMoveNoHora}`
+        : `⚡ **${m.label}** — ${m.bestMove}`,
+    []
+  );
+
   // Stats legibles de la llamada (para el debrief, el comentario y el registro).
   const buildStatsLine = useCallback((): string => {
     const mins = callStartRef.current
@@ -211,6 +232,7 @@ export function CopilotPage() {
       objs ? `Objeciones: ${objs}` : '',
       ticketRef.current != null ? `Ticket ≈ $${ticketRef.current}` : '',
       perdidosRef.current != null ? `Pierde ≈ ${perdidosRef.current}/mes` : '',
+      `Hora amarrada: ${horaRef.current ? 'sí' : 'no'}`,
     ]
       .filter(Boolean)
       .join(' · ');
@@ -231,6 +253,14 @@ export function CopilotPage() {
     if (ticketRef.current != null) nums.push(`ticket ≈ $${ticketRef.current}`);
     if (perdidosRef.current != null) nums.push(`pierde ≈ ${perdidosRef.current} clientes/mes`);
     if (nums.length) parts.push(`Números del prospecto (úsalos EXACTOS): ${nums.join(' · ')}`);
+    // La hora solo es contexto útil cuando está amarrada (que el coach no la
+    // re-pida) o cuando el cierre/despedida está en juego SIN ella. Meterla en
+    // todo suggest contaminaba las llamadas T2 con "el T1 no termina sin ella".
+    if (horaRef.current) {
+      parts.push('Hora de lectura: AMARRADA — no la vuelvas a pedir');
+    } else if (['senal-compra', 'cierre', 'despedida'].includes(momentRef.current?.id ?? '')) {
+      parts.push('Hora de lectura: aún NO amarrada (si es el toque 1, no cuelgues sin ella; si es el toque 2, cierra el pago)');
+    }
     return parts.join('. ');
   }, []);
 
@@ -317,6 +347,10 @@ export function CopilotPage() {
       if (mp) perdidosRef.current = Number(mp[1]);
       if (mt || mp) setNumbers({ ticket: ticketRef.current, perdidos: perdidosRef.current });
 
+      // 0c) ¿Dio la hora de lectura? (el cierre real del T1 — alimenta el
+      //     callState y el rescate de la despedida sin hora)
+      if (detectHora(text)) horaRef.current = true;
+
       // 1) ¿En qué momento de la llamada estamos? (regex, instantáneo)
       const prevMomentId = momentRef.current?.id;
       const m = detectMoment(text);
@@ -342,18 +376,20 @@ export function CopilotPage() {
       const urgent = m && URGENT_MOMENTS.includes(m.id);
       if (urgent && m.id !== prevMomentId && !suggestingRef.current) {
         archiveSuggestion();
-        setSuggestion(`⚡ **${m.label}** — ${m.bestMove}`);
+        setSuggestion(instantPlay(m));
       }
 
-      // 4) Coach LLM: objeción o momento urgente → YA (supersede al anterior);
-      //    si no, reactivo tras cada frase con colchón de SUGGEST_GAP_MS.
-      if (lead && (hit || urgent)) {
+      // 4) Coach LLM por EVENTO: objeción, momento urgente o CAMBIO de momento
+      //    → YA (supersede al anterior; el cambio de momento cubre p.ej. una
+      //    objeción fraseada fuera de toda battlecard). El goteo de fondo solo
+      //    con colchón de 20s.
+      if (lead && (hit || urgent || (m && m.id !== prevMomentId))) {
         runSuggest(lead, text);
       } else if (lead && Date.now() - lastSuggestRef.current > SUGGEST_GAP_MS) {
         runSuggest(lead);
       }
     },
-    [lead, runSuggest, archiveSuggestion, isEcho]
+    [lead, runSuggest, archiveSuggestion, isEcho, instantPlay]
   );
 
   // Cada resultado PARCIAL (~300ms tras hablar): detección instantánea local.
@@ -380,14 +416,14 @@ export function CopilotPage() {
         }
         if (!suggestingRef.current) {
           archiveSuggestion();
-          setSuggestion(`⚡ **${m.label}** — ${m.bestMove}`);
+          setSuggestion(instantPlay(m));
         }
         if (URGENT_MOMENTS.includes(m.id) && leadRef.current) {
           runSuggest(leadRef.current, text); // especulativo: una vez por cambio de momento
         }
       }
     },
-    [runSuggest, archiveSuggestion, isEcho]
+    [runSuggest, archiveSuggestion, isEcho, instantPlay]
   );
 
   // Dos motores de transcripción; misma interfaz. Deepgram (premium) si está
@@ -507,6 +543,7 @@ export function CopilotPage() {
     momentsSeenRef.current = [];
     ticketRef.current = null;
     perdidosRef.current = null;
+    horaRef.current = false;
     callStartRef.current = Date.now();
     // lastSuggest en 0: la PRIMERA respuesta del prospecto siempre dispara al
     // coach de una (tu lectura de la apertura no cuenta — la filtra el eco).
@@ -645,6 +682,7 @@ export function CopilotPage() {
     momentsSeenRef.current = [];
     ticketRef.current = null;
     perdidosRef.current = null;
+    horaRef.current = false;
     callStartRef.current = 0;
     startBriefing(l);
   }
@@ -890,7 +928,10 @@ export function CopilotPage() {
                             Jugadas anteriores
                           </p>
                           <div className="space-y-2">
-                            {pastSuggestions.map((s, i) => (
+                            {/* En vivo solo las 3 últimas: más historial = más ojos en pantalla
+                                y menos en la voz del prospecto. (El resto queda en estado por si
+                                el wrap las quiere mostrar algún día — hoy no las renderiza.) */}
+                            {pastSuggestions.slice(0, 3).map((s, i) => (
                               <p key={i} className="whitespace-pre-wrap text-xs leading-relaxed text-surface-400">
                                 {s}
                               </p>

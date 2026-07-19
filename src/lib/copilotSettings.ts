@@ -12,10 +12,15 @@ export interface CopilotSettings {
   offer: string; // paquetes y precios
   tone: string; // tono/estilo del coach
   notes: string; // frases/notas que te funcionan
+  /** Casos de éxito REALES (negocio, rubro, resultado con número). Son la
+   *  munición de las anécdotas del coach — solo hay tres cosas que salen de la
+   *  boca de un closer: preguntas, resúmenes y anécdotas. Sin casos aquí, el
+   *  coach no inventa ninguno (contrato de verdad): ofrece la muestra gratis. */
+  proof: string;
 }
 
 const KEY = 'zerioncrm:copilotSettings';
-const EMPTY: CopilotSettings = { pitch: '', offer: '', tone: '', notes: '' };
+const EMPTY: CopilotSettings = { pitch: '', offer: '', tone: '', notes: '', proof: '' };
 
 export function getCopilotSettings(): CopilotSettings {
   try {
@@ -36,7 +41,7 @@ export function saveCopilotSettings(s: CopilotSettings): void {
 
 export function hasCopilotSettings(): boolean {
   const s = getCopilotSettings();
-  return Boolean(s.pitch || s.offer || s.tone || s.notes);
+  return Boolean(s.pitch || s.offer || s.tone || s.notes || s.proof);
 }
 
 /** Bloque de texto para inyectar en el system prompt del coach. */
@@ -47,5 +52,9 @@ export function settingsForPrompt(): string {
   if (s.offer.trim()) parts.push(`Mis paquetes y precios: ${s.offer.trim()}`);
   if (s.tone.trim()) parts.push(`Tono/estilo que quiero que uses: ${s.tone.trim()}`);
   if (s.notes.trim()) parts.push(`Frases y notas que me funcionan: ${s.notes.trim()}`);
+  if (s.proof.trim())
+    parts.push(
+      `MIS CASOS REALES (la munición de tus anécdotas — úsalos en una frase al responder objeciones, con el rubro más parecido; JAMÁS inventes otros): ${s.proof.trim()}`
+    );
   return parts.join('\n');
 }

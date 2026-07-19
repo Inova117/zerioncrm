@@ -28,8 +28,8 @@ export const BATTLECARDS: Battlecard[] = [
       /hagame un descuent|descuentito|rebaj(a|e|ita)|en cuanto me lo deja|ultimo precio|ayudeme con el precio|hay descuento|si pago de una|deme un mejor precio/,
     objection: 'Regateo: "hágame un descuentito"',
     response:
-      'Buena pregunta. ¿Y cómo hago yo para darle la página completa a ese precio? … Mejor hagamos esto: la mitad ahora y la mitad cuando la vea funcionando — o ajustamos qué incluye. ¿Cuál le cuadra?',
-    why: 'La calibrada "¿cómo hago yo…?" lo pone en tus zapatos sin confrontar. Nunca bajes el precio sin cambiar nada: cambia alcance o términos — bajar "porque sí" le enseña que tu precio era mentira.',
+      'Buena pregunta. ¿Y cómo hago yo para darle la página completa a ese precio? … El monto es uno solo y se lo dije de frente — si le bajo porque me lo pide, entonces el precio era mentira. Lo que sí puedo es partírselo: la mitad ahora y la mitad a fin de mes. Y véala primero, que ya está hecha — ¿a qué hora la alcanza a ver?',
+    why: 'La calibrada "¿cómo hago yo…?" lo pone en tus zapatos sin confrontar. El monto JAMÁS baja y el stack JAMÁS se recorta (precio negociable = oferta comparable = precio mentira). La única flexibilidad es de FORMA: 50/50 a fin de mes. Y como todas: desemboca en "véala primero".',
   },
   {
     id: 'caro',
@@ -37,8 +37,8 @@ export const BATTLECARDS: Battlecard[] = [
       /\bcar(o|os|isimo|ito)\b|mucha plata|mucho dinero|no me alcanza|fuerte el precio|esta elevado|cuesta mucho|un ojo de la cara|no tengo (para|plata|dinero)|no hay (plata|presupuesto)|fuera de (mi )?presupuesto|no estoy para (esos )?gastos|es mucho eso/,
     objection: '"Está caro / no tengo presupuesto"',
     response:
-      'Le entiendo, trescientos de un solo no es cualquier cosa. Véalo así: es una sola vez en la vida del negocio, y la página trabaja veinticuatro horas — como una recepcionista que nunca pide permiso. Un solo cliente nuevo la paga. Y si le acomoda más, lo partimos: la mitad ahora y la mitad a fin de mes. ¿Así sí le cuadra?',
-    why: 'Acuerda primero y NUNCA defiendas el precio. El monto no baja — la única flexibilidad es de forma (50/50). Reducción al ridículo con la recepcionista 24h. Y tras decir un precio: SILENCIO, el primero que habla cede.',
+      'Le entiendo, trescientos de un solo no es cualquier cosa. Véalo así: es una sola vez en la vida del negocio, y la página trabaja veinticuatro horas — como una recepcionista que nunca pide permiso. Un solo cliente nuevo la paga. Y usted mismo me decía cuánto se le va cada mes… Pero no me crea a mí: véala primero, que ya está hecha. ¿A qué hora la alcanza a ver?',
+    why: 'Acuerda primero y NUNCA defiendas el precio. "Está caro" = no articulaste el valor: re-ancla a SU pérdida calculada y desemboca en "véala primero". El 50/50 NO se ofrece en este loop 1 — queda para el loop 2 (regalarlo a la primera es ceder términos sin re-articular valor). Distinto del REGATEO explícito o preguntar formas de pago: eso es señal caliente y ahí la forma se sopla de una. Tras decir un precio: SILENCIO, el primero que habla cede.',
   },
   {
     // Antes que 'sobrino': "un muchacho me lo hace a mitad de precio" es
@@ -48,8 +48,8 @@ export const BATTLECARDS: Battlecard[] = [
       /(el otro|otros?|un muchacho) me (cobra|cobraba|ofrecio|lo hace) (menos|mas barato|a mitad)|mas barato|a mitad de precio|lo hace en cien|en marketplace sale|cobran menos|hay quien lo hace/,
     objection: '"Otro me lo hace más barato"',
     response:
-      'Seguro que sí — siempre hay más barato, como en todo… usted también tiene competencia que cobra menos que usted, ¿verdad? La pregunta es: ¿esa página le va a traer clientes, o solo va a existir? Déjeme mostrarle la diferencia con ejemplos reales: ¿mañana o el jueves?',
-    why: 'No pelees precio contra fantasmas: mueve la conversación a resultados y a la cita. "Como en todo" conecta con su propia experiencia de competir contra baratos — el mismo argumento que él usa a diario para defender su precio.',
+      'Seguro que sí — siempre hay más barato, como en todo… usted también tiene competencia que cobra menos que usted, ¿verdad? La pregunta es: ¿esa página le va a traer clientes, o solo va a existir? Y eso no me lo crea a mí: la suya ya está hecha — véala hoy y compárela con calma contra cualquier cotización. ¿A qué hora la alcanza a ver?',
+    why: 'No pelees precio contra fantasmas: mueve la conversación a resultados y a la PRUEBA que ya existe. Decidir no necesita tiempo, necesita información — y la página ES la información comparativa, disponible hoy. Aplazarla al jueves regala Time Delay gratis.',
   },
   {
     // La trampa del mercado: "gratis" con permanencia de 12-24 meses.
@@ -112,8 +112,8 @@ export const BATTLECARDS: Battlecard[] = [
       /dejame pensarlo|lo voy a pensar|dejeme pensar|tengo que pensarlo|deme unos dias|con la almohada|dejeme analizarlo|dejeme verlo con calma|mas adelante (vemos|quizas)|despues vemos/,
     objection: '"Déjame pensarlo"',
     response:
-      'Le entiendo perfecto, y está bien pensarlo… pero déjeme hacerle una sola pregunta: la idea como tal, ¿le gusta? Que lo encuentren en Google y le escriban solos. … Perfecto. ¿Y qué le hace dudar: el precio, o si de verdad le va a traer clientes? Cualquiera de las dos se la aclaro en un minuto.',
-    why: 'Línea Recta: "pensarlo" es cortina de humo — falta uno de los tres dieces. El deflector ("¿le gusta la idea?") mide el producto sin pelear; la binaria fuerza la objeción real, que sí se puede cerrar. Solo la incertidumbre se piensa; la certeza se firma.',
+      'Le entiendo perfecto, y está bien pensarlo… aunque le digo algo con respeto: esto no se piensa con tiempo, se piensa con información — y me tiene aquí mismo. La idea como tal, ¿le gusta? Que lo encuentren en Google y le escriban solos. … Perfecto. ¿Y qué le hace dudar: el precio, o si de verdad le va a traer clientes? Cualquiera de las dos se la aclaro en un minuto.',
+    why: '"Pensarlo" es cortina de humo — falta uno de los tres dieces. El reframe clave: decidir no toma tiempo, toma INFORMACIÓN (y la fuente está en la llamada — colgar no le va a dar datos nuevos). El deflector ("¿le gusta la idea?") mide el producto sin pelear; la binaria fuerza la objeción real, que sí se puede cerrar.',
   },
   {
     id: 'consultar',
@@ -121,8 +121,8 @@ export const BATTLECARDS: Battlecard[] = [
       /(hablar|consultar|ver|conversar)(lo)? con mi (esposa|esposo|senora|socio|hermano|hijo|hija|familia)|eso lo ve mi (esposa|senora|socio|hijo|hija|hermano)|no decido (eso )?(yo )?solo|lo converso en casa|dejeme comentarle a|preguntarle al que me lleva|la que decide (esas cosas )?es mi/,
     objection: '"Tengo que consultarlo con mi esposa/socio"',
     response:
-      'Claro que sí, consúltelo — hace bien. Es más: mándele este mismo link para que la vea él también — así deciden viendo la página de verdad y no de oídas. ¿Le parece si le escribo el jueves para ver qué dijeron los dos?',
-    why: 'Nunca dejes que el prospecto venda por ti: vende peor y sin convicción. En demo-first el mensajero va armado con la página REAL — decidir "viendo y no de oídas" quita el teléfono descompuesto. La fecha de seguimiento amarra el siguiente paso.',
+      'Claro que sí, consúltelo — hace bien. Solo una pregunta antes: ¿su esposa está contenta con cómo le están llegando los clientes hoy? … Entonces en lo importante ya están de acuerdo los dos. Mándele este mismo link para que la vea ella también — así deciden viendo la página de verdad y no de oídas. ¿Y a qué hora están los dos desocupados? Le escribo el jueves a esa hora y me cuentan qué dijeron.',
+    why: 'Nunca dejes que el prospecto venda por ti: vende peor y sin convicción. ANTES de soltar al mensajero, verifica que el decisor ausente YA está de acuerdo en que el status quo no funciona ("¿está contenta con cómo llegan los clientes hoy?") — sin eso, el socio evalúa la página como GASTO, no como solución. Luego los DOS frente a la página + fecha y hora amarradas.',
   },
   {
     // La herida del mercado: mensualidades escondidas. Se responde celebrando
@@ -154,6 +154,18 @@ export const BATTLECARDS: Battlecard[] = [
     response:
       'De su propia información pública — su negocio está en Google Maps con este número, ahí mismo donde lo encuentran sus clientes. De hecho por eso le llamo: lo que NO está en Google es su página. ¿Le muestro la que le hicimos?',
     why: 'Transparente y sin titubear: titubear aquí = estafador confirmado. El judo: el mismo Google Maps que da el número es la prueba de que le falta la página. Y si el opt-out llega ("no me llame más"), se cumple a la primera y se borra de verdad.',
+  },
+  {
+    // La mitad faltante del cubo "uno mismo": extrapola su fracaso pasado al
+    // presente ("ya invertí en eso y no me sirvió"). Distinta de 'desconfianza'
+    // (miedo al estafador) y de 'ya-tengo-pagina' (tiene una funcionando).
+    id: 'ya-intente',
+    triggers:
+      /(ya|antes) (intente|probe|inverti|pague|hice|tuve) .{0,30}(y )?(no (me )?(funciono|sirvio|resulto)|no paso nada|y nada|fue plata perdida)|(la pagina|la publicidad|los anuncios|el facebook) no me (funciono|sirvio|trajo (nada|clientes))|puse plata en (facebook|anuncios|publicidad|una pagina) y (nada|no paso nada|no vendi)|ya me paso con (una pagina|eso)|eso ya lo (intente|probe) y (nada|no)/,
+    objection: '"Ya intenté eso y no me funcionó"',
+    response:
+      'Le entiendo — usted ya puso plata una vez, esperó clientes, y no llegó nada. ¿Le puedo preguntar qué fue lo que le hicieron esa vez? … Mire, eso que le pasó es justo lo que esto evita: aquí usted no pone un centavo hasta VER su página terminada y funcionando. Si le pasa lo mismo que la otra vez, no me paga y ya. ¿Qué pierde con verla?',
+    why: 'Extrapola el pasado al presente: su cerebro dice "esto será igual". No discutas el pasado — pregúntalo (ahí sale qué vehículo falló) y DIFERENCIA el tuyo con la estructura: la otra vez pagó a ciegas, esta vez ve el producto terminado antes de pagar. El fracaso anterior se convierte en tu mejor argumento.',
   },
   {
     id: 'desconfianza',
@@ -208,8 +220,8 @@ export const BATTLECARDS: Battlecard[] = [
       /en cuanto tiempo (aparezco|salgo|me ven)|cuando salgo en google|demora en verse|cuando me (empiezan a )?(encuentran|encuentren|buscan)|cuanto tarda en aparecer/,
     objection: '"¿En cuánto tiempo salgo en Google?"',
     response:
-      'La página queda lista en dos semanas, y desde ese día ya lo encuentran por su nombre y en el mapa. Aparecer cuando buscan el servicio en su zona toma entre uno y tres meses, y cada mes le muestro el avance en un reporte que se entiende de un vistazo. Desconfíe del que le diga "mañana" — ya sabe por qué.',
-    why: 'Trampa de tiempos: prometer de más revienta a los 30 días; ser vago suena a evasiva. Números honestos y escalonados (nombre YA / zona en 1-3 meses) = expectativa que puedes cumplir y superar.',
+      'Su página ya está hecha: el día que me confirme queda publicada, y desde ese mismo día lo encuentran por su nombre y en el mapa. Aparecer cuando buscan el servicio en su zona toma entre uno y tres meses, y cada mes le muestro el avance en un reporte que se entiende de un vistazo. Desconfíe del que le diga "mañana" — ya sabe por qué.',
+    why: 'Trampa de tiempos: prometer de más revienta a los 30 días; ser vago suena a evasiva. La publicación es HOY (demo-first: la página ya existe — jamás digas "en dos semanas", eso infla el Time Delay que tu modelo aplasta); el SEO de zona es honesto y escalonado (1-3 meses con reporte) = expectativa que puedes cumplir y superar.',
   },
   {
     id: 'dominio-mio',
@@ -268,13 +280,16 @@ export const BATTLECARDS: Battlecard[] = [
 
   // --- El dinero (cierre y cobro) ------------------------------------------
   {
+    // OJO: "le pago cuando la vea / cuando esté lista" NO está aquí — en
+    // demo-first eso es señal de compra (cue de senal-compra en momentos.ts),
+    // no fiado. Fiado es pedir que ARRANQUES trabajo nuevo a crédito.
     id: 'fiado',
     triggers:
-      /empiece y (yo )?le voy pagando|arranque nomas y ahi vemos|cuando este list[ao] le pago|le pago cuando (vea|este)|primero muestreme algo y ahi|no le voy a quedar mal|hagalo y cuando este listo/,
+      /empiece y (yo )?le voy pagando|arranque nomas y ahi vemos|primero muestreme algo y ahi|no le voy a quedar mal|hagalo y cuando este listo|me la fia|se lo voy pagando (de a poco|por partes)/,
     objection: '"Mejor empiece y yo le voy pagando" (fiado)',
     response:
-      'Le entiendo, pero así no trabajo con ningún cliente: el anticipo es lo que me deja bloquear al equipo solo para usted. Lo que sí puedo hacer es bajarle el arranque: en vez del 50%, empezamos con el 30% y el resto en dos partes. ¿Le cuadra así?',
-    why: 'Sostén la regla como política universal (no es desconfianza hacia ÉL) y negocia el monto, nunca la existencia del anticipo. Piso: 30% o plan 30/35/35. Ceder aquí convierte la venta en cuenta por cobrar.',
+      'Justamente al revés, y por eso le llamé: aquí no hay anticipo. Su página YA está hecha — usted la ve terminada sin pagar un centavo, no me está fiando nada. Cuando la vea y me diga "la quiero", se paga una vez y ese mismo día queda publicada a su nombre. Lo único que no hago es publicarla sin el primer pago — y si le acomoda, la mitad ahora y la mitad a fin de mes. ¿A qué hora la alcanza a ver?',
+    why: 'En demo-first el fiado NO existe: el trabajo ya está hecho y él ya lo puede VER — "le pago cuando esté" es casi señal de compra, no objeción. La única línea que no se cruza es publicar sin primer pago (50/50 como única forma). JAMÁS mencionar anticipos, 30%, ni "bloquear al equipo": esa palabra es la herida #1 del mercado y tu oferta existe para matarla.',
   },
   {
     id: 'yo-le-aviso',
