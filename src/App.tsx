@@ -7,6 +7,7 @@ import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { LeadFinderPage } from './pages/LeadFinderPage';
 import { CopilotPage } from './pages/CopilotPage';
+import { CopilotMetricsPage } from './pages/CopilotMetricsPage';
 import { LeadsPage } from './pages/LeadsPage';
 import { CompaniesPage } from './pages/CompaniesPage';
 import { TasksPage } from './pages/TasksPage';
@@ -32,6 +33,7 @@ export default function App() {
           <Route path="/" element={<Private><DashboardPage /></Private>} />
           <Route path="/lead-finder" element={<Private><LeadFinderPage /></Private>} />
           <Route path="/copilot" element={<Private><CopilotPage /></Private>} />
+          <Route path="/copilot/metricas" element={<Private><CopilotMetricsPage /></Private>} />
           <Route path="/leads" element={<Private><LeadsPage /></Private>} />
           <Route path="/empresas" element={<Private><CompaniesPage /></Private>} />
           <Route path="/tareas" element={<Private><TasksPage /></Private>} />

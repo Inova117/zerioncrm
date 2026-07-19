@@ -370,7 +370,15 @@ create table if not exists public.copilot_calls (
   coaching    text not null default '',
   created_at  timestamptz not null default now()
 );
+-- `outcome`: el resultado ESTRUCTURADO de la llamada (stats es texto para leer;
+-- esto es para MEDIR). Alimenta el dashboard de métricas: embudo contacto →
+-- oferta → hora amarrada → cierre, cash cobrado y A/B de aperturas.
+--   { apertura:'A'|'B', durationMin, contacto, llegoAOferta, horaAmarrada,
+--     cerrado, cashCollected, objeciones:{id:n}, ticket, perdidos, momentos:[] }
+alter table public.copilot_calls add column if not exists outcome jsonb;
 create index if not exists copilot_calls_lead_idx on public.copilot_calls (lead_id, created_at desc);
+-- El dashboard consulta "mis llamadas de los últimos N días", no por lead.
+create index if not exists copilot_calls_user_idx on public.copilot_calls (user_id, created_at desc);
 
 create table if not exists public.copilot_memory (
   user_id    uuid primary key references public.profiles(id) on delete cascade,

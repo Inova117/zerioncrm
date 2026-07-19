@@ -45,6 +45,38 @@ export interface CallDebrief {
   whatsapp?: string;
 }
 
+/**
+ * El resultado ESTRUCTURADO de una llamada — `stats` es la línea para LEER,
+ * esto es lo que se puede MEDIR. Es la materia prima del dashboard: sin esto
+ * no hay close rate, no hay cash cobrado y no hay caso de estudio.
+ *
+ * El embudo del modelo demo-first en dos toques:
+ *   llamada → contacto (habló con el dueño) → oferta (presentó)
+ *           → hora amarrada (T1 ganado) → cerrado + cash (T2 ganado)
+ */
+export interface CallOutcome {
+  /** Variante de apertura de esta llamada (la prueba A/B). */
+  apertura: 'A' | 'B';
+  durationMin: number;
+  /** Habló con el DUEÑO (no se quedó en la gatekeeper ni colgaron de una). */
+  contacto: boolean;
+  /** Llegó a presentar la oferta (pitch/precio/señal de compra/cierre). */
+  llegoAOferta: boolean;
+  /** T1 ganado: aceptó ver la página Y dio la hora a la que la vería. */
+  horaAmarrada: boolean;
+  /** T2 ganado: el pago quedó confirmado en esta llamada. */
+  cerrado: boolean;
+  /** $ realmente cobrado en esta llamada (0 si no cerró). */
+  cashCollected: number;
+  /** Objeciones que sonaron: id de battlecard → veces. */
+  objeciones: Record<string, number>;
+  /** Números que soltó el prospecto (el ancla de la matemática del dolor). */
+  ticket: number | null;
+  perdidos: number | null;
+  /** Ruta de momentos por id, en orden. */
+  momentos: string[];
+}
+
 export interface CopilotCallRecord {
   id: string;
   leadId: string;
@@ -55,6 +87,8 @@ export interface CopilotCallRecord {
   stats: string;
   coaching: string;
   createdAt: string;
+  /** null en llamadas anteriores al dashboard (jul 2026): se ignoran al medir. */
+  outcome: CallOutcome | null;
 }
 
 export interface DebriefArgs {
@@ -243,28 +277,12 @@ export const saveCopilotMemory: (m: string) => Promise<void> = supabase ? supaSa
 
 type NewCallRecord = Omit<CopilotCallRecord, 'id' | 'createdAt'>;
 
-async function supaSaveCall(rec: NewCallRecord): Promise<void> {
-  const { data: u } = await supabase!.auth.getUser();
-  if (!u.user) return;
-  await supabase!.from('copilot_calls').insert({
-    lead_id: rec.leadId,
-    user_id: u.user.id,
-    transcript: rec.transcript,
-    summary: rec.summary,
-    temperature: rec.temperature,
-    next_action: rec.nextAction,
-    stats: rec.stats,
-    coaching: rec.coaching,
-  });
-}
-async function supaListCalls(leadId: string): Promise<CopilotCallRecord[]> {
-  const { data } = await supabase!
-    .from('copilot_calls')
-    .select('id, lead_id, transcript, summary, temperature, next_action, stats, coaching, created_at')
-    .eq('lead_id', leadId)
-    .order('created_at', { ascending: false })
-    .limit(10);
-  return (data ?? []).map((r) => ({
+const CALL_COLS =
+  'id, lead_id, transcript, summary, temperature, next_action, stats, coaching, created_at, outcome';
+
+/** Fila de Supabase → registro tipado (una sola conversión para todas las queries). */
+function rowToCall(r: Record<string, unknown>): CopilotCallRecord {
+  return {
     id: r.id as string,
     leadId: r.lead_id as string,
     transcript: (r.transcript as string) ?? '',
@@ -274,13 +292,82 @@ async function supaListCalls(leadId: string): Promise<CopilotCallRecord[]> {
     stats: (r.stats as string) ?? '',
     coaching: (r.coaching as string) ?? '',
     createdAt: r.created_at as string,
-  }));
+    outcome: (r.outcome as CallOutcome | null) ?? null,
+  };
+}
+
+/** ¿El error es "la columna outcome no existe" (schema.sql sin re-correr)? */
+const missingOutcomeCol = (e: { code?: string; message?: string } | null): boolean =>
+  Boolean(e && (e.code === '42703' || /outcome/i.test(e.message ?? '')));
+
+async function supaSaveCall(rec: NewCallRecord): Promise<void> {
+  const { data: u } = await supabase!.auth.getUser();
+  if (!u.user) return;
+  const base = {
+    lead_id: rec.leadId,
+    user_id: u.user.id,
+    transcript: rec.transcript,
+    summary: rec.summary,
+    temperature: rec.temperature,
+    next_action: rec.nextAction,
+    stats: rec.stats,
+    coaching: rec.coaching,
+  };
+  const { error } = await supabase!.from('copilot_calls').insert({ ...base, outcome: rec.outcome });
+  // La columna `outcome` es nueva: si la base todavía no la tiene, se guarda la
+  // llamada SIN métricas antes que perderla. Perder el transcript y el coaching
+  // por una columna de dashboard sería el peor intercambio posible.
+  if (missingOutcomeCol(error)) {
+    console.warn('[copilot] guardando sin `outcome`: re-corre supabase/schema.sql para activar las métricas.');
+    await supabase!.from('copilot_calls').insert(base);
+  }
+}
+async function supaListCalls(leadId: string): Promise<CopilotCallRecord[]> {
+  const run = (cols: string) =>
+    supabase!
+      .from('copilot_calls')
+      .select(cols)
+      .eq('lead_id', leadId)
+      .order('created_at', { ascending: false })
+      .limit(10);
+  let { data, error } = await run(CALL_COLS);
+  // Base sin la columna nueva: se reintenta sin ella (el historial del lead no
+  // depende de las métricas).
+  if (missingOutcomeCol(error)) ({ data } = await run(CALL_COLS.replace(', outcome', '')));
+  return ((data ?? []) as unknown as Record<string, unknown>[]).map(rowToCall);
+}
+
+/**
+ * Las llamadas de los últimos N días para el dashboard de métricas.
+ * RLS ya limita a las propias del usuario (o todas si es admin).
+ * Sin transcript: el dashboard solo agrega números y traerlos sería mover
+ * megas por gusto.
+ */
+async function supaListRecentCalls(days: number): Promise<CopilotCallRecord[]> {
+  const since = new Date(Date.now() - days * 86400_000).toISOString();
+  const { data, error } = await supabase!
+    .from('copilot_calls')
+    .select('id, lead_id, summary, temperature, next_action, stats, coaching, created_at, outcome')
+    .gte('created_at', since)
+    .order('created_at', { ascending: false })
+    .limit(1000);
+  // Sin la columna, el dashboard no puede medir NADA: se dice con todas las
+  // letras en vez de mostrar un embudo vacío que parezca "no vendiste".
+  if (missingOutcomeCol(error)) {
+    throw new Error(
+      'Falta activar las métricas en la base: re-corre supabase/schema.sql (agrega la columna `outcome` a copilot_calls). Es idempotente, no borra nada.'
+    );
+  }
+  return ((data ?? []) as unknown as Record<string, unknown>[]).map((r) => rowToCall({ ...r, transcript: '' }));
 }
 // Un valor corrupto en localStorage no debe romper guardar/listar para siempre.
 function readMockCalls(): CopilotCallRecord[] {
   try {
     const all = JSON.parse(localStorage.getItem(CALLS_KEY) ?? '[]');
-    return Array.isArray(all) ? (all as CopilotCallRecord[]) : [];
+    if (!Array.isArray(all)) return [];
+    // Las llamadas guardadas antes del dashboard no traen outcome: se
+    // normaliza a null para que el resto del código no vea undefined.
+    return (all as CopilotCallRecord[]).map((c) => ({ ...c, outcome: c.outcome ?? null }));
   } catch {
     return [];
   }
@@ -303,10 +390,17 @@ async function mockSaveCall(rec: NewCallRecord): Promise<void> {
 async function mockListCalls(leadId: string): Promise<CopilotCallRecord[]> {
   return readMockCalls().filter((c) => c.leadId === leadId).slice(0, 10);
 }
+async function mockListRecentCalls(days: number): Promise<CopilotCallRecord[]> {
+  const since = Date.now() - days * 86400_000;
+  return readMockCalls().filter((c) => new Date(c.createdAt).getTime() >= since);
+}
 export const saveCopilotCall: (rec: NewCallRecord) => Promise<void> =
   supabase ? supaSaveCall : mockSaveCall;
 export const listCopilotCalls: (leadId: string) => Promise<CopilotCallRecord[]> =
   supabase ? supaListCalls : mockListCalls;
+/** Llamadas recientes para el dashboard de métricas (días hacia atrás). */
+export const listRecentCopilotCalls: (days: number) => Promise<CopilotCallRecord[]> =
+  supabase ? supaListRecentCalls : mockListRecentCalls;
 
 // El resultado alimenta moveLead directo: una temperatura fuera del union (el
 // proveedor Kimi va solo por prompt, sin schema) sacaría al lead de todas las

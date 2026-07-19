@@ -5,6 +5,7 @@ import {
   KanbanSquare,
   CheckSquare,
   BarChart3,
+  PhoneCall,
   Users,
   LogOut,
   X,
@@ -22,12 +23,14 @@ interface NavItem {
 }
 
 const NAV: NavItem[] = [
-  // Sales Copilot no tiene tab propio: se abre desde el popup del prospecto
-  // (botón "Sales Copilot"). /empresas sigue viva por URL, pero fuera del menú.
+  // La SALA del Sales Copilot no tiene tab propio: se abre desde el popup del
+  // prospecto (botón "Sales Copilot"). Sus MÉTRICAS sí, porque se consultan
+  // solas al final del día. /empresas sigue viva por URL, pero fuera del menú.
   { to: '/', label: 'Panel', icon: LayoutDashboard },
   { to: '/lead-finder', label: 'Lead Finder', icon: Radar },
   { to: '/leads', label: 'Prospectos', icon: KanbanSquare },
   { to: '/tareas', label: 'Tareas', icon: CheckSquare },
+  { to: '/copilot/metricas', label: 'Llamadas', icon: PhoneCall },
   { to: '/reportes', label: 'Reportes', icon: BarChart3 },
   { to: '/equipo', label: 'Equipo', icon: Users, adminOnly: true },
 ];

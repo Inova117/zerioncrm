@@ -16,9 +16,9 @@ import { useDeepgram } from '../hooks/useDeepgram';
 import {
   copilotBriefing, copilotSuggest, copilotSummary, copilotWarm, copilotDebrief,
   getCopilotMemory, saveCopilotMemory, saveCopilotCall, listCopilotCalls,
-  type CallSummary, type CallDebrief, type CopilotCallRecord,
+  type CallSummary, type CallDebrief, type CopilotCallRecord, type CallOutcome,
 } from '../services/copilotService';
-import { detectObjection, detectMoment, detectHora, normalizeSpeech, type Battlecard, type MomentInfo } from '../data/salesPlaybook';
+import { detectObjection, detectMoment, detectHora, normalizeSpeech, MOMENTS, type Battlecard, type MomentInfo } from '../data/salesPlaybook';
 import type { Lead } from '../types';
 import { cn, colorFromString, initials, telLink, waLink, webLink, googleMapsUrl, fmtDate } from '../lib/utils';
 import { stageLabel } from '../lib/constants';
@@ -88,6 +88,15 @@ const RE_PERDIDOS = /(?:se me van|se van como|pierdo|se pierden|se me escapan|se
 // La detección de "hora de lectura amarrada" vive en el playbook (detectHora,
 // cubierta por el eval harness) — aquí solo se consume.
 
+// La ruta de la llamada se guarda por ID (medible en el dashboard); la etiqueta
+// se deriva solo para mostrarla.
+const MOMENT_LABEL = new Map(MOMENTS.map((m) => [m.id as string, m.label]));
+// Momentos que prueban que se habló con el DUEÑO (no la gatekeeper) — el
+// equivalente al "show rate" en frío.
+const CONTACTO_MOMENTS = ['descubrimiento', 'pitch', 'objecion', 'precio', 'senal-compra', 'cierre'];
+// Momentos que prueban que la OFERTA llegó a presentarse.
+const OFERTA_MOMENTS = ['pitch', 'precio', 'senal-compra', 'cierre'];
+
 /** Condensa el historial del prospecto (comentarios/llamadas) para el coach. */
 function buildHistory(
   comments: { body: string; type: string; createdAt: string }[],
@@ -137,6 +146,9 @@ export function CopilotPage() {
   const [debriefing, setDebriefing] = useState(false);
   // Mensaje de seguimiento por WhatsApp (editable antes de enviarlo).
   const [waText, setWaText] = useState('');
+  // $ realmente cobrado en esta llamada. Se pregunta (no se adivina): el cash
+  // cobrado es la métrica que sostiene el caso de estudio y tiene que ser real.
+  const [cashCollected, setCashCollected] = useState('');
   const [pastCalls, setPastCalls] = useState<CopilotCallRecord[]>([]);
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -228,7 +240,9 @@ export function CopilotPage() {
     return [
       `Apertura ${aperturaRef.current}`,
       mins ? `${mins} min` : '',
-      momentsSeenRef.current.length ? `Ruta: ${momentsSeenRef.current.join(' → ')}` : '',
+      momentsSeenRef.current.length
+        ? `Ruta: ${momentsSeenRef.current.map((id) => MOMENT_LABEL.get(id) ?? id).join(' → ')}`
+        : '',
       objs ? `Objeciones: ${objs}` : '',
       ticketRef.current != null ? `Ticket ≈ $${ticketRef.current}` : '',
       perdidosRef.current != null ? `Pierde ≈ ${perdidosRef.current}/mes` : '',
@@ -237,6 +251,30 @@ export function CopilotPage() {
       .filter(Boolean)
       .join(' · ');
   }, []);
+
+  // El resultado ESTRUCTURADO de la llamada — lo que se puede medir. Es la
+  // materia prima del dashboard (embudo, close rate, cash, A/B de aperturas).
+  const buildOutcome = useCallback(
+    (temperature: string, cash: number): CallOutcome => {
+      const momentos = momentsSeenRef.current;
+      return {
+        apertura: aperturaRef.current,
+        durationMin: callStartRef.current
+          ? Math.max(1, Math.round((Date.now() - callStartRef.current) / 60000))
+          : 0,
+        contacto: momentos.some((m) => CONTACTO_MOMENTS.includes(m)),
+        llegoAOferta: momentos.some((m) => OFERTA_MOMENTS.includes(m)),
+        horaAmarrada: horaRef.current,
+        cerrado: temperature === 'cliente',
+        cashCollected: temperature === 'cliente' ? cash : 0,
+        objeciones: { ...objCountsRef.current },
+        ticket: ticketRef.current,
+        perdidos: perdidosRef.current,
+        momentos: [...momentos],
+      };
+    },
+    []
+  );
 
   // Resumen del estado que viaja al coach en cada suggest: le da el número de
   // loop por objeción (disciplina L1→L2→L3) y los números del prospecto.
@@ -357,8 +395,8 @@ export function CopilotPage() {
       if (m) {
         momentRef.current = m;
         setMoment(m);
-        if (momentsSeenRef.current[momentsSeenRef.current.length - 1] !== m.label) {
-          momentsSeenRef.current.push(m.label);
+        if (momentsSeenRef.current[momentsSeenRef.current.length - 1] !== m.id) {
+          momentsSeenRef.current.push(m.id);
         }
       }
 
@@ -411,8 +449,8 @@ export function CopilotPage() {
       if (m && m.id !== momentRef.current?.id) {
         momentRef.current = m;
         setMoment(m);
-        if (momentsSeenRef.current[momentsSeenRef.current.length - 1] !== m.label) {
-          momentsSeenRef.current.push(m.label);
+        if (momentsSeenRef.current[momentsSeenRef.current.length - 1] !== m.id) {
+          momentsSeenRef.current.push(m.id);
         }
         if (!suggestingRef.current) {
           archiveSuggestion();
@@ -575,6 +613,7 @@ export function CopilotPage() {
     setSaved(false);
     setDebrief(null);
     setWaText('');
+    setCashCollected('');
     // Resumen y coaching corren EN PARALELO: el resumen alimenta el CRM,
     // el debrief te dice qué mejorar y actualiza la memoria del nicho.
     setDebriefing(true);
@@ -622,6 +661,7 @@ export function CopilotPage() {
         nextAction: summary.nextAction,
         stats: statsLine,
         coaching: debrief?.coaching ?? '',
+        outcome: buildOutcome(summary.temperature, Number(cashCollected) || 0),
       }).catch(() => {});
       if (debrief?.lessons && debrief.lessons !== memoryRef.current) {
         memoryRef.current = debrief.lessons;
@@ -671,6 +711,7 @@ export function CopilotPage() {
     setSummary(null);
     setDebrief(null);
     setWaText('');
+    setCashCollected('');
     setSaved(false);
     setError(null);
     setTtftMs(null);
@@ -707,6 +748,7 @@ export function CopilotPage() {
     setMoment(null);
     setDebrief(null);
     setWaText('');
+    setCashCollected('');
     setPastCalls([]);
     momentRef.current = null;
     cardIdRef.current = null;
@@ -982,6 +1024,34 @@ export function CopilotPage() {
                         <span className="text-xs text-surface-400">Temperatura sugerida:</span>
                         <TemperatureBadge temperature={summary.temperature} />
                       </div>
+
+                      {/* Cash cobrado: solo si la llamada cerró. Se PREGUNTA en vez
+                          de adivinarse — es el número que sostiene el caso de estudio. */}
+                      {summary.temperature === 'cliente' && (
+                        <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3">
+                          <label className="block">
+                            <span className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">
+                              💵 ¿Cuánto cobraste en esta llamada?
+                            </span>
+                            <div className="mt-1.5 flex items-center gap-2">
+                              <span className="text-sm font-semibold text-emerald-700">$</span>
+                              <input
+                                type="number"
+                                min="0"
+                                step="1"
+                                inputMode="decimal"
+                                className="input flex-1"
+                                placeholder={lead?.value ? String(lead.value) : '300'}
+                                value={cashCollected}
+                                onChange={(e) => setCashCollected(e.target.value)}
+                              />
+                            </div>
+                            <span className="mt-1 block text-[11px] text-emerald-700/70">
+                              Lo COBRADO hoy, no lo prometido. Alimenta tu tasa de cierre y el cash del dashboard.
+                            </span>
+                          </label>
+                        </div>
+                      )}
                       {summary.nextAction && (
                         <div className="rounded-lg border border-surface-200 p-3">
                           <p className="text-[11px] uppercase tracking-wide text-surface-400">Próxima acción</p>
