@@ -97,6 +97,17 @@ const CONTACTO_MOMENTS = ['descubrimiento', 'pitch', 'objecion', 'precio', 'sena
 // Momentos que prueban que la OFERTA llegó a presentarse.
 const OFERTA_MOMENTS = ['pitch', 'precio', 'senal-compra', 'cierre'];
 
+// La apertura sembrada (tu guion) se PROTEGE mientras la estás leyendo. La
+// sueltan solo las señales GENUINAMENTE POST-SALUDO: una objeción o un momento
+// que ya no es del primer contacto. Los momentos del saludo (apertura, pitch
+// "ya dígame", gatekeeper "¿de parte de quién?") NO la sueltan — son el ida y
+// vuelta del arranque y el vendedor todavía puede estar entregando el guion.
+// La red de seguridad NO es esta liberación: es el goteo de 20s, que sigue
+// corriendo aunque la apertura esté protegida (así el coach nunca enmudece).
+const OPENER_GREETING_MOMENTS = ['apertura', 'pitch', 'gatekeeper'];
+const releasesOpener = (hasObjection: boolean, momentId?: string): boolean =>
+  hasObjection || (momentId != null && !OPENER_GREETING_MOMENTS.includes(momentId));
+
 /** Condensa el historial del prospecto (comentarios/llamadas) para el coach. */
 function buildHistory(
   comments: { body: string; type: string; createdAt: string }[],
@@ -181,6 +192,9 @@ export function CopilotPage() {
   const aperturaRef = useRef<'A' | 'B'>('A'); // variante A/B de esta llamada
   const openerRef = useRef(''); // la apertura del briefing (se siembra en vivo)
   const wantOpenerSeedRef = useRef(false); // escucha activada antes de extraerla
+  // Mientras es true, la apertura sembrada NO se reemplaza (la estás leyendo).
+  // Se suelta con la primera señal post-saludo (ver releasesOpener) o con Ayuda.
+  const openerHeldRef = useRef(false);
 
   useEffect(() => {
     suggestionRef.current = suggestion;
@@ -325,6 +339,7 @@ export function CopilotPage() {
       suggestAbortRef.current = ctrl;
       lastSuggestRef.current = Date.now();
       wantOpenerSeedRef.current = false; // el coach ya tomó el panel
+      openerHeldRef.current = false; // si el coach ya sopla, la apertura ya cumplió
       suggestingRef.current = true;
       setSuggesting(true);
       const t0 = Date.now();
@@ -409,19 +424,31 @@ export function CopilotPage() {
         objCountsRef.current[hit.id] = (objCountsRef.current[hit.id] ?? 0) + 1;
       }
 
+      // 2.5) PROTEGE LA APERTURA: mientras tu guion está en pantalla, una señal
+      //      genuinamente post-saludo (objeción o momento que no es del arranque)
+      //      lo suelta; el "aló / ya dígame" NO. OJO: NO hacemos return aquí — el
+      //      goteo de seguridad (paso 4) tiene que seguir corriendo aunque la
+      //      apertura siga protegida, o el coach enmudecería.
+      if (openerHeldRef.current && releasesOpener(Boolean(hit), m?.id)) {
+        openerHeldRef.current = false;
+      }
+      const held = openerHeldRef.current;
+
       // 3) Jugada instantánea: si entramos a un momento urgente NUEVO, la mejor
       //    jugada de ese momento aparece YA (0ms); el LLM la refina encima.
+      //    Mientras la apertura está protegida, NO la pisamos con la instantánea.
       const urgent = m && URGENT_MOMENTS.includes(m.id);
-      if (urgent && m.id !== prevMomentId && !suggestingRef.current) {
+      if (urgent && m.id !== prevMomentId && !suggestingRef.current && !held) {
         archiveSuggestion();
         setSuggestion(instantPlay(m));
       }
 
-      // 4) Coach LLM por EVENTO: objeción, momento urgente o CAMBIO de momento
-      //    → YA (supersede al anterior; el cambio de momento cubre p.ej. una
-      //    objeción fraseada fuera de toda battlecard). El goteo de fondo solo
-      //    con colchón de 20s.
-      if (lead && (hit || urgent || (m && m.id !== prevMomentId))) {
+      // 4) Coach LLM. Por EVENTO (objeción / urgente / cambio de momento) SOLO si
+      //    la apertura ya se soltó — así protegemos tu guion sin enmudecer: el
+      //    goteo de seguridad de 20s (else) SIEMPRE es alcanzable, incluso con la
+      //    apertura protegida, y a los 20s del arranque suelta y sopla la jugada.
+      const eventFires = lead && !held && (hit || urgent || (m && m.id !== prevMomentId));
+      if (eventFires) {
         runSuggest(lead, text);
       } else if (lead && Date.now() - lastSuggestRef.current > SUGGEST_GAP_MS) {
         runSuggest(lead);
@@ -440,6 +467,13 @@ export function CopilotPage() {
     (text: string) => {
       // Filtro de eco: el vendedor leyendo un consejo (actual o reciente) no dispara nada.
       if (isEcho(text)) return;
+      // Mientras la apertura está protegida, el PARCIAL (texto inestable) no toca
+      // NADA: ni card, ni chip, ni momentRef. Si mutara momentRef aquí, cuando el
+      // FINAL llegara ya no vería el cambio de momento (mismo id) y el coach no
+      // dispararía al soltar la apertura — quedaría mudo hasta el goteo. Y pintar
+      // una battlecard con el panel aún en la apertura confunde. onFinal (estable)
+      // es el único dueño de la transición mientras hay guion en pantalla.
+      if (openerHeldRef.current) return;
       const hit = detectObjection(text);
       if (hit && hit.id !== cardIdRef.current) {
         cardIdRef.current = hit.id;
@@ -540,10 +574,20 @@ export function CopilotPage() {
             const m = /"([^"\n]{40,400})"/.exec(acc);
             if (m) {
               openerRef.current = m[1]!;
-              // Si la escucha ya está activa (usuario rápido), siembra ahora.
+              // Si la escucha ya está activa (usuario rápido), siembra ahora —
+              // salvo que la conversación ya haya pasado del saludo (no pises una
+              // jugada real con una apertura que llega tarde). "Pasó del saludo"
+              // = hubo objeción o un momento que no es del arranque.
               if (wantOpenerSeedRef.current) {
                 wantOpenerSeedRef.current = false;
-                setSuggestion(openerSeed(openerRef.current));
+                const yaArranco =
+                  Boolean(cardIdRef.current) ||
+                  momentsSeenRef.current.some((id) => !OPENER_GREETING_MOMENTS.includes(id));
+                if (!yaArranco) {
+                  setSuggestion(openerSeed(openerRef.current));
+                  openerHeldRef.current = true;
+                  lastSuggestRef.current = Date.now(); // arranca el reloj del goteo
+                }
               }
             }
           }
@@ -583,14 +627,18 @@ export function CopilotPage() {
     perdidosRef.current = null;
     horaRef.current = false;
     callStartRef.current = Date.now();
-    // lastSuggest en 0: la PRIMERA respuesta del prospecto siempre dispara al
-    // coach de una (tu lectura de la apertura no cuenta — la filtra el eco).
+    // Sin apertura sembrada: lastSuggest en 0 → la PRIMERA respuesta del prospecto
+    // dispara el coach de una. CON apertura: el reloj del goteo arranca en el
+    // sembrado, así el coach respeta ~20s para que leas el guion y a los 20s
+    // suelta la apertura y sopla solo (la red de seguridad, nunca un mute).
     lastSuggestRef.current = 0;
     // La primera jugada YA está en pantalla: tu apertura. La dices, callas,
     // y cuando el prospecto responda el coach sopla la siguiente. Si el stream
     // del briefing aún no llegó a la frase, se siembra apenas aparezca.
     if (openerRef.current) {
       setSuggestion(openerSeed(openerRef.current));
+      openerHeldRef.current = true; // protegida hasta señal post-saludo o los 20s
+      lastSuggestRef.current = Date.now();
     } else {
       wantOpenerSeedRef.current = true;
     }
@@ -603,6 +651,7 @@ export function CopilotPage() {
     ws.stop();
     suggestAbortRef.current?.abort();
     wantOpenerSeedRef.current = false; // un opener tardío no debe pintar en wrap
+    openerHeldRef.current = false;
     setPhase('wrap');
     if (!lead) return;
     // Guarda de generación: si el usuario hace "Llamar de nuevo" mientras este
@@ -725,6 +774,11 @@ export function CopilotPage() {
     perdidosRef.current = null;
     horaRef.current = false;
     callStartRef.current = 0;
+    // La apertura es POR LLAMADA: sin esto, callAgain heredaría el guion de la
+    // llamada anterior (startBriefing lo regenera, pero no antes del await).
+    openerRef.current = '';
+    openerHeldRef.current = false;
+    wantOpenerSeedRef.current = false;
     startBriefing(l);
   }
 
@@ -735,6 +789,7 @@ export function CopilotPage() {
     briefAbortRef.current?.abort();
     callGenRef.current += 1; // invalida resúmenes/debriefs en vuelo
     wantOpenerSeedRef.current = false;
+    openerHeldRef.current = false;
     degradedRef.current = false;
     recentEchoRef.current = [];
     setPhase('pick');
@@ -986,7 +1041,11 @@ export function CopilotPage() {
                   <div className="flex gap-2">
                     <button
                       className="btn-secondary flex-1 py-3"
-                      onClick={() => lead && runSuggest(lead)}
+                      onClick={() => {
+                        // Pediste ayuda a propósito: suelta la apertura y sopla la jugada.
+                        openerHeldRef.current = false;
+                        if (lead) runSuggest(lead);
+                      }}
                       disabled={suggesting}
                     >
                       <LifeBuoy className="h-5 w-5" /> Ayuda
