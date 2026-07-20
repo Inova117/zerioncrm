@@ -52,7 +52,7 @@ const KIMI_MODEL = Deno.env.get('KIMI_MODEL') ?? 'kimi-k3';
 // Versión visible en las cabeceras de TODA respuesta (incluido el preflight):
 //   curl -sI -X OPTIONS <url>/functions/v1/copilot | grep x-copilot-version
 // Súbela en cada cambio relevante — es la forma de verificar qué está deployado.
-const VERSION = '2026-07-19.1-hormozi-gates';
+const VERSION = '2026-07-19.2-apertura-estatus';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -394,7 +394,7 @@ async function handle(req: Request): Promise<Response> {
     const aperturaSpec =
       apertura === 'A'
         ? 'la APERTURA A — HONESTIDAD RADICAL ASUNTIVA del playbook: gancho asuntivo ("¡Don/Doña [nombre]! ¿Cómo le va?" — JAMÁS "¿hablo con…?") + "Martín, de ZerionStudio" + "Le soy honesto de entrada: esta es una llamada de ventas — y aun así le va a interesar, porque su página web ya está hecha" + remate con SU dato en pregunta ("¿Sabía que cuando buscan [rubro] en Google usted no aparece?"). PROHIBIDO pedir permiso ("¿me da medio minutito?") — adaptada con los datos REALES de la ficha (registro formal si es profesional/clínica)'
-        : 'la APERTURA B — LA MAESTRA del playbook, con los datos REALES de la ficha: gancho de conocido con pausa ("¡Don/Doña [nombre]! ¿Cómo le va?…"), la confesión ("no me conoce todavía — soy Martín, de ZerionStudio"), la razón con SU dato (estrellas/reseñas/no aparece en Google) y el remate "¿usted sabía eso?". PROHIBIDO rematarla pidiendo permiso';
+        : 'la APERTURA B — LA MAESTRA del playbook, con los datos REALES de la ficha: gancho de conocido con pausa ("¡Don/Doña [nombre]! ¿Cómo le va?…"), la confesión ("no me conoce todavía — soy Martín, de ZerionStudio"), la razón ENMARCADA EN ESTATUS (el cumplido desde arriba: "estoy llamando solo a los [rubro] mejor calificados de [ciudad] — y con [SUS estrellas] y [SUS reseñas], ustedes están en esa lista") y luego el hueco ("…y aun así, cuando buscan [rubro] en [ciudad], no aparecen") y el remate "¿usted sabía eso?". DOS REGLAS DURAS: (1) el encuadre de estatus SOLO si la ficha confirma calificación ALTA — si el rating es bajo o no está en la ficha, NO lo digas (mentir el estatus = estafador); usa el ángulo del competidor. (2) El contraste va con "Y", JAMÁS con "pero" ("buenísimas reseñas… Y aun así no aparece" — nunca "…pero no aparece"): el "pero" borra el cumplido y te pone en contra. PROHIBIDO rematarla pidiendo permiso';
     const userMsg =
       `Dame SOLO el arranque de la llamada. Esta llamada usa ${aperturaSpec}. Decible en 10-12 segundos.\n\nFormato EXACTO:\n\n**Tu apertura ${apertura} (dila y CALLA):**\nLA frase exacta entre comillas.\nUna nota de tonalidad en cursiva, de una sola línea.\n\n**Meta:** una línea — el objetivo del toque 1: que acepte VER su página ya hecha + la hora a la que la va a ver.\n\nNADA MÁS. Ni pasos siguientes, ni objeciones, ni el resto del guion: cada frase siguiente me la soplas EN VIVO según lo que el prospecto responda.`;
 

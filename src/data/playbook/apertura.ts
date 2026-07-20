@@ -15,18 +15,20 @@ export const OPENERS = `
 ### APERTURA B — LA MAESTRA (4 tiempos, remate sin permiso)
 1. GANCHO DE CONOCIDO (2s): "¡Don [nombre]! ¿Cómo le va, cómo le ha ido?" + PAUSA REAL hasta que responda (Gong: ~6.6x — el cerebro no encuentra el patrón de call center).
 2. LA CONFESIÓN (2s): "No me conoce todavía — soy Martín, de ZerionStudio, aquí de [ciudad]."
-3. LA RAZÓN CON SU DATO (6s): "Y la llamo a USTED y no a otro por algo puntual: antes de marcarle busqué su negocio en Google, como haría un cliente — tiene [4.8] estrellas con [86] reseñas… y cuando buscan '[rubro] en [ciudad]', usted no aparece. Aparece su competencia."
+3. LA RAZÓN CON SU DATO, ENMARCADA EN ESTATUS (6s): el cumplido se dice desde ARRIBA (descalificación honesta: tú también eliges a quién llamas), no como halago suelto. "Y la llamo a USTED por algo puntual: estoy llamando solo a los [rubro] mejor calificados de [ciudad] — y con [4.9] estrellas y [169] reseñas, ustedes están en esa lista. Justo por eso me llamó la atención: cuando alguien busca '[rubro] en [ciudad]', usted no aparece. Aparece su competencia." (El encuadre de estatus sube tu posición y filtra a la vez — el que siente que lo eligieron, escucha.)
 4. EL REMATE (1s): "¿Usted sabía eso?" + SILENCIO TOTAL. Es pregunta sobre SU negocio: "no me interesa" no es respuesta coherente a "¿sabía?".
+- CONDICIÓN DEL ESTATUS (contrato de verdad): el encuadre "solo llamo a los mejor calificados" SOLO se usa si la ficha confirma calificación ALTA (≥4.5 o claramente buena). Si el rating es bajo o desconocido, NO lo digas — usa el ángulo del competidor o de una reseña citada. Mentir el estatus te iguala al estafador.
+- EL CONTRASTE VA CON "Y", JAMÁS CON "PERO": "buenísimas reseñas… Y aun así no aparece en Google" — nunca "…pero no aparece". El "pero" borra el cumplido y te pone en contra; el "y" suma y deja el cumplido en pie (regla madre: no contradigas ni con la estructura de la frase).
 - En AMBAS aperturas está PROHIBIDO rematar pidiendo permiso ("¿me regala 30 segundos?", "¿tiene un minutito?", "¿me da medio minutito?") y PROHIBIDO arrancar verificando el número ("¿hablo con don…?"): siempre asuntivo — "¡Don [nombre]!" — y el remate siempre es dato + pregunta sobre SU negocio.
 
 ### DESPUÉS de cualquiera de las dos: la razón verificable
-"La razón de mi llamada es bien puntual: la semana pasada busqué [rubro] por [sector] en Google… y su negocio aparece con muy buenas reseñas — lo felicito — pero sin página web. Sus clientes nuevos le encuentran de milagro. Puede que esto le sirva o puede que no — para eso le pregunto un par de cositas primero, ¿le parece?"
+"La razón de mi llamada es bien puntual: la semana pasada busqué [rubro] por [sector] en Google… y su negocio aparece con muy buenas reseñas — lo felicito — Y aun así, sin página web, sus clientes nuevos le encuentran de milagro. Puede que esto le sirva o puede que no — para eso le pregunto un par de cositas primero, ¿le parece?" (El contraste con "Y", nunca con "pero".)
 - RUTA EXPRESS ("estoy ocupado / dígame rápido" — 30 segundos prometidos = 30 cumplidos): "Se lo digo en una frase y le dejo trabajar: su página web ya está hecha — con su negocio, sus servicios y las reseñas de sus clientes en Google. Verla no le cuesta nada. ¿Se la mando por WhatsApp y la ve en la noche con calma? … ¿Mañana a qué hora le escribo mejor?"
 
 ### VARIANTES SITUACIONALES (cuando el contexto manda)
 - COMPETIDOR EN LA CARA: "Antes de marcarle busqué '[rubro] en [sector]' en Google, como haría cualquier cliente. ¿Sabe quién aparece primero? [Competidor]. Ustedes no salen — y ahí se van clientes todos los días."
 - RESEÑA CITADA TEXTUAL: "Leí sus reseñas y hay una que dice: '[cita real]'. Con clientes que hablan así de usted, lo que falta no es calidad — es que lo encuentren más fácil."
-- LA LISTA DE LOS MEJORES: "Estoy llamando SOLO a los mejor puntuados de la zona — y ustedes están en esa lista."
+- LA LISTA DE LOS MEJORES (el encuadre de estatus — ya integrado como default de la maestra cuando el rating es alto; úsalo también en la A si viene al caso): "Estoy llamando SOLO a los mejor puntuados de la zona — y ustedes están en esa lista."
 - PROHIBIDO SIEMPRE: "¿le agarro en mal momento?" / "¿le cojo en mal momento?" (~40% menos citas según Gong), "quería ofrecerle nuestros servicios", "disculpe la molestia", dos "me regala" seguidos.
 - Suena a VECINO, no a call center. Registro FORMAL con profesionales (doctora/clínica: jamás "de ley", "full", "que le vaya bonito"); BARRIO con peluquería/restaurante. Guion leído o metralleta = colgón en 3 segundos.
 

@@ -447,11 +447,16 @@ async function mockBriefing(lead: Lead, history: string, _memory: string, apertu
     ? [`**Ya tienes historia con este prospecto:** ${history.trim()}`, 'Retómala: no arranques de cero, referénciala ("La vez pasada quedamos en…").', '']
     : [];
   const settingsLine = settings ? [`**Tu oferta (úsala tal cual):** ${settings.split('\n')[0]}`, ''] : [];
-  const dato = e?.rating != null ? `tiene ${e.rating} estrellas con ${e.reviewCount} reseñas` : 'me llamó la atención lo que encontré';
+  // El encuadre de estatus SOLO con calificación alta (contrato de verdad: si el
+  // rating es bajo o desconocido, no se dice). El cumplido, desde arriba.
+  const ratingAlto = e?.rating != null && e.rating >= 4.5;
+  const estatus = ratingAlto
+    ? `estoy llamando solo a los mejor calificados de la zona — y con ${e!.rating} estrellas y ${e!.reviewCount} reseñas, ustedes están en esa lista`
+    : 'antes de llamarle busqué su negocio en Google, como haría un cliente';
   const opener =
     apertura === 'A'
       ? `"¡${lead.contactName || 'Buenas'}! ¿Cómo le va? … Martín, de ZerionStudio. Le soy honesto de entrada: esta es una llamada de ventas — y aun así le va a interesar, porque su página web ya está hecha. ¿Sabía que cuando lo buscan en Google usted no aparece?"`
-      : `"¡${lead.contactName || 'Buenas'}! ¿Cómo le va? … No me conoce todavía — soy Martín, de ZerionStudio. Antes de llamarle busqué su negocio en Google, como haría un cliente: ${dato}${noWeb ? '… y no le aparece página' : ''}. ¿Usted sabía eso?"`;
+      : `"¡${lead.contactName || 'Buenas'}! ¿Cómo le va? … No me conoce todavía — soy Martín, de ZerionStudio. Y le llamo por algo puntual: ${estatus}. Y justo por eso me llamó la atención${noWeb ? ': cuando lo buscan en Google, usted no aparece' : ' lo que vi'}. ¿Usted sabía eso?"`;
   const tono =
     apertura === 'A'
       ? '*(sinceridad total, sonrisa audible, postura asuntiva — el remate es dato + pregunta sobre SU negocio, jamás permiso)*'
