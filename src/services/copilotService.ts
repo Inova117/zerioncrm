@@ -405,7 +405,7 @@ export const listRecentCopilotCalls: (days: number) => Promise<CopilotCallRecord
 // El resultado alimenta moveLead directo: una temperatura fuera del union (el
 // proveedor Kimi va solo por prompt, sin schema) sacaría al lead de todas las
 // columnas del Kanban. Se valida contra la lista real antes de devolver.
-const VALID_TEMPS: readonly string[] = ['nuevo', 'frio', 'tibio', 'caliente', 'reunion', 'cliente', 'perdido'];
+const VALID_TEMPS: readonly string[] = ['nuevo', 'frio', 'tibio', 'caliente', 'reunion', 'cliente', 'no-acepto', 'perdido'];
 
 async function supaSummary(lead: Lead, transcript: string): Promise<CallSummary> {
   const raw = await callFn({
@@ -504,6 +504,10 @@ async function mockSummary(lead: Lead, transcript: string): Promise<CallSummary>
   if (/transferencia (hecha|enviada|lista)|ya le (pague|deposite|transferi)|(mande|envie) (la transferencia|el comprobante|el deposito)|pago (confirmado|recibido)|recibido el pago/i.test(t)) {
     temperature = 'cliente';
     nextAction = 'Publicar la página HOY, mandar accesos y confirmar la llamada de entrega de mañana.';
+  } else if (/(vi|revise|abri) la pagina.{0,40}(no|pero)|la pagina.{0,30}no (me convenc|la quiero|me interesa|me gusto)|no (la|lo) voy a (tomar|comprar|coger)|asi no mas dejemoslo|mejor no,? gracias/i.test(t)) {
+    // Vio su página construida y dijo que no: demo muerta → reactivación.
+    temperature = 'no-acepto';
+    nextAction = 'Dar de baja la demo el viernes y reactivar en 90 días con caso de éxito del rubro.';
   } else if (/jueves|manana|lunes|martes|miercoles|viernes|agend|cita|reunion|demo/i.test(t)) {
     temperature = 'caliente';
     nextAction = 'Preparar el diseño de muestra y confirmar la cita agendada.';

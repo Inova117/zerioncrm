@@ -77,6 +77,19 @@ export const STAGES: StageConfig[] = [
     text: 'text-emerald-600',
   },
   {
+    // Demo-first: la página se construyó, la vio, y no la compró. NO es un
+    // "perdido" cualquiera — el activo existe y es la lista de reactivación
+    // a 90 días ("todavía tengo guardada la muestra que le habíamos hecho").
+    key: 'no-acepto',
+    label: 'No aceptó',
+    description: 'Vio su página hecha y no la compró — reactivable en 90 días',
+    color: '#14b8a6',
+    dot: 'bg-teal-400',
+    ring: 'border-teal-300',
+    soft: 'bg-teal-50',
+    text: 'text-teal-600',
+  },
+  {
     key: 'perdido',
     label: 'Perdido',
     description: 'No avanzó',
@@ -97,6 +110,7 @@ export const BOARD_STAGES: Temperature[] = [
   'caliente',
   'reunion',
   'cliente',
+  'no-acepto',
   'perdido',
 ];
 

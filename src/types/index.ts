@@ -33,7 +33,9 @@ export interface Credential {
 // Leads (prospective clients)
 // ---------------------------------------------------------------------------
 
-/** Pipeline stage === "temperature". Ordered coldest → won. */
+/** Pipeline stage === "temperature". Ordered coldest → won.
+ *  'no-acepto' = vio su página ya hecha y no la compró (demo-first): cerrado
+ *  como perdido, pero con el activo construido — la lista de reactivación. */
 export type Temperature =
   | 'nuevo'
   | 'frio'
@@ -41,6 +43,7 @@ export type Temperature =
   | 'caliente'
   | 'reunion'
   | 'cliente'
+  | 'no-acepto'
   | 'perdido';
 
 /** Where the prospect was found / first touched. */

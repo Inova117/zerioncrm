@@ -28,8 +28,12 @@ do $$ begin
 exception when duplicate_object then null; end $$;
 
 do $$ begin
-  create type temperature_t as enum ('nuevo','frio','tibio','caliente','reunion','cliente','perdido');
+  create type temperature_t as enum ('nuevo','frio','tibio','caliente','reunion','cliente','no-acepto','perdido');
 exception when duplicate_object then null; end $$;
+
+-- Migración (bases existentes): etapa demo-first "vio su página hecha y no la
+-- compró" — cerrado pero reactivable a 90 días. Idempotente.
+alter type temperature_t add value if not exists 'no-acepto' before 'perdido';
 
 do $$ begin
   create type source_t as enum ('linkedin','instagram','email','whatsapp','referido','web','evento','llamada','scraper','otro');

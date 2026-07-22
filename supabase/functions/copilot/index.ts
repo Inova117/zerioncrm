@@ -52,7 +52,7 @@ const KIMI_MODEL = Deno.env.get('KIMI_MODEL') ?? 'kimi-k3';
 // Versión visible en las cabeceras de TODA respuesta (incluido el preflight):
 //   curl -sI -X OPTIONS <url>/functions/v1/copilot | grep x-copilot-version
 // Súbela en cada cambio relevante — es la forma de verificar qué está deployado.
-const VERSION = '2026-07-19.2-apertura-estatus';
+const VERSION = '2026-07-22.1-etapa-no-acepto';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -559,7 +559,7 @@ async function handle(req: Request): Promise<Response> {
   // Definiciones de ÉXITO por toque (modelo demo-first): sin esto el modelo
   // clasifica a ciegas y el close rate que se calcule encima es basura.
   const SUMMARY_RUBRIC =
-    'El vendedor usa un modelo demo-first en DOS toques: en el TOQUE 1 el éxito es que el prospecto acepte VER su página ya hecha Y dé la hora a la que la va a ver (eso es una llamada GANADA del T1 → temperature "caliente", nextAction = mandar el link por WhatsApp en <5 min y escribir a la hora dicha). En el TOQUE 2 el éxito es el PAGO: si el pago quedó confirmado o el prospecto aceptó pagar → temperature "cliente" (venta cerrada). Cita explícita para verla juntos o reunión presencial → "reunion". Aceptó ver la página pero SIN hora amarrada → "tibio" (la hora es el test de compromiso). Rechazo definitivo tras escuchar la oferta u hostilidad → "perdido".';
+    'El vendedor usa un modelo demo-first en DOS toques: en el TOQUE 1 el éxito es que el prospecto acepte VER su página ya hecha Y dé la hora a la que la va a ver (eso es una llamada GANADA del T1 → temperature "caliente", nextAction = mandar el link por WhatsApp en <5 min y escribir a la hora dicha). En el TOQUE 2 el éxito es el PAGO: si el pago quedó confirmado o el prospecto aceptó pagar → temperature "cliente" (venta cerrada). Cita explícita para verla juntos o reunión presencial → "reunion". Aceptó ver la página pero SIN hora amarrada → "tibio" (la hora es el test de compromiso). YA VIO su página construida y aun así dijo que NO la quiere → "no-acepto" (distinto de perdido: el activo existe y entra a reactivación en 90 días; nextAction = dar de baja la demo el viernes y reactivar en 90 días con caso de éxito del rubro). Rechazo definitivo SIN haber visto la página, u hostilidad → "perdido".';
   if (mode === 'summary') {
     if (PROVIDER === 'kimi') {
       const res = await openaiFetch({
@@ -567,7 +567,7 @@ async function handle(req: Request): Promise<Response> {
         max_tokens: 700,
         json: true,
         system:
-          `Eres un analista de ventas. Resumes llamadas de prospección en frío para un CRM, en español, con criterio comercial. ${SUMMARY_RUBRIC} Devuelve SOLO un objeto JSON con exactamente estas claves: "summary" (string, 3-5 frases), "temperature" (uno de: nuevo, frio, tibio, caliente, reunion, cliente, perdido) y "nextAction" (string, la próxima acción concreta con cuándo).`,
+          `Eres un analista de ventas. Resumes llamadas de prospección en frío para un CRM, en español, con criterio comercial. ${SUMMARY_RUBRIC} Devuelve SOLO un objeto JSON con exactamente estas claves: "summary" (string, 3-5 frases), "temperature" (uno de: nuevo, frio, tibio, caliente, reunion, cliente, no-acepto, perdido) y "nextAction" (string, la próxima acción concreta con cuándo).`,
         user: `FICHA DEL PROSPECTO:\n${lead}\n\nTRANSCRIPCIÓN COMPLETA DE LA LLAMADA:\n"""\n${transcript || '(sin transcripción)'}\n"""\n\nAnaliza la llamada y devuelve el JSON.`,
       });
       if (!res.ok) {
@@ -604,9 +604,9 @@ async function handle(req: Request): Promise<Response> {
               },
               temperature: {
                 type: 'string',
-                enum: ['nuevo', 'frio', 'tibio', 'caliente', 'reunion', 'cliente', 'perdido'],
+                enum: ['nuevo', 'frio', 'tibio', 'caliente', 'reunion', 'cliente', 'no-acepto', 'perdido'],
                 description:
-                  'Etapa sugerida según el interés real mostrado. "cliente" SOLO con pago confirmado o aceptación explícita de pagar (T2 ganado); "caliente" = aceptó ver la página con hora amarrada (T1 ganado).',
+                  'Etapa sugerida según el interés real mostrado. "cliente" SOLO con pago confirmado o aceptación explícita de pagar (T2 ganado); "caliente" = aceptó ver la página con hora amarrada (T1 ganado); "no-acepto" = YA VIO su página construida y dijo que no la quiere (reactivable — distinto de perdido).',
               },
               nextAction: {
                 type: 'string',

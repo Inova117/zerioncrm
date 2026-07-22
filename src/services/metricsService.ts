@@ -50,7 +50,9 @@ export function totals(leads: Lead[]): Totals {
   const tibiosPlus = leads.filter((l) => rank(l.temperature) >= rank('tibio') && l.temperature !== 'perdido');
   const reunionesPlus = leads.filter((l) => rank(l.temperature) >= rank('reunion') && l.temperature !== 'perdido');
   const clientes = leads.filter((l) => l.temperature === 'cliente');
-  const open = leads.filter((l) => l.temperature !== 'cliente' && l.temperature !== 'perdido');
+  const open = leads.filter(
+    (l) => l.temperature !== 'cliente' && l.temperature !== 'perdido' && l.temperature !== 'no-acepto'
+  );
 
   return {
     contactadas,
@@ -132,7 +134,7 @@ export function byService(leads: Lead[]): ServiceStats[] {
       st.won++;
       st.wonValue += l.value;
       st.mrr += l.mrr;
-    } else if (l.temperature !== 'perdido') {
+    } else if (l.temperature !== 'perdido' && l.temperature !== 'no-acepto') {
       st.openValue += l.value;
     }
   });
@@ -141,10 +143,11 @@ export function byService(leads: Lead[]): ServiceStats[] {
     .sort((a, b) => b.wonValue - a.wonValue || b.deals - a.deals);
 }
 
-/** % of decided deals that were won (won / (won + lost)). */
+/** % of decided deals that were won (won / (won + lost)).
+ *  'no-acepto' cuenta como perdido: vio la página y decidió que no. */
 export function winRate(leads: Lead[]): number {
   const won = leads.filter((l) => l.temperature === 'cliente').length;
-  const lost = leads.filter((l) => l.temperature === 'perdido').length;
+  const lost = leads.filter((l) => l.temperature === 'perdido' || l.temperature === 'no-acepto').length;
   return pct(won, won + lost);
 }
 
