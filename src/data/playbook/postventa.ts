@@ -19,7 +19,7 @@ export const POSTVENTA = `
 
 ## DEL SÍ AL PAGO (donde más ventas mueren en LatAm)
 - En la llamada del sí, amarra ANTES de colgar: "Le mando ahorita por WhatsApp los datos de pago — ¿maneja transferencia o De Una? ¿Me confirma hoy para dejarla oficial hoy mismo?"
-- WhatsApp de cierre en <5 minutos (una pantalla): qué incluye + $300 con IVA incluido, una sola vez + todo queda a su nombre (dominio, accesos — por escrito) + LA GARANTÍA DE ENTREGA por escrito ("${GARANTIA_ENTREGA}") + datos bancarios COMPLETOS + lo que necesitas de él si quiere cambios (logo, fotos que prefiera). Cierra con pregunta: "¿Me confirma hoy y su página queda oficial esta misma tarde?"
+- WhatsApp de cierre en <5 minutos (una pantalla): qué incluye + el precio ([PRECIO], una sola vez) + todo queda a su nombre (dominio, accesos — por escrito) + LA GARANTÍA DE ENTREGA por escrito ("${GARANTIA_ENTREGA}") + datos bancarios COMPLETOS + lo que necesitas de él si quiere cambios (logo, fotos que prefiera). Cierra con pregunta: "¿Me confirma hoy y su página queda oficial esta misma tarde?"
 - Cobra como COORDINADOR, no como cobrador. Prohibido "¿ya me depositó?". El pago atado a un evento: "apenas llegue, la dejo oficial y le mando sus accesos".
 - Escalada: Día 1 → excusa de valor ("ya dejé su página lista para publicar — ¿alguna duda con el pago?") + reenvía los datos bancarios. Día 3 → límite real: "la dejo guardada hasta el viernes; pasado eso la doy de baja para hacerle campo al siguiente negocio. ¿Lo alcanza?" Día 7 → soltar con puerta abierta (a veces revive la venta ese mismo día).
 - Pago partido (solo si salió el loop de "está caro"): mitad ahora, mitad a fin de mes — y la página se publica con el primer pago.

@@ -12,7 +12,8 @@
 import type { Lead, Temperature } from '../types';
 import { supabase } from '../lib/supabaseClient';
 import { detectObjection } from '../data/salesPlaybook';
-import { settingsForPrompt } from '../lib/copilotSettings';
+import { aperturaGuionMock } from '../data/playbook/aperturaSpec';
+import { settingsForPrompt, getCopilotSettings, fillPrecios } from '../lib/copilotSettings';
 
 export interface SuggestArgs {
   lead: Lead;
@@ -98,6 +99,20 @@ export interface DebriefArgs {
   memory: string;
 }
 
+/** Semáforo de la ficha — dosifica qué se puede prometer (LA DOSIS DE LA PROMESA
+ *  del playbook): 🟢 clientela visible = se puede prometer resultado y garantía
+ *  completa; 🟡 = solo ver-antes-de-pagar, jamás cifras de clientes. */
+export function leadSemaforo(lead: Lead): { verde: boolean; linea: string } {
+  const e = lead.enrichment;
+  const verde = e?.rating != null && e.rating >= 4.0 && (e.reviewCount ?? 0) >= 10;
+  return {
+    verde,
+    linea: verde
+      ? 'Semáforo: 🟢 clientela visible (10+ reseñas, buen rating) — puedes prometer resultado y usar la garantía completa'
+      : 'Semáforo: 🟡 poca clientela visible o ficha incompleta — promete SOLO ver-antes-de-pagar y trabajo-hasta-que-quede; JAMÁS cifras de clientes ni plazos de resultados',
+  };
+}
+
 /** Ficha del lead como texto para los prompts (igual en mock y server). */
 export function leadBrief(lead: Lead): string {
   const e = lead.enrichment;
@@ -110,6 +125,7 @@ export function leadBrief(lead: Lead): string {
     e?.city && `Ciudad: ${e.city}`,
     lead.reason && `Contexto: ${lead.reason}`,
     lead.temperature !== 'nuevo' && `Etapa actual en el CRM: ${lead.temperature}`,
+    leadSemaforo(lead).linea,
   ]
     .filter(Boolean)
     .join('\n');
@@ -442,31 +458,36 @@ const streamOut = async (text: string, onDelta?: (t: string) => void, signal?: A
 async function mockBriefing(lead: Lead, history: string, _memory: string, apertura: 'A' | 'B', onDelta?: (t: string) => void, signal?: AbortSignal): Promise<string> {
   const e = lead.enrichment;
   const noWeb = !lead.website.trim();
-  const settings = settingsForPrompt();
+  const s = getCopilotSettings();
   const histLine = history.trim()
     ? [`**Ya tienes historia con este prospecto:** ${history.trim()}`, 'Retómala: no arranques de cero, referénciala ("La vez pasada quedamos en…").', '']
     : [];
-  const settingsLine = settings ? [`**Tu oferta (úsala tal cual):** ${settings.split('\n')[0]}`, ''] : [];
+  const settingsLine = s.pitch.trim() ? [`**Tu oferta (úsala tal cual):** ${s.pitch.trim()}`, ''] : [];
+  // Prueba > promesa: si hay casos reales, el briefing deja UNO listo para la llamada.
+  const proofLine = s.proof.trim()
+    ? [`**Tu prueba (suéltala antes del precio, o en la primera objeción):** ${s.proof.trim().split('\n')[0]}`, '']
+    : [];
+  const semaforo = leadSemaforo(lead);
   // El encuadre de estatus SOLO con calificación alta (contrato de verdad: si el
   // rating es bajo o desconocido, no se dice). El cumplido, desde arriba.
   const ratingAlto = e?.rating != null && e.rating >= 4.5;
   const estatus = ratingAlto
     ? `estoy llamando solo a los mejor calificados de la zona — y con ${e!.rating} estrellas y ${e!.reviewCount} reseñas, ustedes están en esa lista`
     : 'antes de llamarle busqué su negocio en Google, como haría un cliente';
-  const opener =
-    apertura === 'A'
-      ? `"¡${lead.contactName || 'Buenas'}! ¿Cómo le va? … Martín, de ZerionStudio. Le soy honesto de entrada: esta es una llamada de ventas — y aun así le va a interesar, porque su página web ya está hecha. ¿Sabía que cuando lo buscan en Google usted no aparece?"`
-      : `"¡${lead.contactName || 'Buenas'}! ¿Cómo le va? … No me conoce todavía — soy Martín, de ZerionStudio. Y le llamo por algo puntual: ${estatus}. Y justo por eso me llamó la atención${noWeb ? ': cuando lo buscan en Google, usted no aparece' : ' lo que vi'}. ¿Usted sabía eso?"`;
+  const opener = aperturaGuionMock(apertura, { nombre: lead.contactName || 'Buenas', estatus, sinWeb: noWeb });
   const tono =
     apertura === 'A'
       ? '*(sinceridad total, sonrisa audible, postura asuntiva — el remate es dato + pregunta sobre SU negocio, jamás permiso)*'
       : '*(tono de conocido: saluda, PAUSA real hasta que responda, y recién ahí sigues — el remate es pregunta, no permiso)*';
   const text = [
     ...settingsLine,
+    ...proofLine,
     ...histLine,
     `**Tu apertura ${apertura} (dila y CALLA):**`,
     opener,
     tono,
+    '',
+    `**${semaforo.verde ? 'Semáforo 🟢' : 'Semáforo 🟡'}:** ${semaforo.verde ? 'clientela visible — puedes prometer resultado y usar la garantía completa.' : 'poca clientela visible — promete SOLO ver-antes-de-pagar; nada de cifras de clientes.'}`,
     '',
     '**Meta:** que acepte VER su página ya hecha + la hora a la que la va a ver (link por WhatsApp).',
     '',
@@ -485,13 +506,15 @@ async function mockSuggest(args: SuggestArgs, onDelta: (t: string) => void, sign
     text = `**${args.moment.split(':')[0]}** — ${args.moment.split(':').slice(1).join(':').trim()}`;
   } else if (/cuanto (cuesta|vale|sale)|precio|que incluye|cuanto se demora/i.test(args.transcript.slice(-200))) {
     text =
-      '🟢 **SEÑAL DE COMPRA** — deja de presentar y cierra: "Trescientos con IVA incluido, una sola vez. Pero véala primero — ya está hecha. ¿Se la mando? ¿A qué hora la alcanza a ver?"';
+      '🟢 **SEÑAL DE COMPRA** — deja de presentar y cierra: "[PRECIO], una sola vez. Pero véala primero — ya está hecha. ¿Se la mando? ¿A qué hora la alcanza a ver?"';
   } else {
     text =
       '**Siguiente pregunta:** "¿Hoy cómo les llega la gente nueva — puro boca a boca, o también por internet?" Escucha su respuesta y cuantifica: ¿cuántos clientes al mes? ¿cuánto deja cada uno? El que pregunta, controla.';
   }
   await new Promise((r) => setTimeout(r, 350));
-  return streamOut(text, onDelta, signal);
+  // Los textos del playbook traen [PRECIO]/[MENSUAL]: aquí no hay LLM que los
+  // resuelva, así que se interpolan desde los Settings antes de mostrar.
+  return streamOut(fillPrecios(text), onDelta, signal);
 }
 
 async function mockSummary(lead: Lead, transcript: string): Promise<CallSummary> {

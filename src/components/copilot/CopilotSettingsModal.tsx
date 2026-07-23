@@ -1,7 +1,13 @@
 import { useState } from 'react';
 import { Save } from 'lucide-react';
 import { Modal } from '../ui/Modal';
-import { getCopilotSettings, saveCopilotSettings, type CopilotSettings } from '../../lib/copilotSettings';
+import {
+  getCopilotSettings,
+  saveCopilotSettings,
+  DEFAULT_PRICE_ONCE,
+  DEFAULT_PRICE_MONTHLY,
+  type CopilotSettings,
+} from '../../lib/copilotSettings';
 
 interface Props {
   open: boolean;
@@ -40,6 +46,20 @@ export function CopilotSettingsModal({ open, onClose, onSaved }: Props) {
           hint="Ej: Landing $250 (o $80/mes×4). Web + reservas $600. Retainer de mantenimiento $50/mes."
           value={s.offer}
           onChange={(v) => set('offer', v)}
+        />
+        <Field
+          label="Precio principal, HABLADO (el coach lo dice tal cual)"
+          hint={`Como se dice en voz alta. Vacío = "${DEFAULT_PRICE_ONCE}". Todo el playbook usa este monto — no hay precios escritos en otro lado.`}
+          value={s.priceOnce}
+          onChange={(v) => set('priceOnce', v)}
+          rows={1}
+        />
+        <Field
+          label="Plan mensual opcional, HABLADO"
+          hint={`Vacío = "${DEFAULT_PRICE_MONTHLY}". Se ofrece opt-out después del sí.`}
+          value={s.priceMonthly}
+          onChange={(v) => set('priceMonthly', v)}
+          rows={1}
         />
         <Field
           label="Tono / estilo del coach"

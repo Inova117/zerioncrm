@@ -14,6 +14,7 @@
 // descubrimiento con pitch no lo es.
 // ============================================================================
 import { normalizeSpeech } from './normalize';
+import { APERTURA_A_GUION, APERTURA_B_GUION } from './aperturaSpec';
 
 export type CallMoment =
   | 'gatekeeper'
@@ -70,7 +71,7 @@ export const MOMENTS: MomentInfo[] = [
     priority: 95,
     cues: /cuanto (cuesta|vale|sale|es(?! lo (menos|minimo))|cobran?|me sale|se demoran?)|que incluye|en cuanto tiempo|cuanto (tiempo )?se demoran?|estaria list[ao]|como seria|tienen ejemplos|trabajos (hechos|anteriores)|han trabajado con|donde puedo ver|me pueden poner (el menu|las fotos)|ustedes tambien manejan|y si despues quiero cambiar|suena (bien|interesante)|estaria bueno|le pago cuando (la vea|este|la tenga)|cuando este list[ao] le pago/,
     bestMove:
-      'Dejó de evaluarte: está imaginándose CON la página. Responde en UNA frase y convierte en "se la mando ahorita": "Claro — y mejor que explicárselo, véala: ya está hecha, con sus reseñas, lista para mandarle clientes al WhatsApp. ¿Este número tiene WhatsApp? ¿A qué hora la alcanza a ver?" Si pregunta precio: de frente y de vuelta a la página — "Trescientos con IVA incluido, una sola vez. Pero no me crea a mí: véala primero y decide con la página en la mano." DOS señales seguidas y sigues explicando = estás matando la venta.',
+      'Dejó de evaluarte: está imaginándose CON la página. Responde en UNA frase y convierte en "se la mando ahorita": "Claro — y mejor que explicárselo, véala: ya está hecha, con sus reseñas, lista para mandarle clientes al WhatsApp. ¿Este número tiene WhatsApp? ¿A qué hora la alcanza a ver?" Si pregunta precio: de frente y de vuelta a la página — "[PRECIO], una sola vez. Pero no me crea a mí: véala primero y decide con la página en la mano." DOS señales seguidas y sigues explicando = estás matando la venta.',
   },
   {
     id: 'precio',
@@ -79,7 +80,7 @@ export const MOMENTS: MomentInfo[] = [
     priority: 90,
     cues: /(esta|es|muy|tan|que) car(o|a)|carisim|carito|cuanto es lo (menos|minimo)|cual es lo menos|hay descuento|descuentito|rebaj(a|ita|eme)|mas barato|no me alcanza|esta fuerte el precio|esta elevado|formas? de pago|se puede pagar|en cuotas|a credito|mensualidades|si pago de una|ultimo precio|ayudeme con el precio|el otro me cobra(ba)? menos/,
     bestMove:
-      'NUNCA defiendas el precio ni lo bajes. Es UNO y se dice de frente: "trescientos con IVA incluido, con todo — se lo digo de frente porque aquí no hay letra chica. Una sola vez, no es mensualidad." Secuencia si objeta: acuerda ("le entiendo, trescientos de un solo no es cualquier cosa") → reduce al ridículo ("la página trabaja 24 horas — un solo cliente nuevo la paga") → la ÚNICA flexibilidad es de forma ("la mitad ahora y la mitad a fin de mes, ¿así sí le cuadra?"). El monto jamás baja. Tras decir el número: SILENCIO — el primero que habla, cede.',
+      'NUNCA defiendas el precio ni lo bajes. Es UNO y se dice de frente: "[PRECIO], con todo — se lo digo de frente porque aquí no hay letra chica. Una sola vez, no es mensualidad." Secuencia si objeta: acuerda ("le entiendo — pagarlo de un solo no es cualquier cosa") → reduce al ridículo ("la página trabaja 24 horas — un solo cliente nuevo la paga") → EL BONO DE ACCIÓN antes de tocar términos ("si arrancamos hoy, la publico HOY mismo y el primer mes de cambios va por mi cuenta") → y de última carta, la forma ("la mitad ahora y la mitad a fin de mes, ¿así sí le cuadra?"). El monto jamás baja. Tras decir el número: SILENCIO — el primero que habla, cede.',
   },
   {
     id: 'objecion',
@@ -124,7 +125,7 @@ export const MOMENTS: MomentInfo[] = [
     priority: 35,
     cues: /^alo\b|hola,? buen(a|o)s|buenos dias|buenas tardes|quien habla|con quien (hablo|tengo el gusto)|que desea|que se le ofrece|como consiguio mi numero|quien le dio mi numero|es una venta|digame\b|si,? diga|si,? con el( mismo)?\b|con el mismo|el habla|ella habla|mucho gusto|para servirle/,
     bestMove:
-      'Los primeros 12 segundos deciden la llamada. Usa la apertura que dictó el briefing (A/B en prueba, AMBAS asuntivas — jamás "¿hablo con…?" ni pedir permiso): A — honestidad radical asuntiva: "¡Don [nombre]! ¿Cómo le va? … Martín, de ZerionStudio. Le soy honesto: esta es una llamada de ventas — y aun así le va a interesar, porque su página ya está hecha. ¿Sabía que en Google usted no aparece?" · B — la maestra: gancho de conocido + PAUSA ("¡Don [nombre]! ¿Cómo le va?…"), confesión ("no me conoce todavía — soy Martín, de ZerionStudio"), SU dato ENMARCADO EN ESTATUS si el rating es alto ("llamo solo a los mejor calificados de la zona — y con [4.8] estrellas ustedes están en esa lista… Y aun así no aparecen en Google") y "¿usted sabía eso?" + SILENCIO. El contraste con "Y", nunca "pero"; el estatus solo si la ficha confirma rating alto. Si confirma que es el dueño ("sí, con él") → ventana de oro: lánzala YA, sin relleno. Si pregunta "¿es una venta?": en la A ya lo dijiste; en la B: "Es una llamada de negocio: ya hicimos algo para su negocio y se lo puedo mostrar." Energía arriba, cero "disculpe la molestia".',
+      `Los primeros 12 segundos deciden la llamada. Usa la apertura que dictó el briefing (A/B en prueba, AMBAS asuntivas — jamás "¿hablo con…?" ni pedir permiso): A — honestidad radical asuntiva: ${APERTURA_A_GUION} · B — la maestra: ${APERTURA_B_GUION} — con las reglas de la B: el encuadre de estatus SOLO si la ficha confirma rating alto, y el contraste con "Y", nunca "pero". Si confirma que es el dueño ("sí, con él") → ventana de oro: lánzala YA, sin relleno. Si pregunta "¿es una venta?": en la A ya lo dijiste; en la B: "Es una llamada de negocio: ya hicimos algo para su negocio y se lo puedo mostrar." Energía arriba, cero "disculpe la molestia".`,
   },
   {
     id: 'despedida',

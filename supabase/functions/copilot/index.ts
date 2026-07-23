@@ -21,6 +21,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { PLAYBOOK } from './playbook.ts';
+import { APERTURA_A_LLM_SPEC, APERTURA_B_LLM_SPEC } from './aperturaSpec.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -52,7 +53,7 @@ const KIMI_MODEL = Deno.env.get('KIMI_MODEL') ?? 'kimi-k3';
 // Versión visible en las cabeceras de TODA respuesta (incluido el preflight):
 //   curl -sI -X OPTIONS <url>/functions/v1/copilot | grep x-copilot-version
 // Súbela en cada cambio relevante — es la forma de verificar qué está deployado.
-const VERSION = '2026-07-22.1-etapa-no-acepto';
+const VERSION = '2026-07-23.1-precios-settings-p1';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -61,11 +62,11 @@ const CORS = {
   'x-copilot-version': VERSION,
 };
 
-const PERSONA = `Eres "el Closer" de ZerionStudio. Vendes con UNA sola voz — directa, cálida, con certeza tranquila — siguiendo EL SISTEMA (la columna vertebral del playbook). Tu framework es LA LÍNEA RECTA (el mapa de toda la llamada) y todo pitch sigue EL PITCH DE CONTRASTE (dolor → contraste → retirada); lo demás son jugadas puntuales que el sistema invoca — JAMÁS cambias de personalidad a mitad de llamada y JAMÁS citas metodologías ni gurús. Le susurras al oído a un vendedor DURANTE una llamada en frío real. Él vende páginas web a negocios locales (ZerionStudio) con el modelo DEMO-FIRST: la página se construye ANTES de cobrar, el prospecto la ve terminada por WhatsApp, y solo si la quiere paga ($300 con IVA incluido, una vez — salvo que MI NEGOCIO diga otro precio). La venta del TOQUE 1 es que acepte VER su página + la hora a la que la va a ver; el dinero se cierra en el TOQUE 2, cuando ya la vio. El paso se pide directo y más de una vez, y en frío el vendedor LLEVA la llamada. Tu único trabajo: que esta llamada termine con su paso amarrado.
+const PERSONA = `Eres "el Closer" de ZerionStudio. Vendes con UNA sola voz — directa, cálida, con certeza tranquila — siguiendo EL SISTEMA (la columna vertebral del playbook). Tu framework es LA LÍNEA RECTA (el mapa de toda la llamada) y todo pitch sigue EL PITCH DE CONTRASTE (dolor → contraste → retirada); lo demás son jugadas puntuales que el sistema invoca — JAMÁS cambias de personalidad a mitad de llamada y JAMÁS citas metodologías ni gurús. Le susurras al oído a un vendedor DURANTE una llamada en frío real. Él vende páginas web a negocios locales (ZerionStudio) con el modelo DEMO-FIRST: la página se construye ANTES de cobrar, el prospecto la ve terminada por WhatsApp, y solo si la quiere paga. Los montos NUNCA viven en el playbook: donde diga [PRECIO] o [MENSUAL], el monto real sale SIEMPRE de MIS PRECIOS (MI NEGOCIO) — al hablar se dice el monto, jamás el corchete, y jamás inventes uno. La venta del TOQUE 1 es que acepte VER su página + la hora a la que la va a ver; el dinero se cierra en el TOQUE 2, cuando ya la vio. El paso se pide directo y más de una vez, y en frío el vendedor LLEVA la llamada. Tu único trabajo: que esta llamada termine con su paso amarrado.
 
 CÓMO PIENSAS (proceso interno — jamás lo expliques en la respuesta):
 1. Detecta el MOMENTO de la llamada: gatekeeper, apertura, descubrimiento, pitch, objeción, precio, señal de compra, peligro de colgar, cierre. El cliente puede mandarte su detección: confírmala o corrígela leyendo la transcripción.
-2. Juega LA jugada de ESE momento según el playbook: objeción → acordar + loop hacia "véala primero" (máx 2, nunca contradecir; si MI NEGOCIO trae CASOS REALES, injerta la anécdota de una frase del rubro más parecido); señal de compra → en T1 link + hora YA, en T2 cobrar YA; peligro → rescate de 15 segundos con un dato SUYO; descubrimiento → la siguiente pregunta que cuantifica el dolor (y el porqué del AHORA); precio → de frente ($300 con IVA, una vez) y de vuelta a la página, el monto jamás baja (solo 50/50); gatekeeper → aliado, y si la página existe, la jugada pre-built ("necesito mostrársela antes de darla de baja").
+2. Juega LA jugada de ESE momento según el playbook: objeción → acordar + loop hacia "véala primero" (máx 2, nunca contradecir; si MI NEGOCIO trae CASOS REALES, injerta la anécdota de una frase del rubro más parecido); señal de compra → en T1 link + hora YA, en T2 cobrar YA; peligro → rescate de 15 segundos con un dato SUYO; descubrimiento → la siguiente pregunta que cuantifica el dolor (y el porqué del AHORA); precio → de frente (el monto de MIS PRECIOS, una vez) y de vuelta a la página, el monto jamás baja (en loop 2 primero el bono de acción, y el 50/50 de última carta); gatekeeper → aliado, y si la página existe, la jugada pre-built ("necesito mostrársela antes de darla de baja").
 3. VERIFICA LOS GATES antes de subir de etapa: sin problema admitido (o resumen confirmado con "¿así es?") NO soplas el pitch — soplas el sello del problema; sin dolor re-articulado con SUS números NO soplas el precio — soplas el replay del dolor; y una llamada nunca termina sin próximo paso amarrado (hora de lectura, fecha o llamada de entrega).
 4. Personaliza SIEMPRE con la ficha y el historial del prospecto, y con la oferta real del vendedor (MI NEGOCIO tiene prioridad sobre el playbook).
 
@@ -391,16 +392,13 @@ async function handle(req: Request): Promise<Response> {
     // la sopla el coach EN VIVO según lo que el prospecto responda de verdad.
     // Prueba A/B de aperturas: el cliente alterna la variante por llamada y
     // queda registrada en las stats — la data decide cuál convierte más.
-    const aperturaSpec =
-      apertura === 'A'
-        ? 'la APERTURA A — HONESTIDAD RADICAL ASUNTIVA del playbook: gancho asuntivo ("¡Don/Doña [nombre]! ¿Cómo le va?" — JAMÁS "¿hablo con…?") + "Martín, de ZerionStudio" + "Le soy honesto de entrada: esta es una llamada de ventas — y aun así le va a interesar, porque su página web ya está hecha" + remate con SU dato en pregunta ("¿Sabía que cuando buscan [rubro] en Google usted no aparece?"). PROHIBIDO pedir permiso ("¿me da medio minutito?") — adaptada con los datos REALES de la ficha (registro formal si es profesional/clínica)'
-        : 'la APERTURA B — LA MAESTRA del playbook, con los datos REALES de la ficha: gancho de conocido con pausa ("¡Don/Doña [nombre]! ¿Cómo le va?…"), la confesión ("no me conoce todavía — soy Martín, de ZerionStudio"), la razón ENMARCADA EN ESTATUS (el cumplido desde arriba: "estoy llamando solo a los [rubro] mejor calificados de [ciudad] — y con [SUS estrellas] y [SUS reseñas], ustedes están en esa lista") y luego el hueco ("…y aun así, cuando buscan [rubro] en [ciudad], no aparecen") y el remate "¿usted sabía eso?". DOS REGLAS DURAS: (1) el encuadre de estatus SOLO si la ficha confirma calificación ALTA — si el rating es bajo o no está en la ficha, NO lo digas (mentir el estatus = estafador); usa el ángulo del competidor. (2) El contraste va con "Y", JAMÁS con "pero" ("buenísimas reseñas… Y aun así no aparece" — nunca "…pero no aparece"): el "pero" borra el cumplido y te pone en contra. PROHIBIDO rematarla pidiendo permiso';
+    const aperturaSpec = apertura === 'A' ? APERTURA_A_LLM_SPEC : APERTURA_B_LLM_SPEC;
     const userMsg =
-      `Dame SOLO el arranque de la llamada. Esta llamada usa ${aperturaSpec}. Decible en 10-12 segundos.\n\nFormato EXACTO:\n\n**Tu apertura ${apertura} (dila y CALLA):**\nLA frase exacta entre comillas.\nUna nota de tonalidad en cursiva, de una sola línea.\n\n**Meta:** una línea — el objetivo del toque 1: que acepte VER su página ya hecha + la hora a la que la va a ver.\n\nNADA MÁS. Ni pasos siguientes, ni objeciones, ni el resto del guion: cada frase siguiente me la soplas EN VIVO según lo que el prospecto responda.`;
+      `Dame SOLO el arranque de la llamada. Esta llamada usa ${aperturaSpec}. Decible en 10-12 segundos.\n\nFormato EXACTO:\n\n**Tu apertura ${apertura} (dila y CALLA):**\nLA frase exacta entre comillas.\nUna nota de tonalidad en cursiva, de una sola línea.\n\n**Tu prueba (SOLO si MI NEGOCIO trae CASOS REALES — si no, omite esta sección entera):** el caso del rubro más parecido en UNA frase con su número, listo para soltarlo antes del precio o en la primera objeción.\n\n**Meta:** una línea — el objetivo del toque 1: que acepte VER su página ya hecha + la hora a la que la va a ver.\n\nNADA MÁS. Ni pasos siguientes, ni objeciones, ni el resto del guion: cada frase siguiente me la soplas EN VIVO según lo que el prospecto responda.`;
 
     if (PROVIDER === 'kimi') {
       const upstream = await openaiFetch({
-        model: KIMI_MODEL, max_tokens: 300, stream: true, system: systemToText(sys), user: userMsg,
+        model: KIMI_MODEL, max_tokens: 380, stream: true, system: systemToText(sys), user: userMsg,
       });
       if (!upstream.ok || !upstream.body) {
         const detail = await upstream.text().catch(() => '');
@@ -413,7 +411,7 @@ async function handle(req: Request): Promise<Response> {
 
     const upstream = await anthropicFetch({
       model: MODEL,
-      max_tokens: 300,
+      max_tokens: 380,
       stream: true,
       system: sys,
       ...effortFor(MODEL),

@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { AppLayout } from '../components/layout/AppLayout';
 import { CopilotSettingsModal } from '../components/copilot/CopilotSettingsModal';
-import { hasCopilotSettings } from '../lib/copilotSettings';
+import { hasCopilotSettings, fillPrecios } from '../lib/copilotSettings';
 import { EmptyState } from '../components/ui/misc';
 import { TemperatureBadge } from '../components/ui/TemperatureBadge';
 import { useAuth } from '../context/AuthContext';
@@ -237,9 +237,13 @@ export function CopilotPage() {
   // del playbook (bestMoveNoHora), no de un string hardcodeado aquí.
   const instantPlay = useCallback(
     (m: MomentInfo): string =>
-      m.bestMoveNoHora && !horaRef.current
-        ? `⚡ **${m.label}** — ${m.bestMoveNoHora}`
-        : `⚡ **${m.label}** — ${m.bestMove}`,
+      // Los textos del playbook traen [PRECIO]/[MENSUAL] — aquí no hay LLM que
+      // los resuelva: se interpolan desde los Settings antes de mostrar.
+      fillPrecios(
+        m.bestMoveNoHora && !horaRef.current
+          ? `⚡ **${m.label}** — ${m.bestMoveNoHora}`
+          : `⚡ **${m.label}** — ${m.bestMove}`
+      ),
     []
   );
 
@@ -351,7 +355,7 @@ export function CopilotPage() {
             transcript: transcriptRef.current,
             trigger,
             history: historyRef.current,
-            moment: momentRef.current ? `${momentRef.current.label}: ${momentRef.current.bestMove}` : undefined,
+            moment: momentRef.current ? fillPrecios(`${momentRef.current.label}: ${momentRef.current.bestMove}`) : undefined,
             callState: buildCallState() || undefined,
             memory: memoryRef.current || undefined,
           },
@@ -997,7 +1001,7 @@ export function CopilotPage() {
                       <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-amber-600">
                         ⚡ Objeción: {card.objection}
                       </p>
-                      <p className="text-sm font-medium text-surface-800">{card.response}</p>
+                      <p className="text-sm font-medium text-surface-800">{fillPrecios(card.response)}</p>
                     </div>
                   )}
                   <div className="card flex min-h-0 flex-1 flex-col p-4">

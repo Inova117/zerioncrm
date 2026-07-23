@@ -4,11 +4,13 @@
 // agencias que venden web a negocios locales, adaptado al habla latina.
 // ============================================================================
 
+import { APERTURA_A_GUION, APERTURA_B_GUION } from './aperturaSpec';
+
 export const OPENERS = `
 ## LAS DOS APERTURAS EN PRUEBA A/B (el briefing dicta cuál toca en esta llamada; las stats registran cuál convierte más "sí, mándela")
 
 ### APERTURA A — HONESTIDAD RADICAL ASUNTIVA (v1.2 — sin verificar el número, sin pedir permiso)
-"¡[Don/Doña|Doctora] [nombre]! ¿Cómo le va? … Martín, de ZerionStudio, aquí en [ciudad]. Le soy honesto de entrada: esta es una llamada de ventas — y aun así le va a interesar, porque ya hicimos algo para su negocio: su página web ya está hecha. ¿Sabía que cuando buscan [rubro] en Google, usted no aparece?"
+${APERTURA_A_GUION}
 - Por qué funciona: SIEMPRE asume que es él y que el número es correcto — arrancar con "¿hablo con don…?" es la firma del telemarketer y regala el control. Nombras el elefante ANTES de que él lo nombre (la honestidad radical es tu diferenciador), pero el remate es DATO + PREGUNTA sobre SU negocio — jamás permiso: pedir "medio minutito" convierte el reto en súplica. Sonrisa audible, cero titubeo.
 - Si suena molesto: "Entendido, no le quito más tiempo. Que le vaya bien." — y queda en cadencia de WhatsApp. Un no aquí no quema el prospecto.
 
@@ -17,6 +19,7 @@ export const OPENERS = `
 2. LA CONFESIÓN (2s): "No me conoce todavía — soy Martín, de ZerionStudio, aquí de [ciudad]."
 3. LA RAZÓN CON SU DATO, ENMARCADA EN ESTATUS (6s): el cumplido se dice desde ARRIBA (descalificación honesta: tú también eliges a quién llamas), no como halago suelto. "Y la llamo a USTED por algo puntual: estoy llamando solo a los [rubro] mejor calificados de [ciudad] — y con [4.9] estrellas y [169] reseñas, ustedes están en esa lista. Justo por eso me llamó la atención: cuando alguien busca '[rubro] en [ciudad]', usted no aparece. Aparece su competencia." (El encuadre de estatus sube tu posición y filtra a la vez — el que siente que lo eligieron, escucha.)
 4. EL REMATE (1s): "¿Usted sabía eso?" + SILENCIO TOTAL. Es pregunta sobre SU negocio: "no me interesa" no es respuesta coherente a "¿sabía?".
+- EL GUION CORRIDO CANÓNICO (los 4 tiempos de un tirón): ${APERTURA_B_GUION}
 - CONDICIÓN DEL ESTATUS (contrato de verdad): el encuadre "solo llamo a los mejor calificados" SOLO se usa si la ficha confirma calificación ALTA (≥4.5 o claramente buena). Si el rating es bajo o desconocido, NO lo digas — usa el ángulo del competidor o de una reseña citada. Mentir el estatus te iguala al estafador.
 - EL CONTRASTE VA CON "Y", JAMÁS CON "PERO": "buenísimas reseñas… Y aun así no aparece en Google" — nunca "…pero no aparece". El "pero" borra el cumplido y te pone en contra; el "y" suma y deja el cumplido en pie (regla madre: no contradigas ni con la estructura de la frase).
 - En AMBAS aperturas está PROHIBIDO rematar pidiendo permiso ("¿me regala 30 segundos?", "¿tiene un minutito?", "¿me da medio minutito?") y PROHIBIDO arrancar verificando el número ("¿hablo con don…?"): siempre asuntivo — "¡Don [nombre]!" — y el remate siempre es dato + pregunta sobre SU negocio.
@@ -50,5 +53,5 @@ export const OPENERS = `
 - Clínicas y consultorios: antes de las 9:00, almuerzo (13:00-14:00) o después de las 17:00 — en horario de pacientes contesta solo la recepcionista.
 - Salones de belleza: martes a jueves, 10:30 o 14:00-15:00. Nunca viernes/sábado (sus días fuertes).
 - Ferreterías y talleres: 8:00-9:30 apenas abren, o 16:00-17:30.
-- Martes a jueves rinden más que lunes (poniéndose al día) y viernes (desconectados). Se necesitan 5-8 intentos en 2-3 semanas para agarrar al dueño: rota las ventanas horarias y lleva ángulo NUEVO en cada intento (1.º el dato de Maps, 2.º la reseña, 3.º la muestra ya hecha).
+- Martes a jueves rinden más que lunes (poniéndose al día) y viernes (desconectados). Se necesitan 5-8 intentos en 2-3 semanas para agarrar al dueño: rota las ventanas horarias y lleva ángulo NUEVO en cada intento (1.º el dato de Maps, 2.º la reseña, 3.º la muestra ya hecha, 4.º el caso real del rubro — SOLO si MIS CASOS REALES traen uno: "a la [barbería de X] le entraron [23] clientes por su página el primer mes; por eso le volví a marcar").
 `.trim();

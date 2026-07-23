@@ -37,8 +37,8 @@ export const BATTLECARDS: Battlecard[] = [
       /\bcar(o|os|isimo|ito)\b|mucha plata|mucho dinero|no me alcanza|fuerte el precio|esta elevado|cuesta mucho|un ojo de la cara|no tengo (para|plata|dinero)|no hay (plata|presupuesto)|fuera de (mi )?presupuesto|no estoy para (esos )?gastos|es mucho eso/,
     objection: '"Está caro / no tengo presupuesto"',
     response:
-      'Le entiendo, trescientos de un solo no es cualquier cosa. Véalo así: es una sola vez en la vida del negocio, y la página trabaja veinticuatro horas — como una recepcionista que nunca pide permiso. Un solo cliente nuevo la paga. Y usted mismo me decía cuánto se le va cada mes… Pero no me crea a mí: véala primero, que ya está hecha. ¿A qué hora la alcanza a ver?',
-    why: 'Acuerda primero y NUNCA defiendas el precio. "Está caro" = no articulaste el valor: re-ancla a SU pérdida calculada y desemboca en "véala primero". El 50/50 NO se ofrece en este loop 1 — queda para el loop 2 (regalarlo a la primera es ceder términos sin re-articular valor). Distinto del REGATEO explícito o preguntar formas de pago: eso es señal caliente y ahí la forma se sopla de una. Tras decir un precio: SILENCIO, el primero que habla cede.',
+      'Le entiendo — pagarlo de un solo no es cualquier cosa. Véalo así: es una sola vez en la vida del negocio, y la página trabaja veinticuatro horas — como una recepcionista que nunca pide permiso. Un solo cliente nuevo la paga. Y usted mismo me decía cuánto se le va cada mes… Pero no me crea a mí: véala primero, que ya está hecha. ¿A qué hora la alcanza a ver?',
+    why: 'Acuerda primero y NUNCA defiendas el precio. "Está caro" = no articulaste el valor: re-ancla a SU pérdida calculada y desemboca en "véala primero". En el loop 2 el orden es VALOR ANTES QUE TÉRMINOS: primero el bono de acción (publico hoy + primer mes de cambios incluido) y el 50/50 de última carta — regalarlo a la primera es ceder términos sin re-articular valor. Distinto del REGATEO explícito o preguntar formas de pago: eso es señal caliente y ahí la forma se sopla de una. Tras decir un precio: SILENCIO, el primero que habla cede.',
   },
   {
     // Antes que 'sobrino': "un muchacho me lo hace a mitad de precio" es
@@ -132,7 +132,7 @@ export const BATTLECARDS: Battlecard[] = [
       /que mensualidad|mensualidad me van a (sacar|cobrar)|me van a (cobrar|sacar) mensual|y despues cuanto (me )?cobran|cuanto es (al|el) mes despues|cobran algo mensual|hay que pagar mensual|letra (chica|chiquita)/,
     objection: '"¿Y después qué mensualidad me van a sacar?"',
     response:
-      'Buena pregunta, y me gusta que la haga. Los trescientos con IVA incluido son UNA vez, y la página es suya: dominio a su nombre, accesos suyos. Mensualidad obligatoria: cero. Hay un plan de mantenimiento opcional — y lo cancela cuando quiera. Si mañana se quiere ir con otra persona, se lleva todo. Eso está por escrito. Entonces, sabiendo que es una sola vez y todo queda a su nombre… ¿la dejamos oficial esta semana?',
+      'Buena pregunta, y me gusta que la haga. Lo que le dije — [PRECIO] — es UNA vez, y la página es suya: dominio a su nombre, accesos suyos. Mensualidad obligatoria: cero. Hay un plan de mantenimiento opcional — y lo cancela cuando quiera. Si mañana se quiere ir con otra persona, se lleva todo. Eso está por escrito. Entonces, sabiendo que es una sola vez y todo queda a su nombre… ¿la dejamos oficial esta semana?',
     why: 'Es LA herida del mercado (el "gratis" con permanencia y el hosting secuestrado). Sinceridad total sin defensividad: celebrar la pregunta + los pilares por escrito convierten la sospecha en el argumento de cierre.',
   },
   {
