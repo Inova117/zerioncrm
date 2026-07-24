@@ -127,6 +127,9 @@ function buildHistory(
 
 export function CopilotPage() {
   const { user } = useAuth();
+  // Nombre de pila del vendedor logueado — el coach se presenta con SU nombre,
+  // no con el "Martín" quemado del playbook.
+  const vendorName = user?.name?.trim().split(/\s+/)[0] ?? '';
   const { leads, addComment, moveLead, createTask, loadComments } = useData();
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
@@ -358,6 +361,7 @@ export function CopilotPage() {
             moment: momentRef.current ? fillPrecios(`${momentRef.current.label}: ${momentRef.current.bestMove}`) : undefined,
             callState: buildCallState() || undefined,
             memory: memoryRef.current || undefined,
+            vendor: vendorName || undefined,
           },
           (chunk) => {
             if (ctrl.signal.aborted) return;
@@ -570,6 +574,7 @@ export function CopilotPage() {
         historyRef.current,
         memoryRef.current,
         aperturaRef.current,
+        vendorName,
         (chunk) => {
           if (briefCtrl.signal.aborted) return; // stream zombi: no interlinea
           acc += chunk;
@@ -675,6 +680,7 @@ export function CopilotPage() {
       transcript: transcriptRef.current,
       stats: buildStatsLine(),
       memory: memoryRef.current,
+      vendor: vendorName,
     })
       .then((d) => {
         if (gen !== callGenRef.current) return;

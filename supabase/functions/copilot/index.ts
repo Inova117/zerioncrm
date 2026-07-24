@@ -53,7 +53,7 @@ const KIMI_MODEL = Deno.env.get('KIMI_MODEL') ?? 'kimi-k3';
 // Versión visible en las cabeceras de TODA respuesta (incluido el preflight):
 //   curl -sI -X OPTIONS <url>/functions/v1/copilot | grep x-copilot-version
 // Súbela en cada cambio relevante — es la forma de verificar qué está deployado.
-const VERSION = '2026-07-23.1-precios-settings-p1';
+const VERSION = '2026-07-23.2-nombre-vendedor';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -103,6 +103,8 @@ interface CopilotBody {
   stats?: string;
   /** Variante de apertura de esta llamada (prueba A/B): 'A' honestidad radical | 'B' maestra. */
   apertura?: string;
+  /** Nombre de pila del vendedor logueado — override a "Martín" del playbook. */
+  vendor?: string;
 }
 
 // --- Llamada a Anthropic (raw HTTP; streaming SSE → texto plano) ------------
@@ -284,7 +286,12 @@ function systemToText(blocks: Array<{ text: string }>): string {
 // (mi negocio + ficha + historial, cambia por lead) va aparte, sin cache.
 // Prefijo mínimo cacheable en Opus 4.8: ~4096 tokens — el playbook expandido
 // lo supera con holgura.
-function buildSystem(lead: string, playbook: string, history: string, settings: string, memory: string) {
+function buildSystem(lead: string, playbook: string, history: string, settings: string, memory: string, vendor: string) {
+  // El playbook y los ejemplos dicen "Martín" (el fundador). Quien hace ESTA
+  // llamada puede ser otro vendedor del equipo: su nombre override a "Martín".
+  const who = vendor.trim()
+    ? `# TÚ, EL VENDEDOR (quien hace ESTA llamada)\nTe llamas ${vendor.trim()}. Preséntate SIEMPRE con tu nombre de pila. Donde el playbook, la persona o los ejemplos digan "Martín", di "${vendor.trim()}" en su lugar — jamás te presentes como Martín si ese no es tu nombre.\n\n`
+    : '';
   const mine = settings.trim()
     ? `# MI NEGOCIO Y MI FORMA DE VENDER (PRIORIDAD: usa ESTO por encima del playbook — mis precios, mi oferta, mi tono)\n${settings.trim()}\n\n`
     : '';
@@ -302,7 +309,7 @@ function buildSystem(lead: string, playbook: string, history: string, settings: 
     },
     {
       type: 'text' as const,
-      text: `${mine}# FICHA DEL PROSPECTO (úsala: personaliza con SUS datos)\n${lead}${hist}${mem}`,
+      text: `${who}${mine}# FICHA DEL PROSPECTO (úsala: personaliza con SUS datos)\n${lead}${hist}${mem}`,
     },
   ];
 }
@@ -366,6 +373,8 @@ async function handle(req: Request): Promise<Response> {
   const memory = str(body.memory).slice(0, 5000);
   const stats = str(body.stats).slice(0, 800);
   const apertura = str(body.apertura) === 'B' ? 'B' : 'A';
+  // El nombre del vendedor logueado (nombre de pila) — override a "Martín".
+  const vendor = str(body.vendor).slice(0, 60);
 
   // -------------------------------------------------------------------- warm
   // Precalienta el cache del system (PERSONA + playbook, por modelo) para que
@@ -379,7 +388,7 @@ async function handle(req: Request): Promise<Response> {
       model: MODEL_SUGGEST,
       max_tokens: 1,
       ...thinkingFor(MODEL_SUGGEST),
-      system: buildSystem('', playbook, '', '', ''),
+      system: buildSystem('', playbook, '', '', '', vendor),
       messages: [{ role: 'user', content: 'ok' }],
     });
     return json({ ok: res.ok });
@@ -387,7 +396,7 @@ async function handle(req: Request): Promise<Response> {
 
   // ---------------------------------------------------------------- briefing
   if (mode === 'briefing') {
-    const sys = buildSystem(lead, playbook, history, settings, memory);
+    const sys = buildSystem(lead, playbook, history, settings, memory, vendor);
     // SOLO la apertura: la llamada es turno por turno y cada frase siguiente
     // la sopla el coach EN VIVO según lo que el prospecto responda de verdad.
     // Prueba A/B de aperturas: el cliente alterna la variante por llamada y
@@ -441,7 +450,7 @@ async function handle(req: Request): Promise<Response> {
     // "Frase primero": con streaming, el vendedor tiene la frase decible en
     // TTFT+~200ms y el porqué llega mientras ya la está usando.
     const userMsg = `${momentLine}${stateLine}TRANSCRIPCIÓN RECIENTE DE LA LLAMADA (mic en altavoz, ambas voces mezcladas):\n"""\n${transcript || '(la llamada acaba de empezar)'}\n"""\n\n${ask}\n\nFORMATO OBLIGATORIO: línea 1 = SOLO la frase exacta para decir en voz alta (máx 15 palabras), en **negrita**. Línea 2 (opcional) = una sola oración en cursiva con la tonalidad o el porqué.`;
-    const sys = buildSystem(lead, playbook, history, settings, memory);
+    const sys = buildSystem(lead, playbook, history, settings, memory, vendor);
 
     if (PROVIDER === 'kimi') {
       const upstream = await openaiFetch({
@@ -481,7 +490,10 @@ async function handle(req: Request): Promise<Response> {
   if (mode === 'debrief') {
     const debriefSystem =
       'Eres el mejor sales manager de Latinoamérica revisando la grabación de una llamada en frío de tu vendedor (vende páginas web + automatizaciones a negocios locales, Ecuador). Tu casa vende con LA LÍNEA RECTA (apertura → pitch → loops → cierre repetido) y el PITCH DE CONTRASTE (dolor → contraste → retirada); evalúa contra ese estándar y habla como jefe de ventas, no como libro. La transcripción viene del altavoz del teléfono: ambas voces mezcladas, con errores — interprétala con ese ruido.';
-    const debriefUser = `FICHA DEL PROSPECTO:\n${lead}\n\nSTATS DE LA LLAMADA:\n${stats || '(sin stats)'}\n\nMEMORIA DEL NICHO ACTUAL (lecciones acumuladas hasta hoy):\n"""\n${memory || '(vacía — primera llamada)'}\n"""\n\nTRANSCRIPCIÓN COMPLETA:\n"""\n${transcript || '(sin transcripción)'}\n"""\n\nDevuelve el JSON con coaching, lessons y whatsapp.`;
+    const vendorLine = vendor.trim()
+      ? `EL VENDEDOR SE LLAMA: ${vendor.trim()} — el mensaje de WhatsApp debe firmarse con SU nombre, jamás "Martín".\n\n`
+      : '';
+    const debriefUser = `${vendorLine}FICHA DEL PROSPECTO:\n${lead}\n\nSTATS DE LA LLAMADA:\n${stats || '(sin stats)'}\n\nMEMORIA DEL NICHO ACTUAL (lecciones acumuladas hasta hoy):\n"""\n${memory || '(vacía — primera llamada)'}\n"""\n\nTRANSCRIPCIÓN COMPLETA:\n"""\n${transcript || '(sin transcripción)'}\n"""\n\nDevuelve el JSON con coaching, lessons y whatsapp.`;
 
     if (PROVIDER === 'kimi') {
       const res = await openaiFetch({

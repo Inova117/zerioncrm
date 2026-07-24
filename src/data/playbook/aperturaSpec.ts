@@ -24,12 +24,14 @@ export const APERTURA_A_LLM_SPEC =
 export const APERTURA_B_LLM_SPEC =
   'la APERTURA B — LA MAESTRA del playbook, con los datos REALES de la ficha: gancho de conocido con pausa ("¡Don/Doña [nombre]! ¿Cómo le va?…"), la confesión ("no me conoce todavía — soy Martín, de ZerionStudio"), la razón ENMARCADA EN ESTATUS (el cumplido desde arriba: "estoy llamando solo a los [rubro] mejor calificados de [ciudad] — y con [SUS estrellas] y [SUS reseñas], ustedes están en esa lista") y luego el hueco ("…y aun así, cuando buscan [rubro] en [ciudad], no aparecen") y el remate "¿usted sabía eso?". DOS REGLAS DURAS: (1) el encuadre de estatus SOLO si la ficha confirma calificación ALTA — si el rating es bajo o no está en la ficha, NO lo digas (mentir el estatus = estafador); usa el ángulo del competidor. (2) El contraste va con "Y", JAMÁS con "pero" ("buenísimas reseñas… Y aun así no aparece" — nunca "…pero no aparece"): el "pero" borra el cumplido y te pone en contra. PROHIBIDO rematarla pidiendo permiso';
 
-/** El opener interpolado del modo mock (sin LLM) — misma redacción, datos reales. */
+/** El opener interpolado del modo mock (sin LLM) — misma redacción, datos reales.
+ *  `vendor` = nombre de pila de quien llama (default "Martín", el fundador). */
 export function aperturaGuionMock(
   variant: 'A' | 'B',
-  d: { nombre: string; estatus?: string; sinWeb?: boolean }
+  d: { nombre: string; estatus?: string; sinWeb?: boolean; vendor?: string }
 ): string {
+  const yo = d.vendor?.trim() || 'Martín';
   if (variant === 'A')
-    return `"¡${d.nombre}! ¿Cómo le va? … Martín, de ZerionStudio. Le soy honesto de entrada: esta es una llamada de ventas — y aun así le va a interesar, porque su página web ya está hecha. ¿Sabía que cuando lo buscan en Google usted no aparece?"`;
-  return `"¡${d.nombre}! ¿Cómo le va? … No me conoce todavía — soy Martín, de ZerionStudio. Y le llamo por algo puntual: ${d.estatus}. Y justo por eso me llamó la atención${d.sinWeb ? ': cuando lo buscan en Google, usted no aparece' : ' lo que vi'}. ¿Usted sabía eso?"`;
+    return `"¡${d.nombre}! ¿Cómo le va? … ${yo}, de ZerionStudio. Le soy honesto de entrada: esta es una llamada de ventas — y aun así le va a interesar, porque su página web ya está hecha. ¿Sabía que cuando lo buscan en Google usted no aparece?"`;
+  return `"¡${d.nombre}! ¿Cómo le va? … No me conoce todavía — soy ${yo}, de ZerionStudio. Y le llamo por algo puntual: ${d.estatus}. Y justo por eso me llamó la atención${d.sinWeb ? ': cuando lo buscan en Google, usted no aparece' : ' lo que vi'}. ¿Usted sabía eso?"`;
 }

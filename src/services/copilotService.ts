@@ -29,6 +29,8 @@ export interface SuggestArgs {
   callState?: string;
   /** Memoria del nicho (lecciones de llamadas anteriores). */
   memory?: string;
+  /** Nombre de pila del vendedor logueado — override a "Martín" del playbook. */
+  vendor?: string;
 }
 
 export interface CallSummary {
@@ -97,6 +99,8 @@ export interface DebriefArgs {
   transcript: string;
   stats: string;
   memory: string;
+  /** Nombre de pila del vendedor logueado — firma el WhatsApp con SU nombre. */
+  vendor?: string;
 }
 
 /** Semáforo de la ficha — dosifica qué se puede prometer (LA DOSIS DE LA PROMESA
@@ -187,9 +191,9 @@ async function callFn(
 
 // El playbook ya NO viaja desde el navegador: vive en el servidor (generado
 // por npm run sync:playbook). Cada request baja de ~58KB a ~2-5KB de subida.
-const supaBriefing = (lead: Lead, history: string, memory: string, apertura: 'A' | 'B', onDelta?: (t: string) => void, signal?: AbortSignal) =>
+const supaBriefing = (lead: Lead, history: string, memory: string, apertura: 'A' | 'B', vendor: string, onDelta?: (t: string) => void, signal?: AbortSignal) =>
   callFn(
-    { mode: 'briefing', lead: leadBrief(lead), history, memory, apertura, settings: settingsForPrompt() },
+    { mode: 'briefing', lead: leadBrief(lead), history, memory, apertura, vendor, settings: settingsForPrompt() },
     onDelta,
     signal
   );
@@ -206,6 +210,7 @@ const supaSuggest = (args: SuggestArgs, onDelta: (t: string) => void, signal?: A
       moment: args.moment ?? '',
       callState: args.callState ?? '',
       memory: args.memory ?? '',
+      vendor: args.vendor ?? '',
       settings: settingsForPrompt(),
     },
     onDelta,
@@ -234,6 +239,7 @@ async function supaDebrief(args: DebriefArgs): Promise<CallDebrief> {
     transcript: args.transcript.slice(-6000),
     stats: args.stats,
     memory: args.memory,
+    vendor: args.vendor ?? '',
     settings: settingsForPrompt(),
   });
   try {
@@ -455,7 +461,7 @@ const streamOut = async (text: string, onDelta?: (t: string) => void, signal?: A
   return text;
 };
 
-async function mockBriefing(lead: Lead, history: string, _memory: string, apertura: 'A' | 'B', onDelta?: (t: string) => void, signal?: AbortSignal): Promise<string> {
+async function mockBriefing(lead: Lead, history: string, _memory: string, apertura: 'A' | 'B', vendor: string, onDelta?: (t: string) => void, signal?: AbortSignal): Promise<string> {
   const e = lead.enrichment;
   const noWeb = !lead.website.trim();
   const s = getCopilotSettings();
@@ -474,7 +480,7 @@ async function mockBriefing(lead: Lead, history: string, _memory: string, apertu
   const estatus = ratingAlto
     ? `estoy llamando solo a los mejor calificados de la zona — y con ${e!.rating} estrellas y ${e!.reviewCount} reseñas, ustedes están en esa lista`
     : 'antes de llamarle busqué su negocio en Google, como haría un cliente';
-  const opener = aperturaGuionMock(apertura, { nombre: lead.contactName || 'Buenas', estatus, sinWeb: noWeb });
+  const opener = aperturaGuionMock(apertura, { nombre: lead.contactName || 'Buenas', estatus, sinWeb: noWeb, vendor });
   const tono =
     apertura === 'A'
       ? '*(sinceridad total, sonrisa audible, postura asuntiva — el remate es dato + pregunta sobre SU negocio, jamás permiso)*'
@@ -551,6 +557,7 @@ export const copilotBriefing: (
   history: string,
   memory: string,
   apertura: 'A' | 'B',
+  vendor: string,
   onDelta?: (t: string) => void,
   signal?: AbortSignal
 ) => Promise<string> = supabase ? supaBriefing : mockBriefing;
