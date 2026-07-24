@@ -1,10 +1,14 @@
 # ============================================================================
 # Config del CLI de Supabase para las Edge Functions.
 #
-# verify_jwt = false en las tres funciones: TODAS hacen su propia autenticación
-# adentro (Authorization Bearer → auth.getUser() → profiles.active), y el
-# verificador de la plataforma ROMPE el preflight CORS del navegador (el
-# OPTIONS nunca lleva token → 401 → "blocked by CORS policy").
+# verify_jwt = false en TODAS: cada una hace su propia autenticación adentro
+# (Authorization Bearer → auth.getUser() → profiles.active/role), que es más
+# estricta que el chequeo genérico de la plataforma. Además el verificador de
+# la plataforma (a) ROMPE el preflight CORS del navegador (el OPTIONS nunca
+# lleva token → 401 → "blocked by CORS policy") y (b) tras migrar el proyecto
+# a llaves de firma ES256 rechaza los tokens legacy sin `kid` con el error
+# "unrecognized JWT kid <nil> for algorithm ES256". admin-users se rompió por
+# esto exacto — se apaga el portón y su verificación interna de admin queda.
 # Con esto, `supabase functions deploy <fn>` ya no necesita --no-verify-jwt.
 # ============================================================================
 project_id = "kvgrjqszmfiylqwnuhpr"
@@ -16,4 +20,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.find-leads]
+verify_jwt = false
+
+[functions.admin-users]
 verify_jwt = false
