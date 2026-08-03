@@ -63,16 +63,82 @@ async function resolveAssignee(crm: SupabaseClient): Promise<Assignee> {
   return { id: data.id as string, name: data.name as string };
 }
 
-/** Normalized set of every phone already present in the CRM (dedupe key). */
-async function loadCrmPhones(crm: SupabaseClient): Promise<Set<string>> {
-  const { data, error } = await crm.from('leads').select('phone');
-  if (error) throw new Error(`No pude leer leads del CRM para deduplicar: ${error.message}`);
-  const seen = new Set<string>();
-  for (const row of data ?? []) {
-    const key = normalizePhone((row as { phone: string | null }).phone);
-    if (key) seen.add(key);
+/** PostgREST caps rows at 1000 by default; page past it so dedupe sees the whole table. */
+const PAGE_SIZE = 1000;
+
+export async function fetchAllPages(
+  crm: SupabaseClient,
+  table: 'leads' | 'lead_discoveries',
+  columns: string,
+): Promise<Record<string, unknown>[]> {
+  const out: Record<string, unknown>[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await crm.from(table).select(columns).range(from, from + PAGE_SIZE - 1);
+    if (error) throw new Error(`No pude leer ${table} para deduplicar: ${error.message}`);
+    const rows = (data ?? []) as unknown as Record<string, unknown>[];
+    out.push(...rows);
+    if (rows.length < PAGE_SIZE) break;
   }
-  return seen;
+  return out;
+}
+
+/** Every dedupe key already present in the CRM, from both ingestion paths. */
+export interface CrmDedupeKeys {
+  /** phones of existing prospectos (public.leads). */
+  phones: Set<string>;
+  /** place_id of existing prospectos (leads.enrichment->>placeId). */
+  placeIds: Set<string>;
+  /** place_id of the Lead Finder inbox (public.lead_discoveries). */
+  discoveryIds: Set<string>;
+  /** phones of the Lead Finder inbox (public.lead_discoveries). */
+  discoveryPhones: Set<string>;
+}
+
+/**
+ * Load the CRM-side dedupe keys: prospect phones/place_ids plus the Lead
+ * Finder inbox. Crossing both ingestion paths means a business the app already
+ * discovered can't be re-inserted as a fresh prospecto by this pipeline.
+ */
+async function loadCrmDedupeKeys(crm: SupabaseClient): Promise<CrmDedupeKeys> {
+  const leadRows = await fetchAllPages(crm, 'leads', 'phone,enrichment');
+  const discoveryRows = await fetchAllPages(crm, 'lead_discoveries', 'place_id,phone');
+
+  const phones = new Set<string>();
+  const placeIds = new Set<string>();
+  for (const row of leadRows) {
+    const key = normalizePhone((row as { phone?: string | null }).phone);
+    if (key) phones.add(key);
+    const pid = ((row as { enrichment?: unknown }).enrichment as { placeId?: string } | null)?.placeId;
+    if (pid) placeIds.add(pid);
+  }
+
+  const discoveryIds = new Set<string>();
+  const discoveryPhones = new Set<string>();
+  for (const row of discoveryRows) {
+    const pid = (row as { place_id?: string | null }).place_id;
+    if (pid) discoveryIds.add(pid);
+    const pk = normalizePhone((row as { phone?: string | null }).phone);
+    if (pk) discoveryPhones.add(pk);
+  }
+
+  return { phones, placeIds, discoveryIds, discoveryPhones };
+}
+
+/**
+ * Cross-CRM dedupe decision. A lead is a duplicate when its place_id or phone
+ * already exist as a prospecto (leads) or in the Lead Finder inbox
+ * (lead_discoveries). Pure — unit-tested without a network.
+ */
+export function isCrmDuplicate(
+  placeId: string | null,
+  phoneKey: string | null,
+  keys: CrmDedupeKeys,
+): boolean {
+  if (placeId && keys.placeIds.has(placeId)) return true;
+  if (placeId && keys.discoveryIds.has(placeId)) return true;
+  if (phoneKey && keys.phones.has(phoneKey)) return true;
+  if (phoneKey && keys.discoveryPhones.has(phoneKey)) return true;
+  return false;
 }
 
 /** Next free Kanban position at the top of the assignee's "nuevo" column. */
@@ -130,14 +196,14 @@ export async function pushLeadsToCrm(db: Db, profile: Profile): Promise<CrmPushS
 
   if (!candidates.length) return summary;
 
-  const seenPhones = await loadCrmPhones(crm);
+  const keys = await loadCrmDedupeKeys(crm);
   let position = await nextPosition(crm, assignee.id);
 
   for (const lead of candidates) {
     const key = crmPhoneKey(lead);
-    if (key && seenPhones.has(key)) {
+    if (isCrmDuplicate(lead.placeId ?? null, key, keys)) {
       summary.duplicates++;
-      recordPush(db, lead.id, 'skipped', null, 'duplicado en el CRM (mismo teléfono)');
+      recordPush(db, lead.id, 'skipped', null, 'duplicado en el CRM (place_id o teléfono)');
       continue;
     }
 
@@ -153,7 +219,8 @@ export async function pushLeadsToCrm(db: Db, profile: Profile): Promise<CrmPushS
 
     summary.pushed++;
     position++;
-    if (key) seenPhones.add(key);
+    if (lead.placeId) keys.placeIds.add(lead.placeId);
+    if (key) keys.phones.add(key);
     recordPush(db, lead.id, 'pushed', String((data as { id: string }).id), null);
   }
 
