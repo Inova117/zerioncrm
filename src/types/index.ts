@@ -109,6 +109,10 @@ export interface Lead {
   channel: string;
   /** Why they are a potential client. */
   reason: string;
+  /** Guion de llamada específico de este prospecto. Se lee en pantalla durante
+   *  la llamada del Sales Copilot y tiene prioridad sobre el guion genérico
+   *  Hormozi; '' = sin guion propio (se usa el estándar). */
+  script: string;
   temperature: Temperature;
   /** Agency service line (web, app, retainer…). */
   service: Service;

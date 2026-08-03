@@ -79,6 +79,7 @@ create table if not exists public.leads (
   source          source_t not null default 'otro',
   channel         text default '',
   reason          text default '',
+  script          text not null default '',
   temperature     temperature_t not null default 'nuevo',
   service         service_t not null default 'otro',
   value           numeric not null default 0,
@@ -100,6 +101,9 @@ create index if not exists leads_temperature_idx on public.leads(temperature);
 -- For DBs where the leads table already exists (create-if-not-exists won't alter it):
 alter table public.leads add column if not exists service service_t not null default 'otro';
 alter table public.leads add column if not exists mrr numeric not null default 0;
+-- Guion de llamada específico por prospecto (Sales Copilot): se lee en pantalla
+-- durante la llamada; '' = se usa el guion genérico Hormozi.
+alter table public.leads add column if not exists script text not null default '';
 
 -- Comments / activity --------------------------------------------------------
 -- author_id is ON DELETE SET NULL: deleting an ex-employee must not be blocked by

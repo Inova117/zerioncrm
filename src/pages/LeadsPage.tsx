@@ -126,6 +126,7 @@ export function LeadsPage() {
       source: 'otro',
       channel: '',
       reason: '',
+      script: '',
       temperature,
       service: 'otro',
       value: 0,
@@ -327,6 +328,10 @@ export function LeadsPage() {
         onDelete={removeLead}
         loadComments={loadComments}
         addComment={addComment}
+        onSaveScript={(script) => {
+          if (!detailLead) return Promise.resolve();
+          return updateLead(detailLead.id, { script });
+        }}
       />
     </AppLayout>
   );

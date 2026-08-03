@@ -121,6 +121,7 @@ export function rowToLeadInput(
     source: sourceMap.get(lc(get('Fuente', 'Source'))) ?? 'otro',
     channel: get('Canal', 'Channel'),
     reason: get('Motivo', 'Reason'),
+    script: '',
     assignedTo: (ownerName && resolveOwner?.(ownerName)) || defaultAssignee,
   };
 }

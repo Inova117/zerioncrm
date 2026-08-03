@@ -15,6 +15,7 @@ import { supabase } from '../lib/supabaseClient';
 import { detectObjection } from '../data/salesPlaybook';
 import { aperturaGuionMock } from '../data/playbook/aperturaSpec';
 import { settingsForPrompt, getCopilotSettings, fillPrecios } from '../lib/copilotSettings';
+import { surveyLabel } from '../data/callSurvey';
 
 export interface SuggestArgs {
   lead: Lead;
@@ -32,6 +33,9 @@ export interface SuggestArgs {
   memory?: string;
   /** Nombre de pila del vendedor logueado — override a "Martín" del playbook. */
   vendor?: string;
+  /** Guion específico de ESTE prospecto (lead.script). Prioridad máxima: el
+   *  coach lo respeta palabra por palabra sobre sus jugadas del playbook. */
+  script?: string;
 }
 
 export interface CallSummary {
@@ -104,6 +108,8 @@ export interface DebriefArgs {
   memory: string;
   /** Nombre de pila del vendedor logueado — firma el WhatsApp con SU nombre. */
   vendor?: string;
+  /** Guion específico de ESTE prospecto (para evaluar si se siguió). */
+  script?: string;
 }
 
 /** Semáforo de la ficha — dosifica qué se puede prometer (LA DOSIS DE LA PROMESA
@@ -136,6 +142,54 @@ export function leadBrief(lead: Lead): string {
   ]
     .filter(Boolean)
     .join('\n');
+}
+
+// ===========================================================================
+// Reporte SIN transcripción — la encuesta manual del vendedor reemplaza al
+// análisis del LLM cuando la escucha falló o quedó vacía (el mic en altavoz es
+// frágil: es el caso real que motivó la encuesta). El desenlace mapea directo
+// a la temperatura del pipeline — la MISMA rúbrica que el summary por LLM.
+// ===========================================================================
+const DESENLACE_TO_TEMP: Record<string, Temperature> = {
+  cliente: 'cliente',
+  reunion: 'reunion',
+  caliente: 'caliente',
+  tibio: 'tibio',
+  'no-acepto': 'no-acepto',
+  perdido: 'perdido',
+};
+
+const NEXT_ACTION_BY_DESENLACE: Record<string, string> = {
+  cliente: 'Publicar la página HOY, mandar accesos y confirmar la llamada de entrega de mañana.',
+  reunion: 'Confirmar la cita/reunión por escrito y preparar la muestra antes.',
+  caliente: 'Enviar el link de la página por WhatsApp en <5 min y escribir a la hora amarrada.',
+  tibio: 'Seguimiento: acordar una hora exacta para mostrarle la página ya hecha.',
+  'no-acepto': 'Dar de baja la demo el viernes y reactivar en 90 días con un caso de éxito del rubro.',
+  perdido: 'Reactivar en 90 días — sin contacto antes.',
+};
+
+export function summarizeFromSurvey(s: CallSurveyAnswers, lead: Lead): CallSummary {
+  const parts = [
+    'Reporte manual del vendedor (sin transcripción).',
+    s.resultado ? `Resultado: ${surveyLabel('resultado', s.resultado)}.` : '',
+    s.objecion ? `Objeción principal: ${surveyLabel('objecion', s.objecion)}.` : 'Sin objeción registrada.',
+    s.oferta === 'si' ? 'Presentó la oferta.' : 'No llegó a presentar la oferta.',
+    s.hora === 'amarrada'
+      ? 'Aceptó ver la página con hora amarrada.'
+      : s.hora === 'sin-hora'
+        ? 'Aceptó ver la página, pero sin hora.'
+        : s.hora === 'no'
+          ? 'No aceptó ver la página.'
+          : '',
+    s.desenlace ? `Desenlace: ${surveyLabel('desenlace', s.desenlace)}.` : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+  return {
+    summary: parts,
+    temperature: DESENLACE_TO_TEMP[s.desenlace] ?? lead.temperature,
+    nextAction: NEXT_ACTION_BY_DESENLACE[s.desenlace] ?? '',
+  };
 }
 
 // ===========================================================================
@@ -196,7 +250,7 @@ async function callFn(
 // por npm run sync:playbook). Cada request baja de ~58KB a ~2-5KB de subida.
 const supaBriefing = (lead: Lead, history: string, memory: string, apertura: 'A' | 'B', vendor: string, onDelta?: (t: string) => void, signal?: AbortSignal) =>
   callFn(
-    { mode: 'briefing', lead: leadBrief(lead), history, memory, apertura, vendor, settings: settingsForPrompt() },
+    { mode: 'briefing', lead: leadBrief(lead), history, memory, apertura, vendor, script: lead.script, settings: settingsForPrompt() },
     onDelta,
     signal
   );
@@ -214,6 +268,7 @@ const supaSuggest = (args: SuggestArgs, onDelta: (t: string) => void, signal?: A
       callState: args.callState ?? '',
       memory: args.memory ?? '',
       vendor: args.vendor ?? '',
+      script: args.script ?? '',
       settings: settingsForPrompt(),
     },
     onDelta,
@@ -243,6 +298,7 @@ async function supaDebrief(args: DebriefArgs): Promise<CallDebrief> {
     stats: args.stats,
     memory: args.memory,
     vendor: args.vendor ?? '',
+    script: args.script ?? '',
     settings: settingsForPrompt(),
   });
   try {

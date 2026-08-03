@@ -16,6 +16,9 @@ import {
   Repeat,
   DollarSign,
   Sparkles,
+  Save,
+  Loader2,
+  BookOpen,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { Comment, Lead, Temperature, User, ActivityType } from '../../types';
@@ -38,6 +41,8 @@ interface LeadDetailModalProps {
   onDelete: (leadId: string) => Promise<void>;
   loadComments: (leadId: string) => Promise<Comment[]>;
   addComment: (leadId: string, body: string) => Promise<void>;
+  /** Persiste el guion de llamada específico del prospecto. */
+  onSaveScript: (script: string) => Promise<void>;
 }
 
 const activityMeta: Record<ActivityType, { icon: typeof MessageCircle; className: string }> = {
@@ -70,12 +75,16 @@ export function LeadDetailModal({
   onDelete,
   loadComments,
   addComment,
+  onSaveScript,
 }: LeadDetailModalProps) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [draft, setDraft] = useState('');
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [scriptDraft, setScriptDraft] = useState('');
+  const [scriptSaving, setScriptSaving] = useState(false);
+  const [scriptSaved, setScriptSaved] = useState(false);
 
   // Key the effect on the lead id (stable), NOT the lead object or loadComments
   // (both change identity on every provider render), so it doesn't re-fetch and
@@ -87,6 +96,8 @@ export function LeadDetailModal({
     setLoading(true);
     setConfirmDelete(false);
     setDraft(''); // don't leak a half-typed comment onto another lead (bug #8)
+    setScriptDraft(lead?.script ?? '');
+    setScriptSaved(false);
     loadComments(leadId)
       .then((c) => !cancelled && setComments(c))
       .finally(() => !cancelled && setLoading(false));
@@ -120,6 +131,17 @@ export function LeadDetailModal({
     if (!lead || to === lead.temperature) return;
     await onMove(lead.id, to);
     await refresh();
+  }
+
+  async function saveScript() {
+    if (!lead || scriptSaving) return;
+    setScriptSaving(true);
+    try {
+      await onSaveScript(scriptDraft.trim());
+      setScriptSaved(true);
+    } finally {
+      setScriptSaving(false);
+    }
   }
 
   return (
@@ -236,6 +258,38 @@ export function LeadDetailModal({
             <p className="text-sm leading-relaxed text-surface-700">
               {lead.reason || 'Sin descripción.'}
             </p>
+          </div>
+
+          {/* Guion de llamada específico del prospecto (Sales Copilot). Se lee
+              en pantalla durante la llamada y tiene prioridad sobre el guion
+              genérico Hormozi; vacío = usar el estándar. */}
+          <div className="rounded-xl border border-brand-100 bg-brand-50/30 p-4">
+            <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-brand-600">
+              <BookOpen className="h-3.5 w-3.5" /> Guion de llamada (este prospecto)
+            </p>
+            <textarea
+              className="input min-h-28 w-full resize-y text-sm"
+              value={scriptDraft}
+              onChange={(e) => {
+                setScriptDraft(e.target.value);
+                setScriptSaved(false);
+              }}
+              placeholder={'Ej.\n1. Apertura: "¡Don [Nombre]! … su página YA ESTÁ HECHA."\n2. Pregunta del dolor: "¿Cómo le llegan los clientes hoy?"\n3. Cierre T1: "¿A qué hora la alcanza a ver?"\n\nVacío = el copilot usa el guion genérico Hormozi.'}
+              aria-label="Guion de llamada específico del prospecto"
+            />
+            <div className="mt-2 flex items-center gap-2">
+              <button
+                className="btn-primary px-3 py-1.5 text-xs"
+                onClick={saveScript}
+                disabled={scriptSaving || scriptDraft.trim() === lead.script}
+              >
+                {scriptSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                {scriptSaved ? 'Guion guardado' : 'Guardar guion'}
+              </button>
+              <span className="text-[11px] text-surface-400">
+                Se muestra en pantalla durante la llamada del Sales Copilot.
+              </span>
+            </div>
           </div>
 
           {/* Scraper enrichment (only for Lead Finder leads) */}

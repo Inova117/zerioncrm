@@ -14,11 +14,13 @@ import { useData } from '../context/DataContext';
 import { useSpeech } from '../hooks/useSpeech';
 import { useDeepgram } from '../hooks/useDeepgram';
 import { SalesScriptPanel } from '../components/copilot/SalesScriptPanel';
-import { EMPTY_SURVEY } from '../components/copilot/CallSurveyModal';
+import { CallSurveyModal } from '../components/copilot/CallSurveyModal';
+import { EMPTY_SURVEY, surveyLabel } from '../data/callSurvey';
 import type { CallSurveyAnswers } from '../types';
 import {
   copilotBriefing, copilotSuggest, copilotSummary, copilotWarm, copilotDebrief,
   getCopilotMemory, saveCopilotMemory, saveCopilotCall, listCopilotCalls,
+  summarizeFromSurvey,
   type CallSummary, type CallDebrief, type CopilotCallRecord, type CallOutcome,
 } from '../services/copilotService';
 import { detectObjection, detectMoment, detectHora, normalizeSpeech, MOMENTS, type Battlecard, type MomentInfo } from '../data/salesPlaybook';
@@ -35,6 +37,10 @@ type Phase = 'pick' | 'brief' | 'live' | 'wrap';
 // momento detectado, no el actual — filtrar por él dejaba mudo al coach tras
 // una objeción durante todo el resto de la llamada.)
 const SUGGEST_GAP_MS = 20000;
+// Debajo de esta cantidad de caracteres de transcripción, el reporte NO se
+// fía del LLM (un summary sobre "(sin transcripción)" es ruido y gasta tokens):
+// el resumen sale de la ENCUESTA del vendedor (o del fallback local si la salta).
+const MIN_TRANSCRIPT_CHARS = 40;
 // 'pitch' es urgente: "ya, dígame" / "¿de qué se trata?" es TU turno — el
 // coach debe soplar el pitch al instante, no en el próximo ciclo.
 // 'despedida' es urgente: si va a colgar SIN hora amarrada, el rescate tiene
@@ -167,9 +173,16 @@ export function CopilotPage() {
   // cobrado es la métrica que sostiene el caso de estudio y tiene que ser real.
   const [cashCollected, setCashCollected] = useState('');
   // Respuestas de la encuesta de la llamada ACTUAL (vacías = no respondida).
-  // El modal CallSurveyModal aún no está conectado a la UI (WIP); cuando se
-  // integre, el setter volverá aquí y `survey` dejará de ser constante.
-  const [survey] = useState<CallSurveyAnswers>(EMPTY_SURVEY);
+  // Se abre al colgar la llamada; si la transcripción falló, sus respuestas
+  // SON el reporte (resumen armado localmente, sin LLM).
+  const [survey, setSurvey] = useState<CallSurveyAnswers>(EMPTY_SURVEY);
+  const [surveyOpen, setSurveyOpen] = useState(false);
+  // El resumen de esta llamada se armó con la encuesta (sin transcripción).
+  const [reportFromSurvey, setReportFromSurvey] = useState(false);
+  // Espejo de `survey` para los callbacks que viven fuera del render (hangUp):
+  // si el usuario responde la encuesta mientras el LLM del resumen aún corre y
+  // ese LLM falla, el rescue debe ver las respuestas NUEVAS, no las del render.
+  const surveyRef = useRef<CallSurveyAnswers>(EMPTY_SURVEY);
   const [pastCalls, setPastCalls] = useState<CopilotCallRecord[]>([]);
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -285,14 +298,21 @@ export function CopilotPage() {
   const buildOutcome = useCallback(
     (temperature: string, cash: number): CallOutcome => {
       const momentos = momentsSeenRef.current;
+      // Sin transcripción (mic falló), los indicadores del embudo salen de la
+      // ENCUESTA del vendedor — si no, el dashboard contaría un "cerrado" que
+      // nunca "contactó" ni "presentó oferta". Con transcripción, los momentos
+      // detectados ya cuentan; la encuesta solo rellena lo que faltó.
+      const surveyContacto = survey.resultado === 'contacto';
+      const surveyOferta = survey.oferta === 'si';
+      const surveyHora = survey.hora === 'amarrada';
       return {
         apertura: aperturaRef.current,
         durationMin: callStartRef.current
           ? Math.max(1, Math.round((Date.now() - callStartRef.current) / 60000))
           : 0,
-        contacto: momentos.some((m) => CONTACTO_MOMENTS.includes(m)),
-        llegoAOferta: momentos.some((m) => OFERTA_MOMENTS.includes(m)),
-        horaAmarrada: horaRef.current,
+        contacto: momentos.some((m) => CONTACTO_MOMENTS.includes(m)) || surveyContacto,
+        llegoAOferta: momentos.some((m) => OFERTA_MOMENTS.includes(m)) || surveyOferta,
+        horaAmarrada: horaRef.current || surveyHora,
         cerrado: temperature === 'cliente',
         cashCollected: temperature === 'cliente' ? cash : 0,
         objeciones: { ...objCountsRef.current },
@@ -371,6 +391,7 @@ export function CopilotPage() {
             callState: buildCallState() || undefined,
             memory: memoryRef.current || undefined,
             vendor: vendorName || undefined,
+            script: l.script,
           },
           (chunk) => {
             if (ctrl.signal.aborted) return;
@@ -645,6 +666,11 @@ export function CopilotPage() {
     perdidosRef.current = null;
     horaRef.current = false;
     callStartRef.current = Date.now();
+    // Encuesta de la llamada NUEVA: la anterior no debe filtrar al outcome.
+    setSurvey(EMPTY_SURVEY);
+    surveyRef.current = EMPTY_SURVEY;
+    setSurveyOpen(false);
+    setReportFromSurvey(false);
     // Sin apertura sembrada: lastSuggest en 0 → la PRIMERA respuesta del prospecto
     // dispara el coach de una. CON apertura: el reloj del goteo arranca en el
     // sembrado, así el coach respeta ~20s para que leas el guion y a los 20s
@@ -681,35 +707,87 @@ export function CopilotPage() {
     setDebrief(null);
     setWaText('');
     setCashCollected('');
-    // Resumen y coaching corren EN PARALELO: el resumen alimenta el CRM,
-    // el debrief te dice qué mejorar y actualiza la memoria del nicho.
-    setDebriefing(true);
-    copilotDebrief({
-      lead,
-      transcript: transcriptRef.current,
-      stats: buildStatsLine(),
-      memory: memoryRef.current,
-      vendor: vendorName,
-    })
-      .then((d) => {
-        if (gen !== callGenRef.current) return;
-        setDebrief(d);
-        setWaText(d?.whatsapp ?? '');
+    setReportFromSurvey(false);
+    const transcript = transcriptRef.current.trim();
+    if (transcript.length >= MIN_TRANSCRIPT_CHARS) {
+      // Hay transcripción utilizable: resumen y coaching corren EN PARALELO —
+      // el resumen alimenta el CRM, el debrief te dice qué mejorar y actualiza
+      // la memoria del nicho.
+      setDebriefing(true);
+      copilotDebrief({
+        lead,
+        transcript,
+        stats: buildStatsLine(),
+        memory: memoryRef.current,
+        vendor: vendorName,
+        script: lead.script,
       })
-      .catch(() => gen === callGenRef.current && setDebrief(null))
-      .finally(() => gen === callGenRef.current && setDebriefing(false));
-    try {
-      const s = await copilotSummary(lead, transcriptRef.current);
-      if (gen === callGenRef.current) setSummary(s);
-    } catch (e) {
-      if (gen === callGenRef.current) {
-        setError(e instanceof Error ? e.message : 'No se pudo generar el resumen.');
+        .then((d) => {
+          if (gen !== callGenRef.current) return;
+          setDebrief(d);
+          setWaText(d?.whatsapp ?? '');
+        })
+        .catch(() => gen === callGenRef.current && setDebrief(null))
+        .finally(() => gen === callGenRef.current && setDebriefing(false));
+      try {
+        const s = await copilotSummary(lead, transcript);
+        if (gen === callGenRef.current) setSummary(s);
+      } catch (e) {
+        if (gen === callGenRef.current) {
+          setError(e instanceof Error ? e.message : 'No se pudo generar el resumen.');
+          // Rescate: si la encuesta ya estaba respondida, su reporte reemplaza
+          // al LLM caído (mejor un reporte manual que ninguno).
+          if (surveyRef.current.resultado) {
+            setSummary(summarizeFromSurvey(surveyRef.current, lead));
+            setReportFromSurvey(true);
+          }
+        }
+      } finally {
+        if (gen === callGenRef.current) setSummarizing(false);
       }
-    } finally {
-      if (gen === callGenRef.current) setSummarizing(false);
+    } else {
+      // Sin transcripción utilizable: el reporte sale de la ENCUESTA del
+      // vendedor. No se llama al LLM (un summary sobre "(sin transcripción)"
+      // es ruido y gasta tokens): al guardar la encuesta se arma el resumen
+      // localmente; si se salta, un fallback mínimo. Nada que generar aquí:
+      // summarizing baja ya (el wrap espera a la encuesta, no a un LLM).
+      setDebriefing(false);
+      setSummarizing(false);
     }
-    // Encuesta post-llamada (WIP): el CallSurveyModal aún no está conectado a
-    // la UI; cuando se integre, aquí se abrirá al colgar la llamada.
+    // La encuesta post-llamada se abre SIEMPRE al colgar: 2 minutos que
+    // alimentan las métricas reales — y el reporte cuando no hay transcripción.
+    setSurveyOpen(true);
+  }
+
+  // Encuesta respondida: se guarda en el outcome medible y, si no había
+  // transcripción, sus respuestas SON el resumen de la llamada.
+  function handleSurveySave(answers: CallSurveyAnswers) {
+    surveyRef.current = answers;
+    setSurvey(answers);
+    setSurveyOpen(false);
+    if (!lead) return;
+    const noTranscript = transcriptRef.current.trim().length < MIN_TRANSCRIPT_CHARS;
+    // Sin transcripción: el resumen sale SIEMPRE de la encuesta — la primera
+    // vez, o re-armado si el usuario saltó primero y respondió después.
+    if (noTranscript && (!summary || reportFromSurvey)) {
+      setSummary(summarizeFromSurvey(answers, lead));
+      setReportFromSurvey(true);
+      setSummarizing(false);
+      return;
+    }
+    // Con transcripción: rescate si el LLM del resumen falló y no hay resumen.
+    if (!summary && !summarizing) {
+      setSummary(summarizeFromSurvey(answers, lead));
+      setReportFromSurvey(true);
+      setSummarizing(false);
+    }
+  }
+
+  // Encuesta saltada (X): sin transcripción no hay reporte que fabricar — un
+  // summary local sería ruido. El resumen queda pendiente hasta responder la
+  // encuesta (el botón "Responder" del wrap) o se descarta al volver.
+  function handleSurveySkip() {
+    setSurveyOpen(false);
   }
 
   async function saveToLead() {
@@ -722,9 +800,9 @@ export function CopilotPage() {
     // Respuestas de la encuesta post-llamada (si se respondió) — quedan en el
     // comentario del prospecto y en el outcome medible del dashboard.
     const surveyLine = survey.resultado
-      ? `\n� Encuesta: ${survey.resultado} · objeción: ${survey.objecion || 'ninguna'} · oferta: ${survey.oferta} · ver página: ${survey.hora} · desenlace: ${survey.desenlace}`
+      ? `\n📝 Encuesta: ${surveyLabel('resultado', survey.resultado)} · objeción: ${survey.objecion ? surveyLabel('objecion', survey.objecion) : 'ninguna'} · oferta: ${survey.oferta === 'si' ? 'sí' : 'no'} · ver página: ${surveyLabel('hora', survey.hora)} · desenlace: ${surveyLabel('desenlace', survey.desenlace)}`
       : '';
-    const body = `�📞 Llamada (Copilot) — ${summary.summary}${summary.nextAction ? `\n➡️ Próxima acción: ${summary.nextAction}` : ''}${statsLine ? `\n📊 ${statsLine}` : ''}${surveyLine}`;
+    const body = `📞 Llamada (Copilot) — ${summary.summary}${summary.nextAction ? `\n➡️ Próxima acción: ${summary.nextAction}` : ''}${statsLine ? `\n📊 ${statsLine}` : ''}${surveyLine}`;
     try {
       // La llamada completa (transcript + coaching) queda revisable, y la
       // memoria del nicho actualizada alimenta TODAS las llamadas siguientes.
@@ -800,6 +878,10 @@ export function CopilotPage() {
     perdidosRef.current = null;
     horaRef.current = false;
     callStartRef.current = 0;
+    setSurvey(EMPTY_SURVEY);
+    surveyRef.current = EMPTY_SURVEY;
+    setSurveyOpen(false);
+    setReportFromSurvey(false);
     // La apertura es POR LLAMADA: sin esto, callAgain heredaría el guion de la
     // llamada anterior (startBriefing lo regenera, pero no antes del await).
     openerRef.current = '';
@@ -831,6 +913,10 @@ export function CopilotPage() {
     setWaText('');
     setCashCollected('');
     setPastCalls([]);
+    setSurvey(EMPTY_SURVEY);
+    surveyRef.current = EMPTY_SURVEY;
+    setSurveyOpen(false);
+    setReportFromSurvey(false);
     momentRef.current = null;
     cardIdRef.current = null;
     setSummary(null);
@@ -939,7 +1025,7 @@ export function CopilotPage() {
                       {briefLoading && <Loader2 className="ml-1 inline h-4 w-4 animate-spin text-brand-400" />}
                     </div>
                   </div>
-                  <SalesScriptPanel key={lead.id} temperature={lead.temperature} />
+                  <SalesScriptPanel key={lead.id} temperature={lead.temperature} script={lead.script} />
                   {pastCalls.length > 0 && (
                     <div className="card max-h-56 overflow-y-auto p-3">
                       <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-surface-400">
@@ -1027,7 +1113,7 @@ export function CopilotPage() {
                       <p className="text-sm font-medium text-surface-800">{fillPrecios(card.response)}</p>
                     </div>
                   )}
-                  <SalesScriptPanel key={lead.id} temperature={lead.temperature} />
+                  <SalesScriptPanel key={lead.id} temperature={lead.temperature} script={lead.script} />
                   <div className="card flex min-h-0 flex-1 flex-col p-4">
                     <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-brand-500">
                       <Sparkles className="h-3.5 w-3.5" /> Coach en vivo
@@ -1217,6 +1303,33 @@ export function CopilotPage() {
                     </div>
                   ) : null}
 
+                  {/* Encuesta post-llamada: estado + reabrir. Sin transcripción,
+                      la encuesta ES el reporte (resumen armado de sus respuestas). */}
+                  <div className="rounded-lg border border-surface-200 p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-surface-400">
+                        📝 Encuesta post-llamada
+                      </p>
+                      <button
+                        className="text-xs font-semibold text-brand-600 hover:text-brand-700"
+                        onClick={() => setSurveyOpen(true)}
+                      >
+                        {survey.resultado ? 'Editar' : 'Responder'}
+                      </button>
+                    </div>
+                    {reportFromSurvey ? (
+                      <p className="mt-1 text-xs text-surface-500">
+                        Reporte armado con la encuesta del vendedor (sin análisis de transcripción).
+                      </p>
+                    ) : survey.resultado ? (
+                      <p className="mt-1 text-xs text-surface-500">
+                        Respondida — se suma al comentario del prospecto y a las métricas.
+                      </p>
+                    ) : (
+                      <p className="mt-1 text-xs text-surface-500">Aún sin responder.</p>
+                    )}
+                  </div>
+
                   <div className="mt-3 space-y-2">
                     {saved ? (
                       <span className="btn-secondary flex w-full justify-center py-3 text-emerald-600">
@@ -1251,6 +1364,13 @@ export function CopilotPage() {
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
         onSaved={() => setHasSettings(hasCopilotSettings())}
+      />
+
+      {/* Encuesta post-llamada: se abre al colgar (y se puede reabrir desde el wrap). */}
+      <CallSurveyModal
+        open={surveyOpen}
+        onClose={handleSurveySkip}
+        onSave={handleSurveySave}
       />
     </AppLayout>
   );

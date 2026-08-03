@@ -49,6 +49,7 @@ export function discoveryToInput(d: Discovery): NewLeadInput {
     source: 'scraper',
     channel: d.channel,
     reason: d.reason,
+    script: '',
     temperature: 'nuevo',
     service: d.service,
     value: 0,

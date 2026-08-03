@@ -176,6 +176,10 @@ export function CompaniesPage() {
         onDelete={removeLead}
         loadComments={loadComments}
         addComment={addComment}
+        onSaveScript={(script) => {
+          if (!detailLead) return Promise.resolve();
+          return updateLead(detailLead.id, { script });
+        }}
       />
 
       <LeadFormModal

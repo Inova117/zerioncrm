@@ -56,7 +56,7 @@ const KIMI_MODEL = Deno.env.get('KIMI_MODEL') ?? 'kimi-k3';
 // Versión visible en las cabeceras de TODA respuesta (incluido el preflight):
 //   curl -sI -X OPTIONS <url>/functions/v1/copilot | grep x-copilot-version
 // Súbela en cada cambio relevante — es la forma de verificar qué está deployado.
-const VERSION = '2026-08-02.1-openrouter-deepseek';
+const VERSION = '2026-08-03.1-guion-cliente';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -108,6 +108,9 @@ interface CopilotBody {
   apertura?: string;
   /** Nombre de pila del vendedor logueado — override a "Martín" del playbook. */
   vendor?: string;
+  /** Guion específico de ESTE prospecto (lead.script). Prioridad máxima: se
+   *  sigue palabra por palabra por encima de las jugadas del playbook. */
+  script?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -243,7 +246,7 @@ function systemToText(blocks: Array<{ text: string }>): string {
 // (los sistemas que reciben el mismo prefijo de tokens pagan menos). El
 // playbook estático va PRIMERO en el system para maximizar el hit de cache;
 // los datos dinámicos (ficha, historial, memoria) van después.
-function buildSystem(lead: string, playbook: string, history: string, settings: string, memory: string, vendor: string) {
+function buildSystem(lead: string, playbook: string, history: string, settings: string, memory: string, vendor: string, script: string) {
   // El playbook y los ejemplos dicen "Martín" (el fundador). Quien hace ESTA
   // llamada puede ser otro vendedor del equipo: su nombre override a "Martín".
   const who = vendor.trim()
@@ -251,6 +254,12 @@ function buildSystem(lead: string, playbook: string, history: string, settings: 
     : '';
   const mine = settings.trim()
     ? `# MI NEGOCIO Y MI FORMA DE VENDER (PRIORIDAD: usa ESTO por encima del playbook — mis precios, mi oferta, mi tono)\n${settings.trim()}\n\n`
+    : '';
+  // El guion del prospecto pesa MÁS que cualquier jugada genérica: es el plan
+  // escrito para ESTE cliente. El coach solo se desvía cuando el prospecto se
+  // desvía, y vuelve al guion apenas puede.
+  const guion = script.trim()
+    ? `\n\n# GUION DE ESTA LLAMADA (escrito ESPECIALMENTE para este prospecto — PRIORIDAD MÁXIMA: síguelo tal cual, palabra por palabra; solo aléjate si el prospecto se desvía, y regresa al guion apenas puedas)\n${script.trim()}`
     : '';
   const hist = history.trim()
     ? `\n\n# HISTORIAL CON ESTE PROSPECTO (ya lo conoces — NO arranques de cero, referencia lo previo)\n${history.trim()}`
@@ -265,7 +274,7 @@ function buildSystem(lead: string, playbook: string, history: string, settings: 
     },
     {
       type: 'text' as const,
-      text: `${who}${mine}# FICHA DEL PROSPECTO (úsala: personaliza con SUS datos)\n${lead}${hist}${mem}`,
+      text: `${who}${mine}# FICHA DEL PROSPECTO (úsala: personaliza con SUS datos)\n${lead}${guion}${hist}${mem}`,
     },
   ];
 }
@@ -330,6 +339,8 @@ async function handle(req: Request): Promise<Response> {
   const apertura = str(body.apertura) === 'B' ? 'B' : 'A';
   // El nombre del vendedor logueado (nombre de pila) — override a "Martín".
   const vendor = str(body.vendor).slice(0, 60);
+  // El guion específico del prospecto (lead.script) — prioridad máxima en vivo.
+  const script = str(body.script).slice(0, 4000);
 
   // -------------------------------------------------------------------- warm
   // Precalienta el cache del system (PERSONA + playbook, por modelo) para que
@@ -340,7 +351,7 @@ async function handle(req: Request): Promise<Response> {
     const res = await openrouterFetch({
       model: MODEL_SUGGEST,
       max_tokens: 1,
-      system: systemToText(buildSystem('', playbook, '', '', '', vendor)),
+      system: systemToText(buildSystem('', playbook, '', '', '', vendor, '')),
       user: 'ok',
     });
     return json({ ok: res.ok });
@@ -348,7 +359,7 @@ async function handle(req: Request): Promise<Response> {
 
   // ---------------------------------------------------------------- briefing
   if (mode === 'briefing') {
-    const sys = buildSystem(lead, playbook, history, settings, memory, vendor);
+    const sys = buildSystem(lead, playbook, history, settings, memory, vendor, script);
     // SOLO la apertura: la llamada es turno por turno y cada frase siguiente
     // la sopla el coach EN VIVO según lo que el prospecto responda de verdad.
     // Prueba A/B de aperturas: el cliente alterna la variante por llamada y
@@ -383,7 +394,7 @@ async function handle(req: Request): Promise<Response> {
     // "Frase primero": con streaming, el vendedor tiene la frase decible en
     // TTFT+~200ms y el porqué llega mientras ya la está usando.
     const userMsg = `${momentLine}${stateLine}TRANSCRIPCIÓN RECIENTE DE LA LLAMADA (mic en altavoz, ambas voces mezcladas):\n"""\n${transcript || '(la llamada acaba de empezar)'}\n"""\n\n${ask}\n\nFORMATO OBLIGATORIO: línea 1 = SOLO la frase exacta para decir en voz alta (máx 15 palabras), en **negrita**. Línea 2 (opcional) = una sola oración en cursiva con la tonalidad o el porqué.`;
-    const sys = buildSystem(lead, playbook, history, settings, memory, vendor);
+    const sys = buildSystem(lead, playbook, history, settings, memory, vendor, script);
 
     const upstream = await llmFetch({
       model: MODEL_SUGGEST, max_tokens: 150, stream: true, system: systemToText(sys), user: userMsg,
@@ -407,7 +418,7 @@ async function handle(req: Request): Promise<Response> {
     const vendorLine = vendor.trim()
       ? `EL VENDEDOR SE LLAMA: ${vendor.trim()} — el mensaje de WhatsApp debe firmarse con SU nombre, jamás "Martín".\n\n`
       : '';
-    const debriefUser = `${vendorLine}FICHA DEL PROSPECTO:\n${lead}\n\nSTATS DE LA LLAMADA:\n${stats || '(sin stats)'}\n\nMEMORIA DEL NICHO ACTUAL (lecciones acumuladas hasta hoy):\n"""\n${memory || '(vacía — primera llamada)'}\n"""\n\nTRANSCRIPCIÓN COMPLETA:\n"""\n${transcript || '(sin transcripción)'}\n"""\n\nDevuelve el JSON con coaching, lessons y whatsapp.`;
+    const debriefUser = `${vendorLine}FICHA DEL PROSPECTO:\n${lead}\n\nGUION DE ESTA LLAMADA (el plan escrito para este prospecto — evalúa si se siguió):\n${script || '(sin guion personalizado)'}\n\nSTATS DE LA LLAMADA:\n${stats || '(sin stats)'}\n\nMEMORIA DEL NICHO ACTUAL (lecciones acumuladas hasta hoy):\n"""\n${memory || '(vacía — primera llamada)'}\n"""\n\nTRANSCRIPCIÓN COMPLETA:\n"""\n${transcript || '(sin transcripción)'}\n"""\n\nDevuelve el JSON con coaching, lessons y whatsapp.`;
 
     const res = await llmFetch({
       model: MODEL,

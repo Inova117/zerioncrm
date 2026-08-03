@@ -25,6 +25,7 @@ const empty = (assignedTo: string): NewLeadInput => ({
   source: 'linkedin',
   channel: '',
   reason: '',
+  script: '',
   temperature: 'nuevo',
   service: 'web',
   value: 0,
@@ -45,6 +46,7 @@ const toForm = (l: Lead): NewLeadInput => ({
   source: l.source,
   channel: l.channel,
   reason: l.reason,
+  script: l.script,
   temperature: l.temperature,
   service: l.service,
   value: l.value,
@@ -255,6 +257,16 @@ export function LeadFormModal({
             value={form.reason}
             onChange={(e) => set('reason', e.target.value)}
             placeholder="Ej. Publican a diario en redes pero su web está desactualizada…"
+          />
+        </div>
+
+        <div>
+          <label className="label">Guion de llamada (específico de este prospecto)</label>
+          <textarea
+            className="input min-h-[80px] resize-y"
+            value={form.script}
+            onChange={(e) => set('script', e.target.value)}
+            placeholder={'Opcional. Se lee en pantalla durante la llamada del Sales Copilot.\nVacío = se usa el guion genérico.'}
           />
         </div>
 

@@ -71,7 +71,7 @@ export const seedCredentials: Credential[] = [
 let pos = 0;
 const p = () => pos++;
 
-const rawLeads: Omit<Lead, 'service' | 'mrr'>[] = [
+const rawLeads: Omit<Lead, 'service' | 'mrr' | 'script'>[] = [
   {
     id: 'lead-1', company: 'Cafetería Aroma', contactName: 'Marta Ruiz', role: 'Dueña',
     email: 'marta@aroma.mx', phone: '+52 55 1234 5678', website: 'aroma.mx',
@@ -247,6 +247,7 @@ export const seedLeads: Lead[] = rawLeads.map((l, i) => ({
   ...l,
   service: seedServices[i] ?? 'otro',
   mrr: seedMrr[i] ?? 0,
+  script: '',
 }));
 
 // ---- Contacts (stakeholders per account) -----------------------------------

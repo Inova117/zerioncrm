@@ -33,6 +33,7 @@ function toLead(d: Discovery): Lead {
     source: 'scraper',
     channel: d.channel,
     reason: d.reason,
+    script: '',
     temperature: 'nuevo',
     service: d.service,
     value: 0,
@@ -434,6 +435,10 @@ export function LeadFinderPage() {
         onDelete={removeLead}
         loadComments={loadComments}
         addComment={addComment}
+        onSaveScript={(script) => {
+          if (!detailLead) return Promise.resolve();
+          return updateLead(detailLead.id, { script });
+        }}
       />
 
       <LeadFormModal

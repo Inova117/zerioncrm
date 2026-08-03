@@ -31,6 +31,7 @@ export const rowToLead = (r: any): Lead => ({
   source: (r.source ?? 'otro') as Source,
   channel: r.channel ?? '',
   reason: r.reason ?? '',
+  script: r.script ?? '',
   temperature: (r.temperature ?? 'nuevo') as Temperature,
   service: (r.service ?? 'otro') as Service,
   value: Number(r.value ?? 0),
@@ -57,6 +58,7 @@ export const leadToRow = (l: Partial<Lead>): Record<string, unknown> => {
   if (l.source !== undefined) row.source = l.source;
   if (l.channel !== undefined) row.channel = l.channel;
   if (l.reason !== undefined) row.reason = l.reason;
+  if (l.script !== undefined) row.script = l.script;
   if (l.temperature !== undefined) row.temperature = l.temperature;
   if (l.service !== undefined) row.service = l.service;
   if (l.value !== undefined) row.value = l.value;
