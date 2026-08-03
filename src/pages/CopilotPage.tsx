@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link as RouterLink, useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  Sparkles, Mic, MicOff, Phone, PhoneOff, LifeBuoy,
+  Sparkles, Mic, MicOff, Phone, PhoneOff, LifeBuoy, BookOpen,
   Star, Globe, MapPin, Loader2, AlertTriangle, Save, ArrowRight, SlidersHorizontal,
 } from 'lucide-react';
 import { AppLayout } from '../components/layout/AppLayout';
@@ -642,11 +642,14 @@ export function CopilotPage() {
     }
   }
 
-  function startListening() {
-    if (!engine.supported) {
-      setError('Tu navegador no soporta captura de micrófono. Usa Chrome o Edge de escritorio.');
-      return;
-    }
+  // ¿La llamada usa transcripción/coach (mic) o solo guion + encuesta? El modo
+  // guion es el flujo PRINCIPAL: la transcripción del altavoz es frágil y el
+  // vendedor lee el guion del prospecto en pantalla; al terminar, la encuesta
+  // genera el reporte. La escucha queda como opción para quien quiera el coach.
+  const [micMode, setMicMode] = useState(true);
+
+  // Reseteo común al arrancar UNA llamada (con o sin micrófono).
+  function resetLiveState() {
     degradedRef.current = false;
     recentEchoRef.current = [];
     setPhase('live');
@@ -671,6 +674,25 @@ export function CopilotPage() {
     surveyRef.current = EMPTY_SURVEY;
     setSurveyOpen(false);
     setReportFromSurvey(false);
+  }
+
+  // Modo guion: la llamada se hace SIN transcripción — el guion del prospecto
+  // es la pantalla y el reporte sale de la encuesta al colgar.
+  function startGuionCall() {
+    resetLiveState();
+    setMicMode(false);
+  }
+
+  function startListening() {
+    if (!engine.supported) {
+      // Sin soporte de micrófono el copilot NO bloquea la llamada: cae al modo
+      // guion (el flujo principal) en vez de dejar al vendedor sin pantalla.
+      setError('Tu navegador no soporta captura de micrófono — arranca en modo guion.');
+      startGuionCall();
+      return;
+    }
+    resetLiveState();
+    setMicMode(true);
     // Sin apertura sembrada: lastSuggest en 0 → la PRIMERA respuesta del prospecto
     // dispara el coach de una. CON apertura: el reloj del goteo arranca en el
     // sembrado, así el coach respeta ~20s para que leas el guion y a los 20s
@@ -978,7 +1000,7 @@ export function CopilotPage() {
             <div className="flex min-h-0 flex-col gap-3">
               <LeadHeader lead={lead} onBack={reset} />
 
-              {phase === 'live' && (
+              {phase === 'live' && micMode && (
                 <div className="card flex min-h-0 flex-1 flex-col p-3">
                   <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-surface-400">
                     <Mic className={cn('h-3.5 w-3.5', engine.listening ? 'text-red-500' : 'text-surface-400')} />
@@ -1008,6 +1030,17 @@ export function CopilotPage() {
                     {engine.interim && <p className="text-surface-400">{engine.interim}</p>}
                     <div ref={linesEndRef} />
                   </div>
+                </div>
+              )}
+
+              {phase === 'live' && !micMode && (
+                <div className="card flex min-h-0 flex-1 flex-col items-center justify-center gap-2 p-6 text-center">
+                  <BookOpen className="h-8 w-8 text-brand-300" />
+                  <p className="text-sm font-semibold text-surface-700">Modo guion</p>
+                  <p className="max-w-xs text-xs leading-relaxed text-surface-400">
+                    Sin transcripción: el guion de este prospecto (panel derecho) es tu pantalla.
+                    Al colgar, la encuesta arma el reporte automáticamente.
+                  </p>
                 </div>
               )}
             </div>
@@ -1058,12 +1091,16 @@ export function CopilotPage() {
                       </div>
                     </div>
                   )}
-                  <button className="btn-primary w-full py-3 text-base" onClick={startListening}>
-                    <Mic className="h-5 w-5" /> Empezar a escuchar la llamada
+                  <button className="btn-primary w-full py-3 text-base" onClick={startGuionCall}>
+                    <BookOpen className="h-5 w-5" /> Empezar llamada — modo guion
+                  </button>
+                  <button className="btn-secondary w-full py-3" onClick={startListening}>
+                    <Mic className="h-5 w-5" /> Con escucha y coach (micrófono)
                   </button>
                   <p className="text-center text-xs text-surface-400">
-                    Llama o escribe por WhatsApp desde la ficha de arriba — y activa la escucha cuando
-                    arranque la conversación (celular en altavoz).
+                    Modo guion: lee el guion de este prospecto durante la llamada y al terminar
+                    responde la encuesta — el reporte se arma solo. La escucha es opcional
+                    (transcripción del altavoz, frágil en llamadas).
                   </p>
                 </>
               )}
@@ -1114,70 +1151,88 @@ export function CopilotPage() {
                     </div>
                   )}
                   <SalesScriptPanel key={lead.id} temperature={lead.temperature} script={lead.script} />
-                  <div className="card flex min-h-0 flex-1 flex-col p-4">
-                    <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-brand-500">
-                      <Sparkles className="h-3.5 w-3.5" /> Coach en vivo
-                      {suggesting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                      {ttftMs != null && (
-                        <span
-                          className="ml-auto rounded-full bg-surface-100 px-1.5 py-0.5 text-[9px] font-bold normal-case tracking-normal text-surface-400"
-                          title="Tiempo hasta el primer token de la última sugerencia"
-                        >
-                          {(ttftMs / 1000).toFixed(1)}s
-                        </span>
-                      )}
-                    </p>
-                    <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-                      <div className="whitespace-pre-wrap text-sm leading-relaxed text-surface-800">
-                        {suggestion || (
-                          <span className="text-surface-400">El coach te irá soplando la mejor jugada. Toca “Ayuda” cuando lo necesites.</span>
-                        )}
-                      </div>
-                      {pastSuggestions.length > 0 && (
-                        <div className="mt-3 border-t border-surface-100 pt-2">
-                          <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-surface-300">
-                            Jugadas anteriores
-                          </p>
-                          <div className="space-y-2">
-                            {/* En vivo solo las 3 últimas: más historial = más ojos en pantalla
-                                y menos en la voz del prospecto. (El resto queda en estado por si
-                                el wrap las quiere mostrar algún día — hoy no las renderiza.) */}
-                            {pastSuggestions.slice(0, 3).map((s, i) => (
-                              <p key={i} className="whitespace-pre-wrap text-xs leading-relaxed text-surface-400">
-                                {s}
-                              </p>
-                            ))}
+                  {micMode ? (
+                    <>
+                      <div className="card flex min-h-0 flex-1 flex-col p-4">
+                        <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-brand-500">
+                          <Sparkles className="h-3.5 w-3.5" /> Coach en vivo
+                          {suggesting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                          {ttftMs != null && (
+                            <span
+                              className="ml-auto rounded-full bg-surface-100 px-1.5 py-0.5 text-[9px] font-bold normal-case tracking-normal text-surface-400"
+                              title="Tiempo hasta el primer token de la última sugerencia"
+                            >
+                              {(ttftMs / 1000).toFixed(1)}s
+                            </span>
+                          )}
+                        </p>
+                        <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+                          <div className="whitespace-pre-wrap text-sm leading-relaxed text-surface-800">
+                            {suggestion || (
+                              <span className="text-surface-400">El coach te irá soplando la mejor jugada. Toca “Ayuda” cuando lo necesites.</span>
+                            )}
                           </div>
+                          {pastSuggestions.length > 0 && (
+                            <div className="mt-3 border-t border-surface-100 pt-2">
+                              <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-surface-300">
+                                Jugadas anteriores
+                              </p>
+                              <div className="space-y-2">
+                                {/* En vivo solo las 3 últimas: más historial = más ojos en pantalla
+                                    y menos en la voz del prospecto. (El resto queda en estado por si
+                                    el wrap las quiere mostrar algún día — hoy no las renderiza.) */}
+                                {pastSuggestions.slice(0, 3).map((s, i) => (
+                                  <p key={i} className="whitespace-pre-wrap text-xs leading-relaxed text-surface-400">
+                                    {s}
+                                  </p>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      className="btn-secondary flex-1 py-3"
-                      onClick={() => {
-                        // Pediste ayuda a propósito: suelta la apertura y sopla la jugada.
-                        openerHeldRef.current = false;
-                        if (lead) runSuggest(lead);
-                      }}
-                      disabled={suggesting}
-                    >
-                      <LifeBuoy className="h-5 w-5" /> Ayuda
-                    </button>
-                    <button className="btn-danger flex-1 py-3" onClick={hangUp}>
-                      <PhoneOff className="h-5 w-5" /> Terminar
-                    </button>
-                  </div>
-                  <button
-                    className="text-center text-xs text-surface-400 hover:text-surface-600"
-                    onClick={() => (engine.listening ? engine.stop() : engine.start())}
-                  >
-                    {engine.listening ? (
-                      <span className="inline-flex items-center gap-1"><MicOff className="h-3 w-3" /> pausar micrófono</span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1"><Mic className="h-3 w-3" /> reanudar micrófono</span>
-                    )}
-                  </button>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          className="btn-secondary flex-1 py-3"
+                          onClick={() => {
+                            // Pediste ayuda a propósito: suelta la apertura y sopla la jugada.
+                            openerHeldRef.current = false;
+                            if (lead) runSuggest(lead);
+                          }}
+                          disabled={suggesting}
+                        >
+                          <LifeBuoy className="h-5 w-5" /> Ayuda
+                        </button>
+                        <button className="btn-danger flex-1 py-3" onClick={hangUp}>
+                          <PhoneOff className="h-5 w-5" /> Terminar
+                        </button>
+                      </div>
+                      <button
+                        className="text-center text-xs text-surface-400 hover:text-surface-600"
+                        onClick={() => (engine.listening ? engine.stop() : engine.start())}
+                      >
+                        {engine.listening ? (
+                          <span className="inline-flex items-center gap-1"><MicOff className="h-3 w-3" /> pausar micrófono</span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1"><Mic className="h-3 w-3" /> reanudar micrófono</span>
+                        )}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      {/* Modo guion: el guion del prospecto es la pantalla principal */}
+                      <div className="card flex min-h-0 flex-1 flex-col items-center justify-center gap-2 p-6 text-center">
+                        <p className="text-sm font-semibold text-surface-700">🎯 Sigue el guion paso a paso</p>
+                        <p className="max-w-xs text-xs leading-relaxed text-surface-400">
+                          Sin transcripción activa. Cuando termines la llamada pulsa Terminar y
+                          responde la encuesta — el reporte y el seguimiento se arman solos.
+                        </p>
+                      </div>
+                      <button className="btn-danger w-full py-3" onClick={hangUp}>
+                        <PhoneOff className="h-5 w-5" /> Terminar llamada
+                      </button>
+                    </>
+                  )}
                 </>
               )}
 
