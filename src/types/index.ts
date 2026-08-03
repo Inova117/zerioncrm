@@ -207,6 +207,24 @@ export interface Task {
 }
 
 // ---------------------------------------------------------------------------
+// Encuesta post-llamada (Sales Copilot) — qué pasó en la llamada, reportado
+// manualmente por el vendedor. Se guarda dentro del CallOutcome de cada llamada
+// para alimentar métricas reales (embudo, objeciones, cierres, cash).
+// ---------------------------------------------------------------------------
+export interface CallSurveyAnswers {
+  /** ¿Qué pasó con la llamada? (contacto | gatekeeper | no-contesto | colgo) */
+  resultado: string;
+  /** Objeción principal ('' = no hubo; caro | no-interesa | ya-pagina | sobrino | mandame-info | no-tiempo | pensarlo | otro). */
+  objecion: string;
+  /** ¿Llegó a presentar la oferta? */
+  oferta: 'si' | 'no';
+  /** ¿Aceptó ver la página? (amarrada | sin-hora | no) */
+  hora: 'amarrada' | 'sin-hora' | 'no';
+  /** ¿Cómo terminó? (cliente | reunion | caliente | tibio | no-acepto | perdido) */
+  desenlace: string;
+}
+
+// ---------------------------------------------------------------------------
 // Derived / view models
 // ---------------------------------------------------------------------------
 export interface FunnelStage {

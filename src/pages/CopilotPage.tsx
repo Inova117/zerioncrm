@@ -13,6 +13,9 @@ import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { useSpeech } from '../hooks/useSpeech';
 import { useDeepgram } from '../hooks/useDeepgram';
+import { SalesScriptPanel } from '../components/copilot/SalesScriptPanel';
+import { EMPTY_SURVEY } from '../components/copilot/CallSurveyModal';
+import type { CallSurveyAnswers } from '../types';
 import {
   copilotBriefing, copilotSuggest, copilotSummary, copilotWarm, copilotDebrief,
   getCopilotMemory, saveCopilotMemory, saveCopilotCall, listCopilotCalls,
@@ -163,6 +166,10 @@ export function CopilotPage() {
   // $ realmente cobrado en esta llamada. Se pregunta (no se adivina): el cash
   // cobrado es la métrica que sostiene el caso de estudio y tiene que ser real.
   const [cashCollected, setCashCollected] = useState('');
+  // Respuestas de la encuesta de la llamada ACTUAL (vacías = no respondida).
+  // El modal CallSurveyModal aún no está conectado a la UI (WIP); cuando se
+  // integre, el setter volverá aquí y `survey` dejará de ser constante.
+  const [survey] = useState<CallSurveyAnswers>(EMPTY_SURVEY);
   const [pastCalls, setPastCalls] = useState<CopilotCallRecord[]>([]);
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -292,9 +299,11 @@ export function CopilotPage() {
         ticket: ticketRef.current,
         perdidos: perdidosRef.current,
         momentos: [...momentos],
+        // Encuesta post-llamada: si se respondió, queda en el outcome medible.
+        survey: survey.resultado ? survey : null,
       };
     },
-    []
+    [survey]
   );
 
   // Resumen del estado que viaja al coach en cada suggest: le da el número de
@@ -699,6 +708,8 @@ export function CopilotPage() {
     } finally {
       if (gen === callGenRef.current) setSummarizing(false);
     }
+    // Encuesta post-llamada (WIP): el CallSurveyModal aún no está conectado a
+    // la UI; cuando se integre, aquí se abrirá al colgar la llamada.
   }
 
   async function saveToLead() {
@@ -708,7 +719,12 @@ export function CopilotPage() {
     savingRef.current = true;
     setSaving(true);
     const statsLine = buildStatsLine();
-    const body = `📞 Llamada (Copilot) — ${summary.summary}${summary.nextAction ? `\n➡️ Próxima acción: ${summary.nextAction}` : ''}${statsLine ? `\n📊 ${statsLine}` : ''}`;
+    // Respuestas de la encuesta post-llamada (si se respondió) — quedan en el
+    // comentario del prospecto y en el outcome medible del dashboard.
+    const surveyLine = survey.resultado
+      ? `\n� Encuesta: ${survey.resultado} · objeción: ${survey.objecion || 'ninguna'} · oferta: ${survey.oferta} · ver página: ${survey.hora} · desenlace: ${survey.desenlace}`
+      : '';
+    const body = `�📞 Llamada (Copilot) — ${summary.summary}${summary.nextAction ? `\n➡️ Próxima acción: ${summary.nextAction}` : ''}${statsLine ? `\n📊 ${statsLine}` : ''}${surveyLine}`;
     try {
       // La llamada completa (transcript + coaching) queda revisable, y la
       // memoria del nicho actualizada alimenta TODAS las llamadas siguientes.
@@ -923,6 +939,7 @@ export function CopilotPage() {
                       {briefLoading && <Loader2 className="ml-1 inline h-4 w-4 animate-spin text-brand-400" />}
                     </div>
                   </div>
+                  <SalesScriptPanel key={lead.id} temperature={lead.temperature} />
                   {pastCalls.length > 0 && (
                     <div className="card max-h-56 overflow-y-auto p-3">
                       <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-surface-400">
@@ -1010,6 +1027,7 @@ export function CopilotPage() {
                       <p className="text-sm font-medium text-surface-800">{fillPrecios(card.response)}</p>
                     </div>
                   )}
+                  <SalesScriptPanel key={lead.id} temperature={lead.temperature} />
                   <div className="card flex min-h-0 flex-1 flex-col p-4">
                     <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-brand-500">
                       <Sparkles className="h-3.5 w-3.5" /> Coach en vivo

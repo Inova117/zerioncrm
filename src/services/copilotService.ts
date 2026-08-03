@@ -2,14 +2,15 @@
 // Copilot — el coach de ventas en tiempo real.
 //
 // Capa dual como todos los servicios:
-//   • Supabase → Edge Function `copilot` (Claude, streaming; la API key vive
-//     SOLO en el servidor). El cliente lee el stream y pinta token a token.
+//   • Supabase → Edge Function `copilot` (DeepSeek vía OpenRouter, streaming;
+//     la API key vive SOLO en el servidor). El cliente lee el stream y pinta
+//     token a token.
 //   • Mock     → respuestas del playbook con streaming simulado, para
 //     desarrollar/demo sin gastar un centavo.
 //
 // Tres modos: briefing (pre-llamada) · suggest (en vivo) · summary (al colgar).
 // ============================================================================
-import type { Lead, Temperature } from '../types';
+import type { CallSurveyAnswers, Lead, Temperature } from '../types';
 import { supabase } from '../lib/supabaseClient';
 import { detectObjection } from '../data/salesPlaybook';
 import { aperturaGuionMock } from '../data/playbook/aperturaSpec';
@@ -78,6 +79,8 @@ export interface CallOutcome {
   perdidos: number | null;
   /** Ruta de momentos por id, en orden. */
   momentos: string[];
+  /** Encuesta post-llamada (reporte manual del vendedor). null = no respondida. */
+  survey: CallSurveyAnswers | null;
 }
 
 export interface CopilotCallRecord {
@@ -217,8 +220,8 @@ const supaSuggest = (args: SuggestArgs, onDelta: (t: string) => void, signal?: A
     signal
   );
 
-// Precalienta el cache del modelo de suggest (fire-and-forget). El cache de
-// Anthropic es por modelo: el briefing (Opus) no calienta el de Haiku.
+// Precalienta el cache del modelo de suggest (fire-and-forget). OpenRouter
+// cachea el prefijo del system prompt automáticamente por modelo.
 const supaWarm = () => {
   callFn({ mode: 'warm' }).catch(() => {
     /* best-effort: si falla, la primera sugerencia solo será más lenta */
