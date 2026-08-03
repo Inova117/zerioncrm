@@ -1,13 +1,20 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
+import { fileURLToPath } from 'node:url';
+import { transformSync } from 'esbuild';
 import * as local from '../src/lib/normalize.js';
 import * as shared from '../../supabase/functions/_shared/normalize';
 
-// R2: the normalize logic exists twice — the pipeline's src/lib/normalize.ts
-// and the Supabase edge-function copy at supabase/functions/_shared/normalize.ts
-// (imported by find-leads). They must produce IDENTICAL outputs: the two
-// ingestion paths dedupe against the same CRM tables, so a divergence here
-// silently creates duplicate prospectos. Change one → change both.
+// R2: the normalize logic exists in THREE places that must stay identical:
+//   1. the pipeline's src/lib/normalize.ts            (ingesta masiva local)
+//   2. supabase/functions/_shared/normalize.ts        (canónico para edge fns)
+//   3. the inline block inside find-leads/index.ts    (autocontenido para
+//      deploy por dashboard — el bundler web no incluye _shared)
+// The two ingestion paths dedupe against the same CRM tables, so a divergence
+// silently creates duplicate prospectos. Change one → change ALL three, or
+// this test fails. The inline block is extracted between the
+// "normalize-inline-begin" / "normalize-inline-end" markers.
 
 const PHONES = [
   '(713) 555-0101',
@@ -41,6 +48,28 @@ const URLS = [
   undefined,
 ];
 
+const INDEX_PATH = fileURLToPath(
+  new URL('../../supabase/functions/find-leads/index.ts', import.meta.url),
+);
+
+/** Evaluate the inline normalize block of find-leads/index.ts as plain JS. */
+function inlineNormalize() {
+  const src = readFileSync(INDEX_PATH, 'utf8');
+  const begin = src.indexOf('// normalize-inline-begin');
+  const end = src.indexOf('// normalize-inline-end');
+  assert.ok(begin >= 0 && end > begin, 'marcadores normalize-inline no encontrados en find-leads/index.ts');
+  const code = src.slice(begin + '// normalize-inline-begin'.length, end);
+  // The block is TypeScript (annotations); transpile to JS before evaluating.
+  const { code: js } = transformSync(code, { loader: 'ts' });
+  return new Function(
+    `${js}; return { isSocialUrl, normalizeDomain, normalizePhone };`,
+  )() as {
+    isSocialUrl: typeof shared.isSocialUrl;
+    normalizeDomain: typeof shared.normalizeDomain;
+    normalizePhone: typeof shared.normalizePhone;
+  };
+}
+
 test('parity: normalizePhone identical outputs', () => {
   for (const input of PHONES) {
     assert.equal(
@@ -67,6 +96,30 @@ test('parity: isSocialUrl identical outputs', () => {
       shared.isSocialUrl(input as string),
       local.isSocialUrl(input as string),
       `isSocialUrl diverged for ${JSON.stringify(input)}`,
+    );
+  }
+});
+
+test('parity: inline find-leads block matches shared + local (3-way)', () => {
+  const inline = inlineNormalize();
+
+  for (const input of PHONES) {
+    assert.equal(
+      inline.normalizePhone(input),
+      shared.normalizePhone(input),
+      `inline normalizePhone diverged for ${JSON.stringify(input)}`,
+    );
+  }
+  for (const input of URLS) {
+    assert.equal(
+      inline.normalizeDomain(input),
+      shared.normalizeDomain(input),
+      `inline normalizeDomain diverged for ${JSON.stringify(input)}`,
+    );
+    assert.equal(
+      inline.isSocialUrl(input as string),
+      shared.isSocialUrl(input as string),
+      `inline isSocialUrl diverged for ${JSON.stringify(input)}`,
     );
   }
 });
