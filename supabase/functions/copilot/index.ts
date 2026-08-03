@@ -56,7 +56,7 @@ const KIMI_MODEL = Deno.env.get('KIMI_MODEL') ?? 'kimi-k3';
 // Versión visible en las cabeceras de TODA respuesta (incluido el preflight):
 //   curl -sI -X OPTIONS <url>/functions/v1/copilot | grep x-copilot-version
 // Súbela en cada cambio relevante — es la forma de verificar qué está deployado.
-const VERSION = '2026-08-03.1-guion-cliente';
+const VERSION = '2026-08-03.2-reasoning-off';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -144,11 +144,23 @@ async function openrouterFetch(req: OpenAIRequest): Promise<Response> {
         Authorization: `Bearer ${OPENROUTER_API_KEY}`,
         'Content-Type': 'application/json',
       },
+      // Timeout duro: si OpenRouter cuelga, que el error sea visible (502) en
+      // vez de dejar al vendedor con "Preparando…" eterno hasta que la
+      // plataforma mate la función a los 150s.
+      signal: AbortSignal.timeout(60000),
       body: JSON.stringify({
         model: req.model,
         max_tokens: req.max_tokens,
         stream: req.stream ?? false,
         temperature: 0.6,
+        // DeepSeek V4 Flash trae razonamiento (chain-of-thought) ACTIVADO en
+        // esfuerzo ALTO por defecto (reasoning.default_enabled=true). Para un
+        // coach EN VIVO es latencia pura: el modelo "piensa" decenas de
+        // segundos ANTES de emitir la frase, consume el max_tokens sin producir
+        // contenido (el parser solo lee delta.content) y el cliente se queda en
+        // "Preparando…" sin error. El modelo NO lo exige (mandatory=false), así
+        // que se apaga explícitamente — la frase exacta no necesita pensarse.
+        reasoning: { enabled: false },
         ...(req.json ? { response_format: { type: 'json_object' } } : {}),
         messages: [
           { role: 'system', content: req.system },
@@ -173,6 +185,9 @@ async function kimiFetch(req: OpenAIRequest): Promise<Response> {
         Authorization: `Bearer ${KIMI_API_KEY}`,
         'content-type': 'application/json',
       },
+      // Mismo timeout duro que OpenRouter: un proveedor que cuelga no debe
+      // dejar al vendedor esperando en silencio.
+      signal: AbortSignal.timeout(60000),
       body: JSON.stringify({
         model: req.model,
         max_tokens: req.max_tokens,

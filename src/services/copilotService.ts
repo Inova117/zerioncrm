@@ -207,16 +207,33 @@ async function callFn(
   const token = sess.session?.access_token;
   if (!token) throw new Error('Sesión expirada — vuelve a iniciar sesión.');
 
-  const res = await fetch(FN_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-      apikey: ANON_KEY,
-    },
-    body: JSON.stringify(body),
-    signal,
-  });
+  // Tope duro de 90s: si el server cuelga (el edge ya tiene timeout propio,
+  // esto es la red de seguridad del navegador), que el vendedor vea un error
+  // claro en vez de "Preparando…" eterno. El abort del caller (supersede)
+  // sigue teniendo prioridad: se combinan ambos señales.
+  const timeoutSignal = AbortSignal.timeout(90000);
+  const requestSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
+
+  let res: Response;
+  try {
+    res = await fetch(FN_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        apikey: ANON_KEY,
+      },
+      body: JSON.stringify(body),
+      signal: requestSignal,
+    });
+  } catch (e) {
+    // Timeout propio (no del caller): mensaje claro. El abort del caller se
+    // re-lanza para que el flujo de supersede siga comportándose igual.
+    if (e instanceof DOMException && e.name === 'AbortError' && !signal?.aborted) {
+      throw new Error('El copilot tardó demasiado (90s) — reintenta.');
+    }
+    throw e;
+  }
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
