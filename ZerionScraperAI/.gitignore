@@ -1,0 +1,26 @@
+# deps
+node_modules/
+
+# secrets — never commit
+.env
+.env.*
+!.env.example
+
+# runtime data
+data/
+screenshots/
+exports/
+*.db
+*.db-journal
+
+# build/tooling
+dist/
+.next/
+*.tsbuildinfo
+
+# misc
+.DS_Store
+npm-debug.log*
+
+# respaldo git anidado (historia previa)
+.git.bak/
