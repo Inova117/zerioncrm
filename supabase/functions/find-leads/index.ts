@@ -21,6 +21,7 @@
 // ============================================================================
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { isSocialUrl, normalizeDomain, normalizePhone } from '../_shared/normalize.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -38,38 +39,9 @@ const CORS = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-// --- normalize (ported from the scraper's lib/normalize) -------------------
-const SOCIAL_HOSTS = new Set([
-  'facebook.com', 'm.facebook.com', 'instagram.com', 'linktr.ee', 'wa.me',
-  'api.whatsapp.com', 'linkedin.com', 'x.com', 'twitter.com', 'tiktok.com',
-  'youtube.com', 'yelp.com', 'google.com',
-]);
-function hostnameOf(url: string): string | null {
-  try {
-    const s = /^[a-z][a-z0-9+.-]*:\/\//i.test(url) ? url : `https://${url}`;
-    return new URL(s).hostname.toLowerCase().replace(/^www\./, '');
-  } catch {
-    return null;
-  }
-}
-function isSocialUrl(url: string): boolean {
-  const h = hostnameOf(url);
-  if (!h) return false;
-  return SOCIAL_HOSTS.has(h) || [...SOCIAL_HOSTS].some((s) => h.endsWith(`.${s}`));
-}
-function normalizeDomain(url: string | null | undefined): string | null {
-  if (!url) return null;
-  const h = hostnameOf(url);
-  if (!h || isSocialUrl(url)) return null;
-  return h;
-}
-function normalizePhone(phone: string | null | undefined): string | null {
-  if (!phone) return null;
-  const d = String(phone).replace(/\D/g, '');
-  if (d.length < 7) return null;
-  if (d.length === 10) return `1${d}`;
-  return d;
-}
+// --- normalize: shared module (supabase/functions/_shared/normalize.ts) ----
+// Canonical copy kept in parity with ZerionScraperAI/src/lib/normalize.ts by
+// test/normalize-parity.test.ts — change both together or the test fails.
 
 // --- Apify place → normalized fields (defensive against field-name drift) ---
 interface RawPlace { [k: string]: unknown }
