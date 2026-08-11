@@ -262,7 +262,7 @@ export function LeadDetailModal({
 
           {/* Guion de llamada específico del prospecto (Sales Copilot). Se lee
               en pantalla durante la llamada y tiene prioridad sobre el guion
-              genérico Hormozi; vacío = usar el estándar. */}
+              genérico de llamada en frío; vacío = usar el estándar. */}
           <div className="rounded-xl border border-brand-100 bg-brand-50/30 p-4">
             <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-brand-600">
               <BookOpen className="h-3.5 w-3.5" /> Guion de llamada (este prospecto)
@@ -274,7 +274,7 @@ export function LeadDetailModal({
                 setScriptDraft(e.target.value);
                 setScriptSaved(false);
               }}
-              placeholder={'Ej.\n1. Apertura: "¡Don [Nombre]! … su página YA ESTÁ HECHA."\n2. Pregunta del dolor: "¿Cómo le llegan los clientes hoy?"\n3. Cierre T1: "¿A qué hora la alcanza a ver?"\n\nVacío = el copilot usa el guion genérico Hormozi.'}
+              placeholder={'Ej.\n1. Apertura: "¿Le caí en mal momento o tiene 30 segundos?"\n2. El dolor: "¿Qué pasa cuando lo buscan en Google y no aparece?"\n3. Cierre: "¿Le mando 2 ejemplos por WhatsApp?"\n\nVacío = el copilot usa el guion genérico de llamada en frío.'}
               aria-label="Guion de llamada específico del prospecto"
             />
             <div className="mt-2 flex items-center gap-2">
