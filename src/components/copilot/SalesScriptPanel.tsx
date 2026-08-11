@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
-import { BookOpen, ChevronDown, ChevronRight } from 'lucide-react';
+import { BookOpen, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { SALES_SCRIPT_HORMOZI, HORMOZI_PITCH_LINE } from '../../data/salesScriptHormozi';
 import { splitScriptSteps } from '../../lib/scriptUtils';
+import { fillPrecios } from '../../lib/copilotSettings';
 
 interface SalesScriptPanelProps {
   /** Etapa actual del lead (para resaltar la sección más probable). */
@@ -10,6 +11,9 @@ interface SalesScriptPanelProps {
   /** Guion específico de ESTE prospecto (lead.script). Si existe, tiene
    *  prioridad sobre el guion genérico Hormozi. */
   script?: string;
+  /** Modo grande: tipografía y controles grandes, llena la altura disponible —
+   *  para leer DURANTE la llamada. */
+  large?: boolean;
 }
 
 /** Atajo: qué sección del guion toca según la temperatura del lead. */
@@ -22,7 +26,7 @@ const SECTION_BY_TEMP: Record<string, string> = {
   'no-acepto': 'seguimiento',
 };
 
-export function SalesScriptPanel({ temperature, script }: SalesScriptPanelProps) {
+export function SalesScriptPanel({ temperature, script, large = false }: SalesScriptPanelProps) {
   const hasCustom = Boolean(script?.trim());
   // El key={lead.id} del padre remonta el panel por prospecto, así el modo
   // arranca SIEMPRE en el guion correcto para el lead actual.
@@ -37,62 +41,76 @@ export function SalesScriptPanel({ temperature, script }: SalesScriptPanelProps)
   const steps = useMemo(() => splitScriptSteps(script ?? ''), [script]);
 
   const current = sections.find((s) => s.id === activeId) ?? sections[0]!;
+  const currentIdx = Math.max(0, sections.findIndex((s) => s.id === current.id));
   const step = steps[activeStep] ?? '';
+  const total = mode === 'custom' ? steps.length : sections.length;
+  const atStart = mode === 'custom' ? activeStep === 0 : currentIdx === 0;
+  const atEnd = mode === 'custom' ? activeStep >= steps.length - 1 : currentIdx >= sections.length - 1;
+
+  const prev = () => {
+    if (mode === 'custom') setActiveStep((i) => Math.max(0, i - 1));
+    else setActiveId(sections[Math.max(0, currentIdx - 1)]!.id);
+  };
+  const next = () => {
+    if (mode === 'custom') setActiveStep((i) => Math.min(steps.length - 1, i + 1));
+    else setActiveId(sections[Math.min(sections.length - 1, currentIdx + 1)]!.id);
+  };
+
+  const chipClass = (active: boolean) =>
+    cn(
+      'flex items-center justify-center rounded-lg font-semibold transition-colors',
+      large ? 'h-10 w-10 text-sm' : 'h-7 min-w-7 px-1.5 text-[11px]',
+      active ? 'bg-brand-600 text-white' : 'bg-surface-100 text-surface-500 hover:bg-surface-200'
+    );
 
   return (
-    <div className="card overflow-hidden p-3">
+    <div className={cn('card overflow-hidden', large ? 'flex h-full flex-col p-4' : 'p-3')}>
       <button
         className="flex w-full items-center gap-2 text-left"
         onClick={() => setOpen((v) => !v)}
         title={mode === 'custom' ? 'Guion de este prospecto — llévalo a la vista durante la llamada' : 'Guion de venta Hormozi — llévalo a la vista durante la llamada'}
       >
         {open ? (
-          <ChevronDown className="h-4 w-4 text-brand-500" />
+          <ChevronDown className={cn('text-brand-500', large ? 'h-5 w-5' : 'h-4 w-4')} />
         ) : (
-          <ChevronRight className="h-4 w-4 text-surface-400" />
+          <ChevronRight className={cn('text-surface-400', large ? 'h-5 w-5' : 'h-4 w-4')} />
         )}
-        <BookOpen className="h-4 w-4 text-brand-600" />
-        <span className="text-sm font-semibold text-surface-800">
+        <BookOpen className={cn('text-brand-600', large ? 'h-5 w-5' : 'h-4 w-4')} />
+        <span className={cn('font-semibold text-surface-800', large ? 'text-base' : 'text-sm')}>
           {mode === 'custom' ? 'Guion del prospecto' : 'Guion Hormozi'}
         </span>
-        <span className="ml-auto text-[10px] text-surface-400">
-          {mode === 'custom' ? `paso ${activeStep + 1}/${steps.length}` : `paso ${current.step}/9`}
+        <span className={cn('ml-auto text-surface-400', large ? 'text-xs' : 'text-[10px]')}>
+          paso {mode === 'custom' ? activeStep + 1 : current.step}/{mode === 'custom' ? steps.length : 9}
         </span>
       </button>
 
       {open && (
-        <div className="mt-2 space-y-2">
+        <div className={cn('mt-2 space-y-2', large && 'flex min-h-0 flex-1 flex-col')}>
           {mode === 'custom' && hasCustom ? (
             <>
               {/* Guion escrito para ESTE cliente: prioridad total durante la llamada */}
-              <p className="rounded-lg bg-brand-50/60 px-2.5 py-1.5 text-[11px] italic leading-snug text-brand-700">
+              <p className={cn('rounded-lg bg-brand-50/60 italic leading-snug text-brand-700', large ? 'px-3 py-2 text-sm' : 'px-2.5 py-1.5 text-[11px]')}>
                 Escrito para este prospecto — prioridad sobre el guion genérico.
               </p>
 
               {steps.length > 1 && (
-                <div className="flex flex-wrap gap-1">
+                <div className="flex flex-wrap gap-1.5">
                   {steps.map((_, i) => (
-                    <button
-                      key={i}
-                      onClick={() => setActiveStep(i)}
-                      className={cn(
-                        'flex h-7 min-w-7 items-center justify-center rounded-lg px-1.5 text-[11px] font-semibold transition-colors',
-                        activeStep === i ? 'bg-brand-600 text-white' : 'bg-surface-100 text-surface-500 hover:bg-surface-200'
-                      )}
-                      title={`Paso ${i + 1}`}
-                    >
+                    <button key={i} onClick={() => setActiveStep(i)} className={chipClass(activeStep === i)} title={`Paso ${i + 1}`}>
                       {i + 1}
                     </button>
                   ))}
                 </div>
               )}
 
-              <div className="rounded-xl border border-brand-100 bg-brand-50/40 p-3">
-                <p className="whitespace-pre-wrap text-sm leading-relaxed text-surface-800">{step}</p>
+              <div className={cn('rounded-xl border border-brand-100 bg-brand-50/40', large ? 'min-h-0 flex-1 overflow-y-auto p-4' : 'p-3')}>
+                <p className={cn('whitespace-pre-wrap leading-relaxed text-surface-800', large ? 'text-base' : 'text-sm')}>
+                  {fillPrecios(step)}
+                </p>
               </div>
 
               <button
-                className="text-[11px] text-surface-400 underline hover:text-surface-600"
+                className={cn('self-start text-surface-400 underline hover:text-surface-600', large ? 'text-sm' : 'text-[11px]')}
                 onClick={() => setMode('hormozi')}
               >
                 Ver guion genérico Hormozi
@@ -101,50 +119,65 @@ export function SalesScriptPanel({ temperature, script }: SalesScriptPanelProps)
           ) : (
             <>
               {/* Guion genérico Hormozi (por defecto) */}
-              <div className="flex flex-wrap gap-1">
+              <div className="flex flex-wrap gap-1.5">
                 {sections.map((s) => (
-                  <button
-                    key={s.id}
-                    onClick={() => setActiveId(s.id)}
-                    className={cn(
-                      'flex h-7 min-w-7 items-center justify-center rounded-lg px-1.5 text-[11px] font-semibold transition-colors',
-                      activeId === s.id ? 'bg-brand-600 text-white' : 'bg-surface-100 text-surface-500 hover:bg-surface-200'
-                    )}
-                    title={s.title}
-                  >
+                  <button key={s.id} onClick={() => setActiveId(s.id)} className={chipClass(activeId === s.id)} title={s.title}>
                     {s.step}
                   </button>
                 ))}
               </div>
 
-              <div className="rounded-xl border border-brand-100 bg-brand-50/40 p-3">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-brand-600">
+              <div className={cn('rounded-xl border border-brand-100 bg-brand-50/40', large ? 'min-h-0 flex-1 overflow-y-auto p-4' : 'p-3')}>
+                <p className={cn('font-semibold uppercase tracking-wide text-brand-600', large ? 'text-sm' : 'text-[11px]')}>
                   {current.emoji} Paso {current.step} — {current.title}
                 </p>
-                <p className="mt-1 text-xs text-surface-500">{current.action}</p>
-                <ul className="mt-2 space-y-1.5">
+                <p className={cn('mt-1 text-surface-500', large ? 'text-sm' : 'text-xs')}>{fillPrecios(current.action)}</p>
+                <ul className={cn('mt-2 space-y-2', large && 'mt-3')}>
                   {current.lines.map((line, i) => (
-                    <li key={i} className="text-sm leading-snug text-surface-800">
-                      {line}
+                    <li key={i} className={cn('leading-snug text-surface-800', large ? 'text-base' : 'text-sm')}>
+                      {fillPrecios(line)}
                     </li>
                   ))}
                 </ul>
               </div>
 
               {/* El destino (Hormozi) */}
-              <p className="rounded-lg bg-surface-50 px-2.5 py-1.5 text-[11px] italic leading-snug text-surface-500">
-                {HORMOZI_PITCH_LINE}
+              <p className={cn('rounded-lg bg-surface-50 italic leading-snug text-surface-500', large ? 'px-3 py-2 text-sm' : 'px-2.5 py-1.5 text-[11px]')}>
+                {fillPrecios(HORMOZI_PITCH_LINE)}
               </p>
 
               {hasCustom && (
                 <button
-                  className="text-[11px] text-surface-400 underline hover:text-surface-600"
+                  className={cn('self-start text-surface-400 underline hover:text-surface-600', large ? 'text-sm' : 'text-[11px]')}
                   onClick={() => setMode('custom')}
                 >
                   Volver al guion de este prospecto
                 </button>
               )}
             </>
+          )}
+
+          {/* Navegación anterior/siguiente — controles grandes para la llamada */}
+          {total > 1 && (
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                className={cn('btn-secondary flex items-center justify-center gap-1', large ? 'flex-1 py-3 text-base' : 'py-1.5 text-xs')}
+                onClick={prev}
+                disabled={atStart}
+              >
+                <ChevronLeft className={large ? 'h-5 w-5' : 'h-4 w-4'} /> Anterior
+              </button>
+              <span className={cn('shrink-0 text-surface-400', large ? 'text-sm' : 'text-xs')}>
+                {(mode === 'custom' ? activeStep : currentIdx) + 1} / {total}
+              </span>
+              <button
+                className={cn('btn-secondary flex items-center justify-center gap-1', large ? 'flex-1 py-3 text-base' : 'py-1.5 text-xs')}
+                onClick={next}
+                disabled={atEnd}
+              >
+                Siguiente <ChevronRight className={large ? 'h-5 w-5' : 'h-4 w-4'} />
+              </button>
+            </div>
           )}
         </div>
       )}
