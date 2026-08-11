@@ -297,7 +297,7 @@ export function CopilotPage() {
 
             {/* El guion — la pantalla principal de la llamada */}
             <div className="min-h-0 flex-1">
-              <SalesScriptPanel key={lead.id} temperature={lead.temperature} script={lead.script} large />
+              <SalesScriptPanel key={lead.id} lead={lead} script={lead.script} large />
             </div>
 
             <button className="btn-danger w-full py-4 text-base" onClick={hangUp}>

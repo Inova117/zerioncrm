@@ -2,12 +2,13 @@ import { useMemo, useState } from 'react';
 import { BookOpen, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { SALES_SCRIPT_HORMOZI, HORMOZI_PITCH_LINE } from '../../data/salesScriptHormozi';
-import { splitScriptSteps } from '../../lib/scriptUtils';
+import { splitScriptSteps, fillLeadVars, type ScriptLeadVars } from '../../lib/scriptUtils';
 import { fillPrecios } from '../../lib/copilotSettings';
 
 interface SalesScriptPanelProps {
-  /** Etapa actual del lead (para resaltar la sección más probable). */
-  temperature?: string;
+  /** Datos del prospecto — resuelven las variables del guion ([SALUDO],
+   *  [NOMBRE], [rubro], [CIUDAD], [EMPRESA]) en pantalla, sin LLM. */
+  lead?: ScriptLeadVars;
   /** Guion específico de ESTE prospecto (lead.script). Si existe, tiene
    *  prioridad sobre el guion genérico Hormozi. */
   script?: string;
@@ -26,19 +27,24 @@ const SECTION_BY_TEMP: Record<string, string> = {
   'no-acepto': 'seguimiento',
 };
 
-export function SalesScriptPanel({ temperature, script, large = false }: SalesScriptPanelProps) {
+export function SalesScriptPanel({ lead, script, large = false }: SalesScriptPanelProps) {
   const hasCustom = Boolean(script?.trim());
   // El key={lead.id} del padre remonta el panel por prospecto, así el modo
   // arranca SIEMPRE en el guion correcto para el lead actual.
   const [mode, setMode] = useState<'custom' | 'hormozi'>(hasCustom ? 'custom' : 'hormozi');
   const [open, setOpen] = useState(true);
   const [activeId, setActiveId] = useState<string | null>(
-    () => (temperature ? SECTION_BY_TEMP[temperature] ?? 'apertura' : 'apertura')
+    () => (lead?.temperature ? SECTION_BY_TEMP[lead.temperature] ?? 'apertura' : 'apertura')
   );
   const [activeStep, setActiveStep] = useState(0);
 
   const sections = useMemo(() => SALES_SCRIPT_HORMOZI, []);
   const steps = useMemo(() => splitScriptSteps(script ?? ''), [script]);
+
+  // El texto del guion sale con las variables del prospecto resueltas
+  // ([SALUDO] → "Doña Marta", [rubro] → "clínica dental"…) y los precios de
+  // Ajustes ([PRECIO]/[MENSUAL]). Todo en pantalla, sin LLM.
+  const fill = (t: string) => fillPrecios(fillLeadVars(t, lead));
 
   const current = sections.find((s) => s.id === activeId) ?? sections[0]!;
   const currentIdx = Math.max(0, sections.findIndex((s) => s.id === current.id));
@@ -105,7 +111,7 @@ export function SalesScriptPanel({ temperature, script, large = false }: SalesSc
 
               <div className={cn('rounded-xl border border-brand-100 bg-brand-50/40', large ? 'min-h-0 flex-1 overflow-y-auto p-4' : 'p-3')}>
                 <p className={cn('whitespace-pre-wrap leading-relaxed text-surface-800', large ? 'text-base' : 'text-sm')}>
-                  {fillPrecios(step)}
+                  {fill(step)}
                 </p>
               </div>
 
@@ -131,11 +137,11 @@ export function SalesScriptPanel({ temperature, script, large = false }: SalesSc
                 <p className={cn('font-semibold uppercase tracking-wide text-brand-600', large ? 'text-sm' : 'text-[11px]')}>
                   {current.emoji} Paso {current.step} — {current.title}
                 </p>
-                <p className={cn('mt-1 text-surface-500', large ? 'text-sm' : 'text-xs')}>{fillPrecios(current.action)}</p>
+                <p className={cn('mt-1 text-surface-500', large ? 'text-sm' : 'text-xs')}>{fill(current.action)}</p>
                 <ul className={cn('mt-2 space-y-2', large && 'mt-3')}>
                   {current.lines.map((line, i) => (
                     <li key={i} className={cn('leading-snug text-surface-800', large ? 'text-base' : 'text-sm')}>
-                      {fillPrecios(line)}
+                      {fill(line)}
                     </li>
                   ))}
                 </ul>
@@ -143,7 +149,7 @@ export function SalesScriptPanel({ temperature, script, large = false }: SalesSc
 
               {/* El destino (Hormozi) */}
               <p className={cn('rounded-lg bg-surface-50 italic leading-snug text-surface-500', large ? 'px-3 py-2 text-sm' : 'px-2.5 py-1.5 text-[11px]')}>
-                {fillPrecios(HORMOZI_PITCH_LINE)}
+                {fill(HORMOZI_PITCH_LINE)}
               </p>
 
               {hasCustom && (

@@ -9,6 +9,14 @@
 //
 // Los montos [PRECIO] / [MENSUAL] se resuelven SIEMPRE desde MIS PRECIOS
 // (ajustes del copilot) — nunca inventar una cifra.
+//
+// Variables del prospecto (se resuelven en pantalla con los datos del lead,
+// sin LLM — ver fillLeadVars en src/lib/scriptUtils.ts):
+//   [SALUDO]  → "Doña Marta" / "Don Juan" / "Buenas"
+//   [NOMBRE]  → "Marta, de ZerionStudio" (auto-presentación)
+//   [rubro]   → industria ("clínica dental", "restaurantes"…)
+//   [CIUDAD]  → ciudad del negocio
+//   [EMPRESA] → nombre del negocio
 // ============================================================================
 
 export interface ScriptSection {
@@ -30,9 +38,9 @@ export const SALES_SCRIPT_HORMOZI: ScriptSection[] = [
     emoji: '🎯',
     action: 'Dila y CALLA. No pidas permiso. Sonríe — se escucha.',
     lines: [
-      '"¡Don [Nombre]! ¿Cómo le va? … [Nombre de pila], de ZerionStudio."',
+      '"¡[SALUDO]! ¿Cómo le va? … Soy [NOMBRE]."',
       '"Le soy honesto de entrada: esta es una llamada de ventas — y aun así le va a interesar, porque su página web YA ESTÁ HECHA."',
-      '"¿Sabía que cuando buscan [rubro] en Google, usted no aparece?"',
+      '"¿Sabía que cuando buscan [rubro] en Google, usted no aparece? … En [CIUDAD], [EMPRESA] no sale ni en la primera página."',
     ],
   },
   {
@@ -67,7 +75,7 @@ export const SALES_SCRIPT_HORMOZI: ScriptSection[] = [
     action: 'El contraste: HOY vs CON la página. Pausa de misterio antes de "ya está hecha".',
     lines: [
       '"Yo no le llamo a ofrecerle una página… le llamo porque su página YA ESTÁ HECHA."',
-      '"La armamos por nuestra cuenta, como muestra de trabajo, con SUS fotos y SUS reseñas de Google — para que el que lo busca le escriba directo al WhatsApp."',
+      '"La armamos por nuestra cuenta, como muestra de trabajo, con SUS fotos y SUS reseñas de Google — para que el que busca [rubro] en [CIUDAD] le escriba directo al WhatsApp."',
       '"HOY: cuando lo buscan en Google, aparece su competencia. CON la página: lo encuentran a usted, le escriben, y usted vende sin contestar el teléfono."',
       '"Y ojo — usted no ha contratado nada ni me debe nada. La hicimos por nuestra cuenta."',
     ],
