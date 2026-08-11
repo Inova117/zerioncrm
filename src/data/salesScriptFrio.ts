@@ -10,7 +10,10 @@
 //   - NEPQ-lite (Jeremy Miner): 2-3 preguntas emocionales + costo de inacción
 //     + acuerdo lógico + cierre con pregunta (el prospecto se vende solo).
 //   - WhatsApp (LatAm): el canal rey — la meta de la llamada fría es que diga
-//     SÍ a recibir ejemplos por WhatsApp. La venta cierra ahí.
+//     SÍ a recibir SU página por WhatsApp. La venta cierra ahí.
+//   - DEMO-FIRST (ZerionStudio): la página del prospecto se desarrolla ANTES
+//     de la llamada (con SUS fotos y reseñas de Google) — "ya está hecha".
+//     Si le gusta, avanza; si no, se borra. Cero riesgo para el prospecto.
 //
 // Los montos [PRECIO] / [MENSUAL] se resuelven SIEMPRE desde MIS PRECIOS
 // (ajustes del copilot) — nunca inventar una cifra.
@@ -84,13 +87,15 @@ export const SALES_SCRIPT_FRIO: ScriptSection[] = [
   {
     id: 'acuerdo',
     step: '5',
-    title: 'Acuerdo lógico + prueba (NEPQ nivel 5)',
-    emoji: '🤝',
-    action: 'No vendas la web: vendes 30 seg → 2 min → WhatsApp. La meta es que diga SÍ a recibir ejemplos.',
+    title: 'La revelación (su página YA está hecha)',
+    emoji: '💥',
+    action: 'El momento clave: NO ofrezcas ejemplos de otros — su página ya existe (demo-first). Pausa de misterio antes de decirlo. Luego amarra el WhatsApp.',
     lines: [
       '"Tiene sentido, ¿no? Si no aparecen cuando lo buscan, el cliente se va con quien sí aparece."',
-      '"Por eso le llamo: yo hago las páginas de [rubro] como el suyo. No sé si le sirva, pero le puedo mandar por WhatsApp 2 ejemplos de negocios como el suyo, para que vea el estilo sin compromiso. ¿Se los mando?"',
-      '"¿Este número tiene WhatsApp? … Perfecto, se los mando ahorita."',
+      '"Ojo, que no le llamo a ofrecerle una página: su página web YA ESTÁ HECHA."',
+      '"La armamos como muestra de trabajo, con SUS fotos y SUS reseñas de Google — usted no ha contratado nada ni me debe nada."',
+      '"Se la mando por WhatsApp, la ve con calma. Si le gusta, avanzamos. Si no, la borro y aquí no ha pasado nada. ¿Le parece justo?"',
+      '"¿Este número tiene WhatsApp? … Perfecto, se la mando ahorita."',
     ],
   },
   {
@@ -101,9 +106,9 @@ export const SALES_SCRIPT_FRIO: ScriptSection[] = [
     action: 'Las primeras objeciones son reflejos, no decisiones (Barrows). Acordar → preguntar → re-pedir el paso. Máx. 2 loops.',
     lines: [
       '"No me interesa" → "Claro, totalmente válido. Solo una cosa: ¿qué hace hoy para que lo encuentren en Google, o no le preocupa por ahora?"',
-      '"Mándame la info" → "La información ES la página — se la mando por WhatsApp y usted la ve con calma. ¿Me da el número?"',
-      '"Ya tengo quien me la haga" → "Qué bueno. Mire los ejemplos igual — si lo de su gente es mejor, no me paga nada. Usted no pierde nada."',
-      '"No tengo tiempo" → "Le entiendo, por eso le mando todo por WhatsApp y usted lo ve cuando pueda. ¿Se los mando?"',
+      '"Mándame la info" → "La información ES la página — ya está hecha, se la mando por WhatsApp y usted la ve con calma. ¿Me da el número?"',
+      '"Ya tengo quien me la haga" → "Qué bueno. Mire la nuestra igual — la armamos con sus fotos y reseñas, sin costo para usted. Si lo de su gente es mejor, la borro y no me paga nada. Usted no pierde nada."',
+      '"No tengo tiempo" → "Le entiendo, por eso la dejamos ya terminada: usted solo la mira 2 minutos por WhatsApp cuando pueda. ¿Se la mando?"',
     ],
   },
   {
@@ -124,8 +129,8 @@ export const SALES_SCRIPT_FRIO: ScriptSection[] = [
     emoji: '💵',
     action: 'La llamada fría NO vende la web: vende el siguiente paso (Barrows). El precio SOLO si él pregunta.',
     lines: [
-      '"¿Le pareció justo? … Entonces le mando los ejemplos por WhatsApp y usted me dice cuál le gusta más. ¿Le parece?"',
-      '→ Solo si pregunta precio: "Todo incluido, [PRECIO], y la ve terminada antes de pagar: si no le encanta, no paga. Pero primero vea los ejemplos."',
+      '"¿Le pareció justo? … Entonces le mando SU página por WhatsApp y usted me dice si le gusta. ¿Le parece?"',
+      '→ Solo si pregunta precio: "Como la suya ya está construida, queda en [PRECIO], con todo — se lo digo de frente porque aquí no hay letra chica. Y la ve terminada antes de pagar: si no le encanta, no paga. Pero primero véala."',
     ],
   },
   {
@@ -135,10 +140,10 @@ export const SALES_SCRIPT_FRIO: ScriptSection[] = [
     emoji: '📆',
     action: 'Siempre con algo NUEVO. Nunca "¿ya lo pensó?". Cadencia: día 0, 2, 5, 9 — y STOP.',
     lines: [
-      'WhatsApp día 0: "Aquí van los 2 ejemplos. Mírelos con calma y dígame cuál estilo le gusta más para el suyo."',
-      'Día 2: "¿Le llegaron? Le dejo uno más de su rubro por si le sirve de referencia."',
+      'WhatsApp día 0: "Aquí va SU página — mírela con calma. Si no le gusta, me dice y la borro, no le molesto más."',
+      'Día 2: "¿Alcanzó a verla? Si quiere cambios o tiene dudas, me escribe — se ajusta sin costo."',
       'Día 5: caso corto: "Un [rubro] de [CIUDAD] pasó de no aparecer a recibir X mensajes a la semana."',
-      'Día 9: cierre suave: "Si no es buen momento, sin problema. Cuando quiera ver cómo se vería la suya, aquí estoy." — STOP.',
+      'Día 9: cierre suave: "Si no es buen momento, sin problema. La dejo guardada unos días — cuando quiera la retomamos. Aquí estoy." — STOP.',
     ],
   },
 ];
@@ -146,6 +151,6 @@ export const SALES_SCRIPT_FRIO: ScriptSection[] = [
 /** La objeción más probable según la etapa del lead (atajo para el panel). */
 export const QUICK_OBJECTIONS = SALES_SCRIPT_FRIO.find((s) => s.id === 'objeciones')!.lines;
 
-/** Frase resumen del sistema (prospección fría): lo que se vende en cada etapa. */
+/** Frase resumen del sistema (prospección fría + demo-first): lo que se vende. */
 export const FRIO_PITCH_LINE =
-  'En la llamada fría no se vende la web: se venden 30 segundos, luego 2 minutos, luego un WhatsApp con ejemplos. La web se vende sola cuando la ven terminada.';
+  'No le ofrezcas una página: muéstrale la suya, YA HECHA. Si le gusta, avanza; si no, se borra. El riesgo siempre es cero — por eso se construye antes de cobrar.';
