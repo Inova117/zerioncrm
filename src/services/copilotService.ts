@@ -644,3 +644,108 @@ export const copilotSuggest: (
 ) => Promise<string> = supabase ? supaSuggest : mockSuggest;
 export const copilotSummary: (lead: Lead, transcript: string) => Promise<CallSummary> =
   supabase ? supaSummary : mockSummary;
+
+// ===========================================================================
+// Análisis post-llamada (grabación → Whisper → DeepSeek V4 Flash)
+// ===========================================================================
+
+/** Coaching de mejora de una llamada (modo 'analyze'). */
+export interface CallAnalysis {
+  summary: string;
+  temperature: string;
+  nextAction: string;
+  whatWentWell: string;
+  coaching: string;
+}
+
+export interface AnalyzeCallResult {
+  transcript: string;
+  analysis: CallAnalysis;
+}
+
+/** Blob → base64 (para subir el audio a la edge function). */
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => resolve(String(fr.result).split(',')[1] ?? '');
+    fr.onerror = () => reject(fr.error);
+    fr.readAsDataURL(blob);
+  });
+}
+
+/** El LLM puede envolver el JSON en ```json fences — se tolera y se valida. */
+function parseAnalysis(raw: unknown): CallAnalysis {
+  const text =
+    typeof raw === 'string'
+      ? raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim()
+      : JSON.stringify(raw ?? '{}');
+  try {
+    const j = JSON.parse(text) as Record<string, unknown>;
+    return {
+      summary: String(j.summary ?? ''),
+      temperature: String(j.temperature ?? ''),
+      nextAction: String(j.nextAction ?? ''),
+      whatWentWell: String(j.whatWentWell ?? ''),
+      coaching: String(j.coaching ?? ''),
+    };
+  } catch {
+    throw new Error('No se pudo leer el análisis del copilot — reintenta.');
+  }
+}
+
+/** Envía el audio de la llamada a la edge function: Whisper la transcribe y
+ *  DeepSeek V4 Flash analiza CÓMO MEJORAR (sales manager). Devuelve el
+ *  transcript (para el registro del CRM) + el coaching. */
+export async function analyzeCallAudio(
+  lead: Lead,
+  audio: Blob,
+  script: string,
+  vendor?: string,
+  signal?: AbortSignal
+): Promise<AnalyzeCallResult> {
+  if (!supabase) throw new Error('El análisis de la grabación requiere Supabase conectado.');
+  if (audio.size > 12 * 1024 * 1024) {
+    throw new Error('La grabación es muy larga (máx ~10 minutos) — prueba con una llamada más corta.');
+  }
+  const audioB64 = await blobToBase64(audio);
+  const { data: sess } = await supabase.auth.getSession();
+  const token = sess.session?.access_token;
+  if (!token) throw new Error('Sesión expirada — vuelve a iniciar sesión.');
+
+  // El análisis (transcripción + LLM) tarda ~1 min: tope de 150s con error
+  // amigable; el abort del caller sigue teniendo prioridad.
+  const timeoutSignal = AbortSignal.timeout(150000);
+  const requestSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
+
+  let res: Response;
+  try {
+    res = await fetch(FN_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        apikey: ANON_KEY,
+      },
+      body: JSON.stringify({
+        mode: 'analyze',
+        lead: leadBrief(lead),
+        audioB64,
+        mimeType: audio.type || 'audio/webm',
+        script,
+        vendor,
+      }),
+      signal: requestSignal,
+    });
+  } catch (e) {
+    if (e instanceof DOMException && e.name === 'AbortError' && !signal?.aborted) {
+      throw new Error('El análisis tardó demasiado (150s) — reintenta o prueba con una llamada más corta.');
+    }
+    throw e;
+  }
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error ?? `Copilot respondió ${res.status}`);
+  }
+  const data = (await res.json().catch(() => ({}))) as { transcript?: string; analysis?: unknown };
+  return { transcript: data.transcript ?? '', analysis: parseAnalysis(data.analysis) };
+}

@@ -33,6 +33,10 @@ const OPENROUTER_API_KEY = Deno.env.get('OPENROUTER_API_KEY') ?? '';
 
 const OPENROUTER_BASE_URL = (Deno.env.get('OPENROUTER_BASE_URL') ?? 'https://openrouter.ai/api/v1').replace(/\/+$/, '');
 
+// Whisper vía OpenRouter (audio → texto) con la MISMA key del LLM. La
+// transcripción alimenta el modo 'analyze' (grabación post-llamada).
+const WHISPER_MODEL = 'openai/whisper-large-v3-turbo';
+
 // Modelo DeepSeek por defecto para briefing/resumen/debrief/coaching:
 // deepseek-v4-flash-0731 es DeepSeek V4 Flash (lanzado 31 jul / 1 ago 2026),
 // la versión más nueva del modelo Flash en el catálogo público de OpenRouter.
@@ -56,7 +60,7 @@ const KIMI_MODEL = Deno.env.get('KIMI_MODEL') ?? 'kimi-k3';
 // Versión visible en las cabeceras de TODA respuesta (incluido el preflight):
 //   curl -sI -X OPTIONS <url>/functions/v1/copilot | grep x-copilot-version
 // Súbela en cada cambio relevante — es la forma de verificar qué está deployado.
-const VERSION = '2026-08-03.2-reasoning-off';
+const VERSION = '2026-08-11.1-analisis-audio';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -111,6 +115,11 @@ interface CopilotBody {
   /** Guion específico de ESTE prospecto (lead.script). Prioridad máxima: se
    *  sigue palabra por palabra por encima de las jugadas del playbook. */
   script?: string;
+  /** Grabación de la llamada en base64 (modo 'analyze'): se transcribe con
+   *  Whisper (misma key de OpenRouter) y DeepSeek analiza cómo mejorar. */
+  audioB64?: string;
+  /** MimeType del audio grabado (webm/ogg/wav). */
+  mimeType?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -356,6 +365,8 @@ async function handle(req: Request): Promise<Response> {
   const vendor = str(body.vendor).slice(0, 60);
   // El guion específico del prospecto (lead.script) — prioridad máxima en vivo.
   const script = str(body.script).slice(0, 4000);
+  const audioB64 = str(body.audioB64);
+  const mimeType = str(body.mimeType) || 'audio/webm';
 
   // -------------------------------------------------------------------- warm
   // Precalienta el cache del system (PERSONA + playbook, por modelo) para que
@@ -473,6 +484,77 @@ async function handle(req: Request): Promise<Response> {
     const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
     const text = data.choices?.[0]?.message?.content ?? '{}';
     return new Response(text, { headers: { 'Content-Type': 'application/json', ...CORS } });
+  }
+
+  // ----------------------------------------------------------------- analyze
+  // Post-llamada: el vendedor GRABA la llamada (sin transcript en vivo); al
+  // terminar, el audio se transcribe con Whisper (la MISMA key de OpenRouter,
+  // sin config extra) y DeepSeek V4 Flash analiza CÓMO MEJORAR (sales manager).
+  // Devuelve { transcript, analysis } — el transcript queda en el registro del
+  // CRM (revisable), el análisis es el coaching de la llamada.
+  if (mode === 'analyze') {
+    if (!audioB64) return json({ error: 'Falta la grabación de la llamada' }, 400);
+    if (audioB64.length > 14_000_000) {
+      return json({ error: 'La grabación es muy larga — prueba con llamadas de hasta ~10 minutos' }, 413);
+    }
+
+    // 1) Transcripción con Whisper (OpenRouter sirve audio con la misma key).
+    let wavBytes: Uint8Array;
+    try {
+      const bin = atob(audioB64);
+      wavBytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) wavBytes[i] = bin.charCodeAt(i);
+    } catch {
+      return json({ error: 'El audio no es base64 válido' }, 400);
+    }
+    const form = new FormData();
+    form.append('model', WHISPER_MODEL);
+    form.append('language', 'es');
+    form.append('file', new Blob([wavBytes], { type: mimeType }), 'llamada.webm');
+    let whisperRes: Response;
+    try {
+      whisperRes = await fetch(`${OPENROUTER_BASE_URL}/audio/transcriptions`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${OPENROUTER_API_KEY}` },
+        // Una llamada de 5-10 min tarda en transcribirse; tope duro para que
+        // el error sea visible en vez de un 500 pelado del gateway.
+        signal: AbortSignal.timeout(120000),
+        body: form,
+      });
+    } catch {
+      return json({ error: 'La transcripción del audio tardó demasiado — prueba con una llamada más corta' }, 504);
+    }
+    if (!whisperRes.ok) {
+      const detail = await whisperRes.text().catch(() => '');
+      return json({ error: `Whisper respondió ${whisperRes.status}`, detail: detail.slice(0, 300) }, 502);
+    }
+    const whisperJson = (await whisperRes.json().catch(() => ({}))) as { text?: string };
+    const transcript = (whisperJson.text ?? '').trim();
+    if (!transcript) {
+      return json({ error: 'No se entendió nada del audio — ¿grabaste la llamada con el celular en altavoz?' }, 422);
+    }
+
+    // 2) DeepSeek analiza la llamada: coaching de mejora + resumen medible.
+    const analyzeSystem =
+      `Eres el mejor sales manager de Latinoamérica revisando la grabación de una llamada en frío de tu vendedor (vende páginas web + automatizaciones a negocios locales con el modelo demo-first de ZerionStudio: la página se construye ANTES de cobrar y el prospecto la ve terminada por WhatsApp). ${SUMMARY_RUBRIC} La transcripción viene del altavoz del teléfono: ambas voces mezcladas, con errores — interprétala con ese ruido, sin comentarlo. Tu trabajo es COACHING DE MEJORA, no calificar: habla como jefe de ventas, no como libro. Devuelve SOLO un objeto JSON con exactamente estas claves: "summary" (string, 3-5 frases: qué pasó en la llamada), "temperature" (uno de: nuevo, frio, tibio, caliente, reunion, cliente, no-acepto, perdido), "nextAction" (string, la próxima acción concreta con cuándo), "whatWentWell" (string, 2-3 cosas específicas que el vendedor hizo bien) y "coaching" (string, 3-5 puntos concretos de mejora — con la frase alternativa EXACTA entre comillas cuando aplique).`;
+    const analyzeUser =
+      `FICHA DEL PROSPECTO:\n${lead}\n\nGUION DE ESTA LLAMADA (el plan escrito — evalúa si se siguió):\n${script || '(sin guion personalizado)'}\n\nTRANSCRIPCIÓN COMPLETA:\n"""\n${transcript}\n"""\n\nAnaliza la llamada y devuelve el JSON.`;
+    const res = await llmFetch({
+      model: MODEL,
+      max_tokens: 1200,
+      json: true,
+      system: analyzeSystem,
+      user: analyzeUser,
+    });
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '');
+      return json({ error: `El análisis respondió ${res.status}`, detail: detail.slice(0, 300) }, 502);
+    }
+    const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
+    const analysis = data.choices?.[0]?.message?.content ?? '{}';
+    return new Response(JSON.stringify({ transcript, analysis }), {
+      headers: { 'Content-Type': 'application/json', ...CORS },
+    });
   }
 
   return json({ error: `Modo desconocido: ${mode}` }, 400);

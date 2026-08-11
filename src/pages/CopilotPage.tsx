@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link as RouterLink, useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  Sparkles, Phone, PhoneOff, BookOpen,
+  Sparkles, Phone, PhoneOff, BookOpen, Mic, Square,
   Star, Globe, MapPin, Loader2, AlertTriangle, Save, ArrowRight, SlidersHorizontal,
 } from 'lucide-react';
 import { AppLayout } from '../components/layout/AppLayout';
@@ -16,8 +16,9 @@ import { CallSurveyModal } from '../components/copilot/CallSurveyModal';
 import { EMPTY_SURVEY, surveyLabel } from '../data/callSurvey';
 import type { CallSurveyAnswers } from '../types';
 import {
-  saveCopilotCall, listCopilotCalls, summarizeFromSurvey,
+  saveCopilotCall, listCopilotCalls, summarizeFromSurvey, analyzeCallAudio,
   type CallSummary, type CopilotCallRecord, type CallOutcome,
+  type CallAnalysis, type AnalyzeCallResult,
 } from '../services/copilotService';
 import type { Lead } from '../types';
 import { cn, colorFromString, initials, telLink, waLink, webLink, googleMapsUrl, fmtDate } from '../lib/utils';
@@ -25,8 +26,15 @@ import { stageLabel } from '../lib/constants';
 
 type Phase = 'pick' | 'call' | 'wrap';
 
+/** Segundos → mm:ss para el timer de grabación. */
+const fmtRec = (s: number): string =>
+  `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+
 export function CopilotPage() {
   const { user } = useAuth();
+  // Nombre de pila del vendedor logueado — el análisis firma el coaching con SU
+  // nombre, no con el "Martín" quemado del playbook.
+  const vendorName = user?.name?.trim().split(/\s+/)[0] ?? '';
   const { leads, addComment, moveLead, createTask } = useData();
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
@@ -54,6 +62,78 @@ export function CopilotPage() {
   const savingRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const callStartRef = useRef(0);
+
+  // --- Grabación de la llamada (para el análisis post-llamada) -------------
+  // El vendedor GRABA la llamada con el mic (celular en altavoz); al terminar,
+  // el audio se sube a la edge function: Whisper transcribe + DeepSeek V4 Flash
+  // analiza CÓMO MEJORAR (coaching). Sin transcript en vivo — el análisis
+  // llega después, en el wrap.
+  const [recording, setRecording] = useState(false);
+  const [recSeconds, setRecSeconds] = useState(0);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysis, setAnalysis] = useState<CallAnalysis | null>(null);
+  const analysisResultRef = useRef<AnalyzeCallResult | null>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
+  const audioRef = useRef<Blob | null>(null);
+  const recTimerRef = useRef<number | null>(null);
+
+  function stopRecordingStream() {
+    if (recTimerRef.current != null) {
+      window.clearInterval(recTimerRef.current);
+      recTimerRef.current = null;
+    }
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+  }
+
+  /** Detiene el grabador y devuelve el audio capturado (o null si no se grabó
+   *  nada). Se usa desde el botón y desde hangUp (que espera el blob). */
+  function stopAndCollect(): Promise<Blob | null> {
+    return new Promise((resolve) => {
+      const rec = recorderRef.current;
+      recorderRef.current = null;
+      setRecording(false);
+      stopRecordingStream();
+      if (!rec || rec.state === 'inactive') {
+        const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+        chunksRef.current = [];
+        resolve(blob.size > 0 ? blob : null);
+        return;
+      }
+      rec.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: rec.mimeType || 'audio/webm' });
+        chunksRef.current = [];
+        resolve(blob.size > 0 ? blob : null);
+      };
+      rec.stop();
+    });
+  }
+
+  async function toggleRecording() {
+    if (recording) {
+      const blob = await stopAndCollect();
+      if (blob) audioRef.current = blob;
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      const rec = new MediaRecorder(stream);
+      chunksRef.current = [];
+      rec.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+      rec.start();
+      recorderRef.current = rec;
+      setRecording(true);
+      setRecSeconds(0);
+      recTimerRef.current = window.setInterval(() => setRecSeconds((s) => s + 1), 1000);
+    } catch {
+      setError('No se pudo acceder al micrófono — revisa el permiso del navegador.');
+    }
+  }
 
   // Lanzamiento con ?lead=<id> desde el detalle del prospecto.
   useEffect(() => {
@@ -83,14 +163,40 @@ export function CopilotPage() {
     surveyRef.current = EMPTY_SURVEY;
     setSurveyOpen(false);
     setReportFromSurvey(false);
+    // Grabación/análisis de la llamada anterior: no deben filtrar.
+    audioRef.current = null;
+    analysisResultRef.current = null;
+    setAnalysis(null);
+    setAnalyzing(false);
+    setRecording(false);
+    chunksRef.current = [];
+    stopRecordingStream();
   }
 
-  function hangUp() {
+  async function hangUp() {
     if (!lead) return;
+    // Si quedó grabando, detener y esperar el blob ANTES de pasar al wrap.
+    const audio = (recorderRef.current ? await stopAndCollect().catch(() => null) : audioRef.current) ?? null;
+    audioRef.current = null;
     setPhase('wrap');
     setSaved(false);
     setCashCollected('');
     setReportFromSurvey(false);
+    // Si se grabó la llamada, el análisis (Whisper → DeepSeek) corre en
+    // paralelo a la encuesta: llega al wrap cuando termine. Si falla, la
+    // encuesta sigue siendo el reporte — nada se bloquea.
+    if (audio) {
+      setAnalyzing(true);
+      analyzeCallAudio(lead, audio, lead.script, vendorName)
+        .then((r) => {
+          analysisResultRef.current = r;
+          setAnalysis(r.analysis);
+        })
+        .catch((e) => {
+          setError(e instanceof Error ? e.message : 'No se pudo analizar la grabación.');
+        })
+        .finally(() => setAnalyzing(false));
+    }
     // La encuesta post-llamada se abre SIEMPRE al colgar: sus respuestas
     // alimentan las métricas reales y son el reporte de la llamada.
     setSurveyOpen(true);
@@ -158,16 +264,18 @@ export function CopilotPage() {
       ? `\n📝 Encuesta: ${surveyLabel('resultado', survey.resultado)} · objeción: ${survey.objecion ? surveyLabel('objecion', survey.objecion) : 'ninguna'} · oferta: ${survey.oferta === 'si' ? 'sí' : 'no'} · ver página: ${surveyLabel('hora', survey.hora)} · desenlace: ${surveyLabel('desenlace', survey.desenlace)}`
       : '';
     const body = `📞 Llamada (Copilot) — ${summary.summary}${summary.nextAction ? `\n➡️ Próxima acción: ${summary.nextAction}` : ''}${statsLine ? `\n📊 ${statsLine}` : ''}${surveyLine}`;
+    const callAnalysis = analysisResultRef.current;
     try {
-      // La llamada queda registrada con el reporte de la encuesta (medible).
+      // La llamada queda registrada: el transcript del análisis (si se grabó)
+      // y el coaching de mejora quedan revisables en el CRM.
       saveCopilotCall({
         leadId: lead.id,
-        transcript: '',
+        transcript: callAnalysis?.transcript ?? '',
         summary: summary.summary,
         temperature: summary.temperature,
         nextAction: summary.nextAction,
         stats: statsLine,
-        coaching: '',
+        coaching: callAnalysis?.analysis.coaching ?? '',
         outcome: buildOutcome(summary.temperature, Number(cashCollected) || 0),
       }).catch(() => {});
       await addComment(lead.id, body);
@@ -217,6 +325,13 @@ export function CopilotPage() {
     surveyRef.current = EMPTY_SURVEY;
     setSurveyOpen(false);
     setReportFromSurvey(false);
+    audioRef.current = null;
+    analysisResultRef.current = null;
+    setAnalysis(null);
+    setAnalyzing(false);
+    setRecording(false);
+    chunksRef.current = [];
+    stopRecordingStream();
     if (params.get('lead')) setParams({}, { replace: true });
     // El copilot vive DENTRO del flujo de prospectos: al terminar, de vuelta.
     navigate('/leads');
@@ -300,6 +415,31 @@ export function CopilotPage() {
               <SalesScriptPanel key={lead.id} lead={lead} script={lead.script} large />
             </div>
 
+            <button
+              className={cn('w-full py-3', recording ? 'btn-danger' : 'btn-secondary')}
+              onClick={toggleRecording}
+              title={
+                recording
+                  ? 'Detener la grabación de la llamada'
+                  : 'Grabar la llamada para analizarla después con IA (Whisper + DeepSeek)'
+              }
+            >
+              {recording ? (
+                <>
+                  <Square className="h-4 w-4 fill-current" /> Detener grabación ({fmtRec(recSeconds)})
+                </>
+              ) : (
+                <>
+                  <Mic className="h-4 w-4" /> {audioRef.current ? 'Volver a grabar' : 'Grabar llamada'}
+                </>
+              )}
+            </button>
+            {recording && (
+              <p className="text-center text-xs text-red-500">
+                ● Grabando — avísale al prospecto que estás grabando la llamada.
+              </p>
+            )}
+
             <button className="btn-danger w-full py-4 text-base" onClick={hangUp}>
               <PhoneOff className="h-5 w-5" /> Terminar llamada
             </button>
@@ -354,6 +494,43 @@ export function CopilotPage() {
                     <div className="rounded-lg border border-surface-200 p-3">
                       <p className="text-[11px] uppercase tracking-wide text-surface-400">Próxima acción</p>
                       <p className="text-sm text-surface-700">{summary.nextAction}</p>
+                    </div>
+                  )}
+
+                  {/* Análisis de la llamada (grabación → Whisper → DeepSeek):
+                      coaching de mejora post-llamada. Corre en paralelo a la
+                      encuesta y llega al wrap cuando termina. */}
+                  {(analyzing || analysis) && (
+                    <div className="rounded-lg border border-brand-200 bg-brand-50/40 p-3">
+                      <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-brand-600">
+                        🎓 Análisis de la llamada (IA)
+                        {analyzing && <Loader2 className="h-3 w-3 animate-spin" />}
+                      </p>
+                      {analyzing ? (
+                        <p className="text-sm text-surface-400">
+                          Transcribiendo y analizando la grabación con DeepSeek… (~1 min)
+                        </p>
+                      ) : analysis ? (
+                        <div className="space-y-2">
+                          {analysis.whatWentWell && (
+                            <p className="whitespace-pre-wrap text-sm leading-relaxed text-surface-700">
+                              <span className="font-semibold text-emerald-700">✅ Lo que hiciste bien:</span>{' '}
+                              {analysis.whatWentWell}
+                            </p>
+                          )}
+                          {analysis.coaching && (
+                            <p className="whitespace-pre-wrap text-sm leading-relaxed text-surface-700">
+                              <span className="font-semibold text-brand-700">📈 A mejorar la próxima:</span>{' '}
+                              {analysis.coaching}
+                            </p>
+                          )}
+                          {analysis.nextAction && (
+                            <p className="text-xs text-surface-500">
+                              <span className="font-semibold">➡️</span> {analysis.nextAction}
+                            </p>
+                          )}
+                        </div>
+                      ) : null}
                     </div>
                   )}
                 </div>
