@@ -7,10 +7,12 @@ import {
   BarChart3,
   PhoneCall,
   Users,
+  Map,
   LogOut,
   X,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { isRoadmapOwner } from '../../lib/roadmapGate';
 import { Avatar } from '../ui/Avatar';
 import { roleLabel } from '../../lib/constants';
 import { cn } from '../../lib/utils';
@@ -20,6 +22,7 @@ interface NavItem {
   label: string;
   icon: typeof LayoutDashboard;
   adminOnly?: boolean;
+  ownerOnly?: boolean;
 }
 
 const NAV: NavItem[] = [
@@ -32,6 +35,9 @@ const NAV: NavItem[] = [
   { to: '/tareas', label: 'Tareas', icon: CheckSquare },
   { to: '/copilot/metricas', label: 'Llamadas', icon: PhoneCall },
   { to: '/reportes', label: 'Reportes', icon: BarChart3 },
+  // Guía Diaria V1: módulo personal del fundador. ownerOnly = solo Martín
+  // (admin id 117mgd…); ni empleados ni otros admins lo ven.
+  { to: '/roadmap', label: 'Roadmap', icon: Map, ownerOnly: true },
   { to: '/equipo', label: 'Equipo', icon: Users, adminOnly: true },
 ];
 
@@ -72,7 +78,8 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
 
         {/* Nav */}
         <nav className="flex-1 space-y-1 px-3">
-          {NAV.filter((n) => !n.adminOnly || isAdmin).map(({ to, label, icon: Icon }) => (
+          {NAV.filter((n) => (!n.adminOnly || isAdmin) && (!n.ownerOnly || isRoadmapOwner(user))).map(
+            ({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}

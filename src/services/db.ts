@@ -7,7 +7,7 @@
 // service functions, not the components.
 // ============================================================================
 
-import type { User, Credential, Lead, Contact, Comment, Task, Discovery } from '../types';
+import type { User, Credential, Lead, Contact, Comment, Task, Discovery, RoadmapDay, RoadmapActivity, RoadmapClient, CashMove, RoadmapMeta } from '../types';
 import {
   seedUsers,
   seedCredentials,
@@ -15,6 +15,9 @@ import {
   seedContacts,
   seedComments,
   seedTasks,
+  seedRoadmapDays,
+  seedRoadmapActivities,
+  seedRoadmapMeta,
 } from '../data/seed';
 
 const NS = 'zerioncrm';
@@ -28,6 +31,11 @@ export interface DBShape {
   comments: Comment[];
   tasks: Task[];
   discoveries: Discovery[];
+  roadmapDays: RoadmapDay[];
+  roadmapActivities: RoadmapActivity[];
+  roadmapClients: RoadmapClient[];
+  roadmapCash: CashMove[];
+  roadmapMeta: RoadmapMeta[];
   session: string | null; // logged-in user id
 }
 
@@ -63,6 +71,11 @@ export function ensureSeeded(): void {
   write('contacts', seedContacts);
   write('comments', seedComments);
   write('tasks', seedTasks);
+  write('roadmapDays', seedRoadmapDays);
+  write('roadmapActivities', seedRoadmapActivities);
+  write('roadmapClients', []);
+  write('roadmapCash', []);
+  write('roadmapMeta', seedRoadmapMeta);
   localStorage.setItem(key('seeded'), '1');
 }
 
@@ -70,6 +83,9 @@ export function ensureSeeded(): void {
 export function resetDB(): void {
   ['users', 'credentials', 'leads', 'contacts', 'comments', 'tasks', 'discoveries', 'session', 'seeded'].forEach(
     (n) => localStorage.removeItem(key(n))
+  );
+  ['roadmapDays', 'roadmapActivities', 'roadmapClients', 'roadmapCash', 'roadmapMeta'].forEach((n) =>
+    localStorage.removeItem(key(n))
   );
   ensureSeeded();
 }

@@ -57,6 +57,7 @@ export type Source =
   | 'evento'
   | 'llamada'
   | 'scraper'
+  | 'meta'
   | 'otro';
 
 /** Agency service line the opportunity is about. */
@@ -130,6 +131,15 @@ export interface Lead {
   meetingAt: ISODate | null;
   /** Google-Maps enrichment from the scraper (null for hand-entered leads). */
   enrichment?: LeadEnrichment | null;
+  /** Meta (Facebook) lead id — 15-17 dígitos que Meta genera para rastrear un
+   *  lead. Se puebla cuando el lead entra por el webhook de Lead Ads o cuando se
+   *  casa con el id que Meta generó. La Conversions API lo usa como llave de
+   *  match de máxima precisión. undefined/null para leads que no vienen de Meta. */
+  metaLeadId?: string | null;
+  /** Facebook click id (fbc/fbclid) capturado en el momento de la captura del
+   *  lead, si está disponible. También es llave de match de máxima prioridad
+   *  para la Conversions API. undefined/null si no aplica. */
+  fbclid?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -247,4 +257,89 @@ export interface EmployeeStats {
   tasksDone: number;
   tasksTotal: number;
   conversionRate: number; // clientes / contacted
+}
+
+// ---------------------------------------------------------------------------
+// Roadmap Zerion (Guía Diaria V1) — plan personal del fundador, 12 semanas.
+// Módulo visible SOLO para el owner (admin id 117mgd…). El DIARIO es la
+// fuente de verdad: semanas, meses, KPIs y gates se derivan de él.
+// ---------------------------------------------------------------------------
+export type RoadmapActivityStatus = 'pendiente' | 'hecho' | 'cancelado';
+
+/** Fases del roadmap (columna "Fase" del Excel). */
+export type RoadmapPhase =
+  | 'Estrategia'
+  | 'Oferta'
+  | 'Producto'
+  | 'Ventas'
+  | 'Contenido'
+  | 'Control'
+  | 'Sistema'
+  | 'Escala';
+
+/** Captura diaria (hoja DIARIO). `day` = 'YYYY-MM-DD', clave de la fila. */
+export interface RoadmapDay {
+  day: string;
+  contacts: number; // contactos REALES del día
+  demos: number; // demos REALES del día
+  webs: number; // webs vendidas ($200)
+  aaas: number; // agentes AaaS vendidos
+  income: number; // ingreso del día ($)
+  content: boolean; // ¿publicó contenido (reel)?
+  notes: string;
+}
+
+/** Actividad del roadmap (hoja ROADMAP). */
+export interface RoadmapActivity {
+  id: string;
+  week: number; // 1..12
+  phase: RoadmapPhase;
+  title: string;
+  responsible: string;
+  dueDate: string | null; // 'YYYY-MM-DD'
+  status: RoadmapActivityStatus;
+  isGate: boolean; // fila de control con veredicto computado
+  sort: number;
+}
+
+export type RoadmapProduct = 'web' | 'aaas' | 'otro';
+export type RoadmapClientStatus = 'activo' | 'pausado' | 'baja';
+
+/** Cliente con mensualidad (hoja FINANZAS → MRR). */
+export interface RoadmapClient {
+  id: string;
+  name: string;
+  product: RoadmapProduct;
+  startDate: string | null; // 'YYYY-MM-DD'
+  setup: number; // setup cobrado una vez ($)
+  monthly: number; // mensualidad ($/mes)
+  status: RoadmapClientStatus;
+  notes: string;
+}
+
+/** Movimiento de caja (hoja FINANZAS → CAJA). */
+export interface CashMove {
+  id: string;
+  day: string; // 'YYYY-MM-DD'
+  concept: string;
+  income: number;
+  expense: number;
+}
+
+/** Configuración del módulo (una fila por owner). */
+export interface RoadmapMeta {
+  planStart: string; // '2026-08-12' — arranque de las 12 semanas
+  pitch: string; // elevator pitch AaaS, editable
+  reserve: number; // reserva intocable ($)
+  /** Metas mensuales: '2026-08' → { income, mrr }. */
+  monthlyGoals: Record<string, { income: number; mrr: number }>;
+}
+
+/** Documento completo que carga el módulo. */
+export interface RoadmapDoc {
+  meta: RoadmapMeta;
+  days: RoadmapDay[];
+  activities: RoadmapActivity[];
+  clients: RoadmapClient[];
+  cash: CashMove[];
 }

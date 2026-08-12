@@ -1,5 +1,6 @@
-import type { User, Credential, Lead, Contact, Comment, Task, Service } from '../types';
+import type { User, Credential, Lead, Contact, Comment, Task, Service, RoadmapMeta } from '../types';
 import { currentPeriodKey } from '../lib/objectives';
+import { defaultActivities, defaultDays, defaultMeta } from './roadmapDefaults';
 
 // ============================================================================
 // Seed data for the local/mock backend.
@@ -323,3 +324,12 @@ export const seedTasks: Task[] = rawTasks.map((t) => {
     ? { ...t, dueDate: null, recurring: true, target: o.target, progress: o.progress, periodKey: currentPeriodKey(t.cadence) }
     : { ...t, recurring: false, target: 0, progress: 0, periodKey: null };
 });
+
+// ---- Roadmap Zerion (Guía Diaria V1) ---------------------------------------
+// El módulo arranca YA poblado: 82 días en cero, las 16 actividades del
+// roadmap y la meta (metas mensuales + pitch + reserva). Clientes y caja
+// arrancan vacíos (los llena Martín). En Supabase el servicio hace el
+// auto-siembra equivalente en el primer load si el diario está vacío.
+export const seedRoadmapDays = defaultDays();
+export const seedRoadmapActivities = defaultActivities();
+export const seedRoadmapMeta: RoadmapMeta[] = [defaultMeta()];
