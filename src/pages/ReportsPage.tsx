@@ -43,11 +43,11 @@ function Bars({
 
 export function ReportsPage() {
   const { user, isAdmin } = useAuth();
-  const { loading, leads } = useData();
+  const { loading, leads: allLeads } = useData();
 
   const scoped = useMemo(
-    () => (isAdmin ? leads : leads.filter((l) => l.assignedTo === user?.id)),
-    [leads, isAdmin, user]
+    () => (isAdmin ? allLeads : allLeads.filter((l) => l.assignedTo === user?.id)),
+    [allLeads, isAdmin, user]
   );
 
   const t = useMemo(() => totals(scoped), [scoped]);

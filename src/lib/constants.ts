@@ -132,6 +132,7 @@ export const SOURCES: { key: Source; label: string }[] = [
   { key: 'evento', label: 'Evento' },
   { key: 'llamada', label: 'Llamada' },
   { key: 'scraper', label: 'Scraper AI' },
+  { key: 'meta', label: 'Facebook / Meta' },
   { key: 'otro', label: 'Otro' },
 ];
 

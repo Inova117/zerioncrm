@@ -4,6 +4,7 @@ import { uid, nowISO } from '../lib/utils';
 import { stageLabel } from '../lib/constants';
 import { supabase } from '../lib/supabaseClient';
 import { rowToLead, leadToRow, rowToComment, rowToContact, contactToRow } from './mappers';
+import { notifyMetaStageChange } from './metaCapiService';
 
 export interface NewContactInput {
   leadId: string;
@@ -107,6 +108,9 @@ const supabaseLeadsService: LeadsService = {
       'stage_change',
       `Movió de ${stageLabel(current.temperature)} a ${stageLabel(temperature)}`
     );
+    // Avisar a Meta (Conversions API) del cambio de etapa — fire-and-forget,
+    // nunca bloquea ni rompe el Kanban. No-op en mock / etapas no reportadas.
+    notifyMetaStageChange(id, temperature);
     return updated;
   },
 
@@ -269,6 +273,10 @@ const mockLeadsService: LeadsService = {
       'stage_change',
       `Movió de ${stageLabel(current.temperature)} a ${stageLabel(temperature)}`
     );
+    // Paridad con la capa Supabase: notifyMetaStageChange es no-op en mock
+    // (no hay `supabase`), así que aquí no dispara nada — se deja por simetría
+    // para que el punto de enganche viva en AMBAS implementaciones.
+    notifyMetaStageChange(id, temperature);
     return updated;
   },
 

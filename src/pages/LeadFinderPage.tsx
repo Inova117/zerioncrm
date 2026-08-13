@@ -50,7 +50,7 @@ function toLead(d: Discovery): Lead {
 
 export function LeadFinderPage() {
   const { user, isAdmin } = useAuth();
-  const { users, leads, importLeads, updateLead, moveLead, removeLead, loadComments, addComment } = useData();
+  const { users, leads: allLeads, importLeads, updateLead, moveLead, removeLead, loadComments, addComment } = useData();
 
   const [tab, setTab] = useState<Tab>('search');
 
@@ -88,12 +88,12 @@ export function LeadFinderPage() {
   // OR by phone (mirrors the Edge Function dedup), so a business saved outside
   // the Lead Finder (manual entry / CSV import) still shows green, not re-savable.
   const savedPlaceIds = useMemo(
-    () => new Set(leads.map((l) => l.enrichment?.placeId).filter(Boolean) as string[]),
-    [leads]
+    () => new Set(allLeads.map((l) => l.enrichment?.placeId).filter(Boolean) as string[]),
+    [allLeads]
   );
   const savedPhones = useMemo(
-    () => new Set(leads.map((l) => normalizePhone(l.phone)).filter(Boolean) as string[]),
-    [leads]
+    () => new Set(allLeads.map((l) => normalizePhone(l.phone)).filter(Boolean) as string[]),
+    [allLeads]
   );
   const isSaved = useCallback(
     (d: Discovery) => {
@@ -108,15 +108,15 @@ export function LeadFinderPage() {
   const savedLeadFor = useCallback(
     (d: Discovery): Lead | undefined => {
       const pk = normalizePhone(d.phone);
-      return leads.find(
+      return allLeads.find(
         (l) =>
           (!!l.enrichment?.placeId && l.enrichment.placeId === d.placeId) ||
           (!!pk && normalizePhone(l.phone) === pk)
       );
     },
-    [leads]
+    [allLeads]
   );
-  const detailLead = detailLeadId ? leads.find((l) => l.id === detailLeadId) ?? null : null;
+  const detailLead = detailLeadId ? allLeads.find((l) => l.id === detailLeadId) ?? null : null;
 
   const assignableEmployees = useMemo(() => {
     let list = activeEmployees;

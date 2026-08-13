@@ -23,16 +23,16 @@ import { taskDone } from '../lib/objectives';
 
 export function DashboardPage() {
   const { user, isAdmin } = useAuth();
-  const { loading, leads, tasks, users } = useData();
+  const { loading, leads: allLeads, tasks, users } = useData();
 
   const scopedLeads = useMemo(
-    () => (isAdmin ? leads : leads.filter((l) => l.assignedTo === user?.id)),
-    [leads, isAdmin, user]
+    () => (isAdmin ? allLeads : allLeads.filter((l) => l.assignedTo === user?.id)),
+    [allLeads, isAdmin, user]
   );
 
   const t = useMemo(() => totals(scopedLeads), [scopedLeads]);
   const funnel = useMemo(() => cumulativeFunnel(scopedLeads), [scopedLeads]);
-  const stats = useMemo(() => employeeStats(users, leads, tasks), [users, leads, tasks]);
+  const stats = useMemo(() => employeeStats(users, allLeads, tasks), [users, allLeads, tasks]);
 
   const myTodayTasks = useMemo(
     () =>

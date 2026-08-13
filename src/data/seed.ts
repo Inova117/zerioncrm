@@ -233,6 +233,25 @@ const rawLeads: Omit<Lead, 'service' | 'mrr' | 'script'>[] = [
     createdAt: ago(1), updatedAt: ago(1), lastContactAt: null, meetingAt: null,
     enrichment: { rating: 5.0, reviewCount: 41, city: 'Guadalajara', segment: 'no_website', whatTheyDo: 'Corte familiar y tinte', score: 79, profile: 'gdl-peluquerias', runId: 2 },
   },
+  // Leads del ADMIN (libro propio — separados del equipo; QA de aislamiento)
+  {
+    id: 'lead-a1', company: 'Óptica Visión 20/20', contactName: 'Rosa Salazar', role: 'Dueña',
+    email: 'rosa@vision2020.ec', phone: '+593 99 100 2000', website: '',
+    industry: 'Óptica', source: 'scraper', channel: 'Scraper · uio-opticas · run #1',
+    reason: 'Óptica · Quito — sin sitio web. Candidata directa a demo-first.',
+    temperature: 'nuevo', value: 0, position: p(), assignedTo: ADMIN_ID,
+    createdAt: ago(3), updatedAt: ago(3), lastContactAt: null, meetingAt: null,
+    enrichment: { rating: 4.8, reviewCount: 87, city: 'Quito', segment: 'no_website', whatTheyDo: 'Exámenes visuales y lentes', score: 82, profile: 'uio-opticas', runId: 1 },
+  },
+  {
+    id: 'lead-a2', company: 'Panadería La Espiga', contactName: 'Pedro Guamán', role: 'Dueño',
+    email: 'pedro@espiga.ec', phone: '+593 98 765 4321', website: '',
+    industry: 'Panadería', source: 'scraper', channel: 'Scraper · uio-panaderias · run #1',
+    reason: 'Panadería · Quito — sin sitio web, alta demanda local.',
+    temperature: 'frio', value: 0, position: p(), assignedTo: ADMIN_ID,
+    createdAt: ago(5), updatedAt: ago(5), lastContactAt: ago(5), meetingAt: null,
+    enrichment: { rating: 4.6, reviewCount: 34, city: 'Quito', segment: 'no_website', whatTheyDo: 'Pan artesanal y pastelería', score: 71, profile: 'uio-panaderias', runId: 1 },
+  },
 ];
 
 // Tag each seed lead with an agency service line + a few retainers (MRR).

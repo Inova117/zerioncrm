@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Plus, Search, KanbanSquare, LayoutList, Columns3, Flame, Clock, User as UserIcon, Upload, Download, Bot } from 'lucide-react';
+import { Plus, Search, KanbanSquare, LayoutList, Columns3, Flame, Clock, Upload, Download, Bot, Users } from 'lucide-react';
 import { AppLayout } from '../components/layout/AppLayout';
 import { KanbanBoard } from '../components/leads/KanbanBoard';
 import { LeadsTable } from '../components/leads/LeadsTable';
@@ -22,6 +22,7 @@ export function LeadsPage() {
   const {
     loading,
     leads,
+    allLeads,
     users,
     commentCounts,
     createLead,
@@ -36,6 +37,10 @@ export function LeadsPage() {
 
   const [query, setQuery] = useState('');
   const [ownerFilter, setOwnerFilter] = useState<string>('all');
+  // Supervisión del admin: por DEFECTO cada quien ve solo SUS prospectos (libros
+  // separados, sin cruce de llamadas). Este toggle amplía la vista a TODO el
+  // equipo — solo para gestionar/asignar, no para llamar leads ajenos.
+  const [showAll, setShowAll] = useState(false);
   const [view, setView] = useState<View>('board');
   const [chips, setChips] = useState<Set<string>>(new Set());
   const [formOpen, setFormOpen] = useState(false);
@@ -55,11 +60,11 @@ export function LeadsPage() {
     return list;
   }, [activeEmployees, editing, usersById, user]);
 
-  // When an admin is filtering by an employee, new leads (quick-add / import)
-  // default to THAT employee so the created card isn't hidden by the filter. (#2)
-  const defaultAssignee = isAdmin
-    ? (ownerFilter !== 'all' ? ownerFilter : activeEmployees[0]?.id ?? user?.id ?? '')
-    : user?.id ?? '';
+  // When an admin is supervising the team (showAll) and filtering by an
+  // employee, new leads (quick-add / import) default to THAT employee so the
+  // created card isn't hidden by the filter. (#2)
+  const defaultAssignee =
+    showAll && ownerFilter !== 'all' ? ownerFilter : user?.id ?? '';
 
   // Resolve a "Responsable" name from a CSV to a user id (round-trips owners). (#3)
   const resolveOwner = useMemo(() => {
@@ -67,17 +72,18 @@ export function LeadsPage() {
     return (name: string) => byName.get(name.trim().toLowerCase());
   }, [users]);
 
-  // Role + owner scope (the "book of business" the pulse bar summarizes).
+  // Book of business: el context ya entrega SOLO los leads del usuario
+  // (assignedTo = uid, para TODOS los roles). El admin puede ampliar la vista
+  // a todo el equipo (supervisión explícita) con el filtro de dueño.
   const scopedLeads = useMemo(() => {
-    let list = isAdmin ? leads : leads.filter((l) => l.assignedTo === user?.id);
-    if (isAdmin && ownerFilter !== 'all') list = list.filter((l) => l.assignedTo === ownerFilter);
+    let list = showAll ? allLeads : leads;
+    if (showAll && ownerFilter !== 'all') list = list.filter((l) => l.assignedTo === ownerFilter);
     return list;
-  }, [leads, isAdmin, user, ownerFilter]);
+  }, [leads, allLeads, showAll, ownerFilter]);
 
   // Quick-filter chips + search applied on top.
   const visibleLeads = useMemo(() => {
     let list = scopedLeads;
-    if (chips.has('mine')) list = list.filter((l) => l.assignedTo === user?.id);
     if (chips.has('hot')) list = list.filter((l) => l.temperature === 'caliente');
     if (chips.has('stale'))
       list = list.filter(
@@ -153,7 +159,6 @@ export function LeadsPage() {
   if (!user) return null;
 
   const chipDefs = [
-    { key: 'mine', label: 'Míos', icon: UserIcon, show: isAdmin },
     { key: 'hot', label: 'Calientes', icon: Flame, show: true },
     { key: 'stale', label: 'Sin seguimiento', icon: Clock, show: true },
     { key: 'scraper', label: 'Scraper AI', icon: Bot, show: true },
@@ -191,14 +196,34 @@ export function LeadsPage() {
             />
           </div>
           {isAdmin && (
-            <select className="input w-auto" value={ownerFilter} onChange={(e) => setOwnerFilter(e.target.value)}>
-              <option value="all">Todo el equipo</option>
-              {employees.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.name}
-                </option>
-              ))}
-            </select>
+            <>
+              <button
+                className={cn('btn-secondary', showAll && 'border-brand-600 bg-brand-600 text-white')}
+                onClick={() => setShowAll((v) => !v)}
+                title={
+                  showAll
+                    ? 'Volver a ver solo TUS prospectos'
+                    : 'Supervisión: ver los prospectos de todo el equipo (para asignar/gestionar — no llamar leads ajenos)'
+                }
+              >
+                <Users className="h-4 w-4" />
+                <span className="hidden md:inline">{showAll ? 'Solo mis leads' : 'Ver todos'}</span>
+              </button>
+              {showAll && (
+                <select
+                  className="input w-auto"
+                  value={ownerFilter}
+                  onChange={(e) => setOwnerFilter(e.target.value)}
+                >
+                  <option value="all">Todo el equipo</option>
+                  {employees.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </>
           )}
 
           {/* View toggle */}

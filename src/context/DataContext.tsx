@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import type { Comment, Contact, Lead, Task, Temperature, User } from '../types';
 import { leadsService } from '../services/leadsService';
 import type { NewLeadInput, NewContactInput } from '../services/leadsService';
+import { notifyMetaStageChange } from '../services/metaCapiService';
 import { tasksService } from '../services/tasksService';
 import type { NewTaskInput } from '../services/tasksService';
 import { usersService } from '../services/usersService';
@@ -13,7 +14,13 @@ import { useAuth } from './AuthContext';
 interface DataContextValue {
   loading: boolean;
   users: User[];
+  /** Los leads del usuario ACTUAL (assignedTo = auth uid) — el libro de
+   *  negocio operativo: Prospectos, Copilot, empresas. Sin cruce: cada quien
+   *  llama SOLO a sus prospectos. */
   leads: Lead[];
+  /** TODOS los leads del equipo (sin filtro) — para analítica/supervisión
+   *  (Panel, Reportes, carga por miembro, dedupe del Lead Finder). */
+  allLeads: Lead[];
   tasks: Task[];
   contacts: Contact[];
   commentCounts: Record<string, number>;
@@ -62,7 +69,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState<User[]>([]);
-  const [leads, setLeads] = useState<Lead[]>([]);
+  const [allLeads, setAllLeads] = useState<Lead[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
@@ -77,7 +84,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       leadsService.commentCounts(),
     ]);
     if (u.status === 'fulfilled') setUsers(u.value);
-    if (l.status === 'fulfilled') setLeads(l.value);
+    if (l.status === 'fulfilled') setAllLeads(l.value);
     if (t.status === 'fulfilled') setTasks(t.value);
     if (ct.status === 'fulfilled') setContacts(ct.value);
     if (cc.status === 'fulfilled') setCommentCounts(cc.value);
@@ -93,13 +100,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const authorId = user?.id ?? '';
 
+  // Separación de libros de negocio: cada usuario (ADMIN INCLUIDO) opera solo
+  // sus leads. allLeads queda para las vistas de supervisión/analítica.
+  const myLeads = user ? allLeads.filter((l) => l.assignedTo === user.id) : [];
+
   // Memoized so the context value keeps a stable identity between renders that
   // don't change the data — avoids re-render / effect-refire storms in consumers
   // (e.g. modal focus effects). Recomputed only when the underlying data changes. (#15)
   const value = useMemo<DataContextValue>(() => ({
     loading,
     users,
-    leads,
+    leads: myLeads,
+    allLeads,
     tasks,
     contacts,
     commentCounts,
@@ -107,7 +119,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
     async createLead(input) {
       const lead = await leadsService.create(input);
-      setLeads((prev) => [...prev, lead]);
+      setAllLeads((prev) => [...prev, lead]);
       return lead;
     },
     async importLeads(inputs) {
@@ -128,30 +140,44 @@ export function DataProvider({ children }: { children: ReactNode }) {
       return { ok, failed };
     },
     async updateLead(id, patch) {
+      // Un cambio de etapa hecho DESDE EL FORMULARIO de edición entra por aquí
+      // (no por move()), así que hay que avisarle a Meta también en este camino.
+      // Solo si temperature viene en el patch Y cambió de verdad — así editar
+      // otro campo (teléfono, valor…) no reenvía un evento de embudo. El drag y
+      // el Copilot pasan por move() y disparan allá; el update() interno de
+      // move() no pasa por aquí, así que no hay doble envío.
+      const prev = allLeads.find((l) => l.id === id);
       const updated = await leadsService.update(id, patch);
-      if (updated) setLeads((prev) => prev.map((l) => (l.id === id ? updated : l)));
+      if (updated) setAllLeads((prevLeads) => prevLeads.map((l) => (l.id === id ? updated : l)));
+      if (
+        patch.temperature !== undefined &&
+        prev &&
+        prev.temperature !== patch.temperature
+      ) {
+        notifyMetaStageChange(id, patch.temperature);
+      }
     },
     async moveLead(id, temperature) {
       // optimistic for snappy UI…
-      setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, temperature } : l)));
+      setAllLeads((prev) => prev.map((l) => (l.id === id ? { ...l, temperature } : l)));
       // …then apply the authoritative row (also carries meetingAt/lastContactAt the
       // service set), so a later edit can't resend stale fields. (bug #1)
       const updated = await leadsService.move(id, temperature, authorId);
-      if (updated) setLeads((prev) => prev.map((l) => (l.id === id ? updated : l)));
+      if (updated) setAllLeads((prev) => prev.map((l) => (l.id === id ? updated : l)));
     },
     async commitDrag(leadId, toTemperature, orderedVisibleIds) {
       // One atomic operation: stage change (if any) + column reorder, finished
       // with a SINGLE authoritative reload. No two setLeads racing. (bugs #4, #14)
-      const lead = leads.find((l) => l.id === leadId);
+      const lead = allLeads.find((l) => l.id === leadId);
       if (lead && lead.temperature !== toTemperature) {
         await leadsService.move(leadId, toTemperature, authorId);
       }
       await leadsService.reorderColumn(toTemperature, orderedVisibleIds);
-      setLeads(await leadsService.list());
+      setAllLeads(await leadsService.list());
     },
     async removeLead(id) {
       await leadsService.remove(id);
-      setLeads((prev) => prev.filter((l) => l.id !== id));
+      setAllLeads((prev) => prev.filter((l) => l.id !== id));
       setContacts((prev) => prev.filter((c) => c.leadId !== id));
       // detach tasks that pointed at this lead so they don't dangle (bug #17)
       setTasks((prev) => prev.map((t) => (t.leadId === id ? { ...t, leadId: null } : t)));
@@ -165,7 +191,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setCommentCounts((prev) => ({ ...prev, [leadId]: (prev[leadId] ?? 0) + 1 }));
       // persist lastContactAt (not just optimistic) so it survives a reload (bug #13)
       const updated = await leadsService.update(leadId, { lastContactAt: new Date().toISOString() });
-      if (updated) setLeads((prev) => prev.map((l) => (l.id === leadId ? updated : l)));
+      if (updated) setAllLeads((prev) => prev.map((l) => (l.id === leadId ? updated : l)));
     },
     async removeComment(id) {
       await leadsService.removeComment(id);
@@ -244,7 +270,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     },
 
     userById: (id) => users.find((u) => u.id === id),
-  }), [loading, users, leads, tasks, contacts, commentCounts, authorId, reload]);
+  }), [loading, users, allLeads, tasks, contacts, commentCounts, authorId, reload, myLeads]);
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
 }
