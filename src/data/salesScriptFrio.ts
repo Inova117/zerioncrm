@@ -147,6 +147,18 @@ export const SALES_SCRIPT_FRIO: ScriptSection[] = [
       'Día 9: cierre suave: "Si no es buen momento, sin problema. Lo dejo guardado unos días — cuando quiera lo retomamos. Aquí estoy." — STOP.',
     ],
   },
+  {
+    id: 'referidos',
+    step: '10',
+    title: 'Referidos (post-venta, dinero en efectivo)',
+    emoji: '🎁',
+    action: 'Se pide SOLO después del pago, con la emoción arriba. La oferta es EFECTIVO: 3 contactos que compren = devolución del precio de su página. Nunca antes del cierre.',
+    lines: [
+      '"¡Felicidades! 🎉 … Oye, una pregunta que solo les hago a mis clientes: ¿conoces a 2-3 dueños de negocios como el tuyo que tampoco tengan página web?"',
+      '"Por cada uno que contrate te voy sumando — y si me traes 3 que compren, te devuelvo los [PRECIO] de tu página. En efectivo."',
+      '"Te mando un enlace para que se los pases directo — así te llevas el crédito. ¿Te parece justo?"',
+    ],
+  },
 ];
 
 /** La objeción más probable según la etapa del lead (atajo para el panel). */
