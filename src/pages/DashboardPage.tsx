@@ -1,4 +1,5 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { Link as RouterLink } from 'react-router-dom';
 import {
   Building2,
   Flame,
@@ -8,6 +9,8 @@ import {
   DollarSign,
   Thermometer,
   Handshake,
+  ClipboardList,
+  ArrowRight,
 } from 'lucide-react';
 import { AppLayout } from '../components/layout/AppLayout';
 import { StatCard } from '../components/dashboard/StatCard';
@@ -20,6 +23,9 @@ import { useData } from '../context/DataContext';
 import { cumulativeFunnel, totals, employeeStats } from '../services/metricsService';
 import { fmtMoney, taskIsCurrent } from '../lib/utils';
 import { taskDone } from '../lib/objectives';
+import { dailyActivityService } from '../services/dailyActivityService';
+import type { DailyActivity } from '../types';
+import { dayKey, weekDays, activityTotals } from '../lib/dailyActivityUtils';
 
 export function DashboardPage() {
   const { user, isAdmin } = useAuth();
@@ -33,6 +39,24 @@ export function DashboardPage() {
   const t = useMemo(() => totals(scopedLeads), [scopedLeads]);
   const funnel = useMemo(() => cumulativeFunnel(scopedLeads), [scopedLeads]);
   const stats = useMemo(() => employeeStats(users, allLeads, tasks), [users, allLeads, tasks]);
+
+  // Check-ins diarios del equipo (semana actual) — supervisión del admin.
+  const [teamActivity, setTeamActivity] = useState<DailyActivity[]>([]);
+  const activeEmployees = useMemo(() => users.filter((u) => u.role === 'employee' && u.active), [users]);
+  const week = useMemo(() => weekDays(new Date()), []);
+  const weekFrom = dayKey(week[0]!);
+  const weekTo = dayKey(week[4]!);
+  useEffect(() => {
+    if (!isAdmin || activeEmployees.length === 0) return;
+    dailyActivityService
+      .listRange(
+        activeEmployees.map((u) => u.id),
+        weekFrom,
+        weekTo
+      )
+      .then(setTeamActivity)
+      .catch(() => setTeamActivity([]));
+  }, [isAdmin, activeEmployees, weekFrom, weekTo]);
 
   const myTodayTasks = useMemo(
     () =>
@@ -161,6 +185,59 @@ export function DashboardPage() {
                 </div>
               </div>
               <EmployeeLeaderboard stats={stats} />
+            </div>
+          )}
+
+          {/* Admin: check-ins diarios del equipo (esta semana) */}
+          {isAdmin && activeEmployees.length > 0 && (
+            <div className="card p-5">
+              <div className="mb-4 flex items-center gap-2">
+                <ClipboardList className="h-4 w-4 text-brand-600" />
+                <div>
+                  <h2 className="text-sm font-semibold text-surface-800">Equipo — esta semana</h2>
+                  <p className="text-xs text-surface-400">
+                    Check-in diario: llamadas, contactos, demos y cierres.
+                  </p>
+                </div>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[520px] text-sm">
+                  <thead>
+                    <tr className="text-left text-[11px] uppercase tracking-wide text-surface-400">
+                      <th className="pb-2 pr-2">Vendedor</th>
+                      <th className="pb-2 pr-2 text-center">Llamadas</th>
+                      <th className="pb-2 pr-2 text-center">Contactos</th>
+                      <th className="pb-2 pr-2 text-center">Demos</th>
+                      <th className="pb-2 pr-2 text-center">Cierres</th>
+                      <th className="pb-2 pr-2 text-center">Demo→cierre</th>
+                      <th className="pb-2 text-center">Registro</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {activeEmployees.map((u) => {
+                      const t = activityTotals(teamActivity.filter((r) => r.userId === u.id));
+                      return (
+                        <tr key={u.id} className="border-t border-surface-100">
+                          <td className="py-2 pr-2 font-medium text-surface-800">
+                            <RouterLink to={`/actividad?u=${u.id}`} className="hover:text-brand-600 hover:underline">
+                              {u.name}
+                            </RouterLink>
+                          </td>
+                          <td className="py-2 pr-2 text-center text-surface-700">{t.calls}</td>
+                          <td className="py-2 pr-2 text-center text-surface-700">{t.contacts}</td>
+                          <td className="py-2 pr-2 text-center text-surface-700">{t.demos}</td>
+                          <td className="py-2 pr-2 text-center font-semibold text-emerald-700">{t.closes}</td>
+                          <td className="py-2 pr-2 text-center text-surface-500">{t.closeRate}%</td>
+                          <td className="py-2 pr-2 text-center text-surface-500">{t.daysLogged}/5</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <p className="mt-3 text-xs text-surface-400">
+                <ArrowRight className="mr-1 inline h-3 w-3" /> Clic en el nombre para ver su diario completo.
+              </p>
             </div>
           )}
         </div>

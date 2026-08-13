@@ -4,6 +4,7 @@ import {
   Radar,
   KanbanSquare,
   CheckSquare,
+  ClipboardList,
   BarChart3,
   PhoneCall,
   Users,
@@ -33,6 +34,7 @@ const NAV: NavItem[] = [
   { to: '/lead-finder', label: 'Lead Finder', icon: Radar },
   { to: '/leads', label: 'Prospectos', icon: KanbanSquare },
   { to: '/tareas', label: 'Tareas', icon: CheckSquare },
+  { to: '/actividad', label: 'Actividad', icon: ClipboardList },
   { to: '/copilot/metricas', label: 'Llamadas', icon: PhoneCall },
   { to: '/reportes', label: 'Reportes', icon: BarChart3 },
   // Guía Diaria V1: módulo personal del fundador. ownerOnly = solo Martín

@@ -11,6 +11,7 @@ import { CopilotMetricsPage } from './pages/CopilotMetricsPage';
 import { LeadsPage } from './pages/LeadsPage';
 import { CompaniesPage } from './pages/CompaniesPage';
 import { TasksPage } from './pages/TasksPage';
+import { ActivityPage } from './pages/ActivityPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { TeamPage } from './pages/TeamPage';
 import { RoadmapPage } from './pages/RoadmapPage';
@@ -46,6 +47,7 @@ export default function App() {
           <Route path="/leads" element={<Private><LeadsPage /></Private>} />
           <Route path="/empresas" element={<Private><CompaniesPage /></Private>} />
           <Route path="/tareas" element={<Private><TasksPage /></Private>} />
+          <Route path="/actividad" element={<Private><ActivityPage /></Private>} />
           <Route path="/reportes" element={<Private><ReportsPage /></Private>} />
           <Route path="/equipo" element={<Private adminOnly><TeamPage /></Private>} />
           {/* Roadmap Zerion: módulo personal del fundador (ownerOnly = solo admin 117mgd…) */}

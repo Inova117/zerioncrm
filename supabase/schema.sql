@@ -536,15 +536,42 @@ create policy "roadmap_cash own"       on public.roadmap_cash       for all usin
 drop policy if exists "roadmap_meta own"       on public.roadmap_meta;
 create policy "roadmap_meta own"       on public.roadmap_meta       for all using (owner_id = auth.uid()) with check (owner_id = auth.uid());
 
+-- ---------------------------------------------------------------------------
+-- daily_activity: check-in diario del vendedor (supervisión del equipo)
+-- Un registro por vendedor y día. RLS: cada quien escribe SOLO su día; el
+-- admin lee/edita todo (supervisión). Espejo de
+-- migrations/20260813000000_daily_activity.sql.
+-- ---------------------------------------------------------------------------
+create table if not exists public.daily_activity (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid not null references public.profiles(id) on delete cascade,
+  day        date not null,
+  calls      int  not null default 0,
+  contacts   int  not null default 0,
+  demos      int  not null default 0,
+  closes     int  not null default 0,
+  notes      text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (user_id, day)
+);
+create index if not exists daily_activity_user_day_idx on public.daily_activity(user_id, day desc);
+alter table public.daily_activity enable row level security;
+drop policy if exists "daily_activity self" on public.daily_activity;
+create policy "daily_activity self" on public.daily_activity for all
+  using (public.is_admin() or user_id = auth.uid())
+  with check (public.is_admin() or user_id = auth.uid());
+
 -- ============================================================================
 -- VERIFICACIÓN — corre esto después para confirmar que todo quedó bien:
 --
 --   select table_name from information_schema.tables
 --   where table_schema = 'public' order by 1;
---   -- Debe listar: comments, contacts, copilot_calls, copilot_memory, leads,
---   --   lead_discoveries, lead_searches, profiles, roadmap_activities,
---   --   roadmap_cash, roadmap_clients, roadmap_days, roadmap_meta, tasks
+--   -- Debe listar: comments, contacts, copilot_calls, copilot_memory,
+--   --   daily_activity, leads, lead_discoveries, lead_searches, profiles,
+--   --   roadmap_activities, roadmap_cash, roadmap_clients, roadmap_days,
+--   --   roadmap_meta, tasks
 --
 --   select count(*) as policies from pg_policies where schemaname = 'public';
---   -- Debe dar: 27 (22 base + 5 del roadmap)
+--   -- Debe dar: 28 (22 base + 5 del roadmap + 1 de daily_activity)
 -- ============================================================================

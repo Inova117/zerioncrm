@@ -343,3 +343,28 @@ export interface RoadmapDoc {
   clients: RoadmapClient[];
   cash: CashMove[];
 }
+
+// ---------------------------------------------------------------------------
+// Actividad diaria del vendedor (check-in manual — supervisión del equipo)
+// ---------------------------------------------------------------------------
+
+/** Check-in diario de prospección: el vendedor registra QUÉ HIZO hoy (proceso),
+ *  no el estado del pipeline (resultado). Un registro por vendedor y día. */
+export interface DailyActivity {
+  id: string;
+  userId: string;
+  /** YYYY-MM-DD (fecha local) — PK compuesta junto a userId. */
+  day: string;
+  /** Llamadas realizadas (intentos de contacto). */
+  calls: number;
+  /** Conversaciones reales con el dueño/decididor. */
+  contacts: number;
+  /** Demos: el prospecto VIO su página ya hecha. */
+  demos: number;
+  /** Cierres: pago confirmado en el día. */
+  closes: number;
+  /** Nota libre del vendedor (qué pasó, contextos, aprendizajes). */
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+}
