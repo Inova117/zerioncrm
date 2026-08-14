@@ -16,7 +16,7 @@ import type { NewLeadInput } from './leadsService';
 import { supabase } from '../lib/supabaseClient';
 import { table, delay } from './db';
 import { rowToDiscovery } from './mappers';
-import type { Discovery } from '../types';
+import type { Discovery, SiteTechnical } from '../types';
 import { uid } from '../lib/utils';
 
 export interface FindLeadsParams {
@@ -239,6 +239,60 @@ async function mockDeleteDiscovery(id: string): Promise<void> {
 }
 
 // ===========================================================================
+// Análisis técnico de webs (edge function analyze-site). Fire-and-forget tras
+// una búsqueda done: analiza hasta 15 discoveries con website por llamada.
+// ===========================================================================
+export interface AnalyzeSitesResult {
+  analyzed: number;
+  failed: number;
+}
+
+async function supabaseAnalyzeSites(discoveryIds: string[]): Promise<AnalyzeSitesResult> {
+  const res = await invoke({ action: 'analyze', discoveryIds });
+  return { analyzed: Number(res.analyzed ?? 0), failed: Number(res.failed ?? 0) };
+}
+
+async function mockAnalyzeSites(discoveryIds: string[]): Promise<AnalyzeSitesResult> {
+  const discoveries = table.get('discoveries') as Discovery[];
+  const next = discoveries.map((d) => {
+    if (!discoveryIds.includes(d.id) || !String(d.website ?? '').trim()) return d;
+    // Sintético determinista a partir del slug (estable entre recargas).
+    // Hash acumulado con salt: los primeros chars son siempre "mock", un
+    // charCodeAt directo por índice colapsa (QA lo detectó: 0% cert roto).
+    const slug = d.placeId.replace(/[^a-z0-9]/gi, '');
+    const hashAt = (salt: number) => {
+      let acc = salt;
+      for (const c of slug) acc = (acc * 31 + c.charCodeAt(0)) >>> 0;
+      return acc;
+    };
+    const brokenCert = hashAt(1) % 4 === 0; // ~25%: bueno para QA del badge
+    const poorSeo = hashAt(2) % 3 === 0;
+    const loadMs = 400 + (hashAt(6) % 12) * 250;
+    const technical: SiteTechnical = {
+      analyzedAt: new Date().toISOString(),
+      accessible: true,
+      https: !brokenCert,
+      httpOk: brokenCert,
+      certExpired: brokenCert,
+      httpStatus: 200,
+      loadTimeMs: loadMs,
+      title: `${d.company} — Inicio`,
+      hasMetaDescription: !poorSeo,
+      hasH1: hashAt(3) % 2 === 0,
+      hasViewport: hashAt(4) % 5 !== 0,
+      openGraph: !poorSeo,
+      socials: [],
+      stackHints: hashAt(5) % 3 === 0 ? ['wordpress'] : ['wix'],
+    };
+    return { ...d, enrichment: { ...(d.enrichment ?? {}), technical } };
+  });
+  table.set('discoveries', next);
+  await sleep(900); // simular latencia del agente
+  return { analyzed: discoveryIds.length, failed: 0 };
+}
+
+// ===========================================================================
 export const findLeads = supabase ? supabaseFindLeads : mockFindLeads;
 export const listDiscoveries = supabase ? supabaseListDiscoveries : mockListDiscoveries;
 export const deleteDiscovery = supabase ? supabaseDeleteDiscovery : mockDeleteDiscovery;
+export const analyzeSites = supabase ? supabaseAnalyzeSites : mockAnalyzeSites;

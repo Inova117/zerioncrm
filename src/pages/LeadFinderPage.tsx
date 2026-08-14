@@ -11,7 +11,7 @@ import { LeadFormModal } from '../components/leads/LeadFormModal';
 import { EmptyState, PageLoader } from '../components/ui/misc';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
-import { findLeads, listDiscoveries, deleteDiscovery, discoveryToInput } from '../services/leadFinderService';
+import { findLeads, listDiscoveries, deleteDiscovery, discoveryToInput, analyzeSites } from '../services/leadFinderService';
 import type { Discovery, Lead, Temperature } from '../types';
 import { cn, normalizePhone } from '../lib/utils';
 import { toCSV, downloadCSV } from '../lib/csv';
@@ -64,6 +64,7 @@ export function LeadFinderPage() {
   const [deep, setDeep] = useState(true); // rich (email + redes) por defecto
   const [assignee, setAssignee] = useState<string>(user?.id ?? '');
   const [running, setRunning] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Results
@@ -190,6 +191,26 @@ export function LeadFinderPage() {
       setSelected(new Set());
       setTab('search');
       await loadDiscoveries(); // the new ones are now persisted
+      // Análisis técnico de las webs encontradas (fire-and-forget: no bloquea
+      // la UI; la tabla se refresca sola cuando el análisis termina).
+      const withWeb = res.discoveries
+        .filter((d) => String(d.website ?? '').trim())
+        .slice(0, 15)
+        .map((d) => d.id);
+      if (withWeb.length) {
+        setAnalyzing(true);
+        analyzeSites(withWeb)
+          .catch(() => undefined)
+          .then(async () => {
+            try {
+              const fresh = await listDiscoveries();
+              setSearchResults(fresh.filter((d) => res.discoveries.some((r) => r.id === d.id)));
+            } catch {
+              /* keep current results */
+            }
+            setAnalyzing(false);
+          });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo completar la búsqueda.');
     } finally {
@@ -322,6 +343,12 @@ export function LeadFinderPage() {
             <p className="mt-3 flex items-center gap-1.5 text-xs text-surface-400">
               <Loader2 className="h-3 w-3 animate-spin" />
               Buscando en Google Maps… puede tardar 1–2 min según la cantidad.
+            </p>
+          )}
+          {analyzing && (
+            <p className="mt-3 flex items-center gap-1.5 text-xs text-brand-600">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Analizando las webs encontradas (HTTPS, SEO, velocidad)…
             </p>
           )}
           {error && (

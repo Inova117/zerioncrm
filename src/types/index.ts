@@ -100,6 +100,30 @@ export interface LeadEnrichment {
   searchId?: string;
   runId?: number;
   profile?: string; // scraper campaign profile name
+  /** Análisis técnico de la web (Lead Finder → edge function analyze-site). */
+  technical?: SiteTechnical | null;
+}
+
+// ---------------------------------------------------------------------------
+// Análisis técnico de la web de un prospecto (edge function analyze-site).
+// Vive dentro de enrichment.technical en discoveries y leads.
+// ---------------------------------------------------------------------------
+export interface SiteTechnical {
+  analyzedAt: ISODate;
+  accessible: boolean; // la web respondió (200-399) al menos por HTTP o HTTPS
+  https: boolean; // respondió por https
+  httpOk: boolean; // respondió por http (relevante cuando https falla: cert roto)
+  certExpired: boolean; // heurística: https falla por cert, http responde
+  httpStatus: number; // último status HTTP obtenido (0 si inaccesible)
+  loadTimeMs: number; // tiempo del fetch https (o http si https falló)
+  title: string;
+  hasMetaDescription: boolean;
+  hasH1: boolean;
+  hasViewport: boolean;
+  openGraph: boolean;
+  socials: string[]; // links sociales encontrados en el HTML
+  stackHints: string[]; // wordpress, wix, shopify, squarespace, joomla, react, next…
+  error?: string; // mensaje crudo cuando accessible=false (diagnóstico)
 }
 
 export interface Lead {
