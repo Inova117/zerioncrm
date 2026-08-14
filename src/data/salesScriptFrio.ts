@@ -87,12 +87,14 @@ export const SALES_SCRIPT_FRIO: ScriptSection[] = [
   {
     id: 'propuesta',
     step: '4',
-    title: 'La propuesta (cero riesgo)',
-    emoji: '🤝',
-    action: 'Gratis de ver, se borra si no gusta. Sin precio todavía.',
+    title: 'La oferta — todo lo que incluye',
+    emoji: '💎',
+    action: 'Beneficios → precio → garantía (Hormozi: valor primero, precio después, riesgo reverso al final). El precio se dice AQUÍ, natural — así las objeciones de precio pueden existir y se manejan en el paso 6. Nunca esconda el precio.',
     lines: [
-      '"Mire, le propongo algo sin riesgo: le hago su página web y no paga nada por verla. Es gratis."',
-      '"Si le encanta, seguimos. Si no, la borro y aquí no pasó nada. ¿Le parece justo?"',
+      '"Mire, le propongo algo: su página web completa, con dominio y alojamiento incluidos, WhatsApp, Google Maps y la versión para celular."',
+      '"Se la entrego lista en 7 días, y le doy 30 días de soporte por si quiere cambiar algo."',
+      '"En una agencia, solo el diseño anda por $500 — se la dejo en [PRECIO], un solo pago, todo incluido."',
+      '"Y no paga nada por verla: la ve terminada antes de pagar. Si no le encanta, la borro y no pasó nada. ¿Le parece justo?"',
     ],
   },
   {
@@ -100,9 +102,9 @@ export const SALES_SCRIPT_FRIO: ScriptSection[] = [
     step: '5',
     title: 'La calificación (LA pregunta de eficiencia)',
     emoji: '🔒',
-    action: 'El sí al compromiso se pide ANTES del trabajo. Si dice no: no desarrolla nada — objeción real (paso 6).',
+    action: 'El precio ya está dicho — la pregunta ahora es solo de compromiso. Si dice no: no desarrolla nada — objeción real (paso 6).',
     lines: [
-      '"Y para ser honestos los dos: si se la muestro terminada en su celular y le encanta, ¿se la quedaría? No le digo cuánto cuesta todavía."',
+      '"Y para ser honestos los dos: si se la muestro terminada en su celular y le encanta, ¿se la quedaría?"',
       '→ SÍ: "¡Listo! La desarrollo esta semana y le escribo por WhatsApp con el link. ¿Este número tiene WhatsApp?"',
       '→ NO / dudas: objeción real (paso 6). Si se resuelve, vuelva al paso 4.',
     ],
@@ -116,8 +118,8 @@ export const SALES_SCRIPT_FRIO: ScriptSection[] = [
     lines: [
       '"No me interesa" → "Claro, entiendo. Solo una cosa: ¿qué hace hoy para que lo encuentren en Google?"',
       '"Está caro" → "Le entiendo. ¿Y cuánto se le va al mes por no aparecer? … La página cuesta menos que eso. Y la vio terminada antes de pagar — cero riesgo."',
-      '"Mi sobrino/amigo me la hace gratis" → "Qué bueno que tenga quién le ayude. Mírela igual — es gratis y ya está con sus fotos. Si lo de él es mejor, no me paga nada. Gana en los dos escenarios."',
-      '"Mándame la info" → "La info es la página — ya está lista. Mírela y me dice: ¿le gustó o no?"',
+      '"Mi sobrino/amigo me la hace gratis" → "Qué bueno que tenga quién le ayude. Mírela igual — se la armo sin costo y la ve terminada antes de pagar. Si lo de él es mejor, no me paga nada. Gana en los dos escenarios."',
+      '"Mándame la info" → "Claro, la info es la página — se la armo y la ve terminada antes de pagar. ¿Me da su WhatsApp para enviársela?"',
       '"No tengo tiempo" → "Le entiendo. Solo mírela 2 minutos por WhatsApp cuando pueda. ¿Se la mando?"',
       '"Déjeme pensarlo" → "¿Es su forma amable de decirme que no? … ¿Qué fue lo que no le convenció: el precio, o que de verdad le traiga clientes?"',
     ],
