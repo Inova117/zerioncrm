@@ -87,14 +87,13 @@ export const SALES_SCRIPT_FRIO: ScriptSection[] = [
   {
     id: 'propuesta',
     step: '4',
-    title: 'La oferta — todo lo que incluye',
+    title: 'La oferta — irresistible, corta',
     emoji: '💎',
-    action: 'Beneficios → precio → garantía (Hormozi: valor primero, precio después, riesgo reverso al final). El precio se dice AQUÍ, natural — así las objeciones de precio pueden existir y se manejan en el paso 6. Nunca esconda el precio.',
+    action: 'La oferta que creamos: mecanismo + entrega/precio + garantía. Tres frases, sin anclas ni listas — el precio se dice aquí, natural.',
     lines: [
-      '"Mire, le propongo algo: su página web completa, con dominio y alojamiento incluidos, WhatsApp, Google Maps y la versión para celular."',
-      '"Se la entrego lista en 7 días, y le doy 30 días de soporte por si quiere cambiar algo."',
-      '"En una agencia, solo el diseño anda por $500 — se la dejo en [PRECIO], un solo pago, todo incluido."',
-      '"Y no paga nada por verla: la ve terminada antes de pagar. Si no le encanta, la borro y no pasó nada. ¿Le parece justo?"',
+      '"Mire, le propongo algo: su página web completa, con WhatsApp, Google Maps y una IA que responde a sus clientes 24/7."',
+      '"Lista en 7 días, dominio y alojamiento incluidos, por [PRECIO] — un solo pago, todo incluido."',
+      '"Y la ve terminada antes de pagar: si no le encanta, no paga nada. ¿Le parece justo?"',
     ],
   },
   {
@@ -104,7 +103,7 @@ export const SALES_SCRIPT_FRIO: ScriptSection[] = [
     emoji: '🔒',
     action: 'El precio ya está dicho — la pregunta ahora es solo de compromiso. Si dice no: no desarrolla nada — objeción real (paso 6).',
     lines: [
-      '"Y para ser honestos los dos: si se la muestro terminada en su celular y le encanta, ¿se la quedaría?"',
+      '"Y para ser honestos: si le muestro la página terminada y le encanta, ¿se la quedaría?"',
       '→ SÍ: "¡Listo! La desarrollo esta semana y le escribo por WhatsApp con el link. ¿Este número tiene WhatsApp?"',
       '→ NO / dudas: objeción real (paso 6). Si se resuelve, vuelva al paso 4.',
     ],
