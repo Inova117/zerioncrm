@@ -19,6 +19,7 @@ import {
   Save,
   Loader2,
   BookOpen,
+  BellRing,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { Comment, Lead, Temperature, User, ActivityType } from '../../types';
@@ -248,6 +249,11 @@ export function LeadDetailModal({
               icon={CalendarClock}
               label="Reunión"
               value={lead.meetingAt ? fmtDateTime(lead.meetingAt) : '—'}
+            />
+            <InfoRow
+              icon={BellRing}
+              label="Próximo seguimiento"
+              value={lead.nextActionAt ? `${fmtDateTime(lead.nextActionAt)} · toque ${lead.touch || 0}` : '—'}
             />
           </div>
 

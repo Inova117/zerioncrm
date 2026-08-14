@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard,
+  CalendarDays,
   Radar,
   KanbanSquare,
   CheckSquare,
@@ -31,6 +32,8 @@ const NAV: NavItem[] = [
   // prospecto (botón "Sales Copilot"). Sus MÉTRICAS sí, porque se consultan
   // solas al final del día. /empresas sigue viva por URL, pero fuera del menú.
   { to: '/', label: 'Panel', icon: LayoutDashboard },
+  // La vista HOY es el centro de mando del vendedor: solo lo que toca hoy.
+  { to: '/hoy', label: 'Hoy', icon: CalendarDays },
   { to: '/lead-finder', label: 'Lead Finder', icon: Radar },
   { to: '/leads', label: 'Prospectos', icon: KanbanSquare },
   { to: '/tareas', label: 'Tareas', icon: CheckSquare },

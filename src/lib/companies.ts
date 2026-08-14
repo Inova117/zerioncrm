@@ -4,7 +4,7 @@ import type { Lead, Contact, Temperature } from '../types';
 // company name. Keeps the data model simple while giving a real account view:
 // all opportunities + contacts + value for one client in one place.
 
-const ORDER: Temperature[] = ['nuevo', 'frio', 'tibio', 'caliente', 'reunion', 'cliente', 'no-acepto', 'perdido'];
+const ORDER: Temperature[] = ['nuevo', 'en-contacto', 'demo-enviada', 'negociando', 'cliente', 'reactivacion', 'perdido'];
 const rank = (t: Temperature) => ORDER.indexOf(t);
 
 export interface CompanyGroup {
@@ -41,7 +41,7 @@ export function groupCompanies(leads: Lead[], contacts: Contact[]): CompanyGroup
   const groups: CompanyGroup[] = [];
   for (const [key, groupLeads] of byKey) {
     const open = groupLeads.filter(
-      (l) => l.temperature !== 'cliente' && l.temperature !== 'perdido' && l.temperature !== 'no-acepto'
+      (l) => l.temperature !== 'cliente' && l.temperature !== 'perdido' && l.temperature !== 'reactivacion'
     );
     const won = groupLeads.filter((l) => l.temperature === 'cliente');
 
@@ -50,8 +50,8 @@ export function groupCompanies(leads: Lead[], contacts: Contact[]): CompanyGroup
       status = open.reduce((best, l) => (rank(l.temperature) > rank(best) ? l.temperature : best), open[0].temperature);
     } else if (won.length) {
       status = 'cliente';
-    } else if (groupLeads.some((l) => l.temperature === 'no-acepto')) {
-      status = 'no-acepto';
+    } else if (groupLeads.some((l) => l.temperature === 'reactivacion')) {
+      status = 'reactivacion';
     } else {
       status = 'perdido';
     }
@@ -70,7 +70,7 @@ export function groupCompanies(leads: Lead[], contacts: Contact[]): CompanyGroup
       contacts: groupContacts,
       // Exclude lost opportunities so an account's value isn't overstated. (#22)
       totalValue: groupLeads
-        .filter((l) => l.temperature !== 'perdido' && l.temperature !== 'no-acepto')
+        .filter((l) => l.temperature !== 'perdido' && l.temperature !== 'reactivacion')
         .reduce((s, l) => s + l.value, 0),
       totalMrr: won.reduce((s, l) => s + l.mrr, 0),
       openCount: open.length,

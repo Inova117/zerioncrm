@@ -19,7 +19,7 @@ export const STAGES: StageConfig[] = [
   {
     key: 'nuevo',
     label: 'Nuevo',
-    description: 'Aún sin contactar',
+    description: 'Sin contactar — en cola de llamadas',
     color: '#64748b',
     dot: 'bg-surface-400',
     ring: 'border-surface-300',
@@ -27,44 +27,34 @@ export const STAGES: StageConfig[] = [
     text: 'text-surface-600',
   },
   {
-    key: 'frio',
-    label: 'Frío',
-    description: 'Contactado, sin respuesta',
+    key: 'en-contacto',
+    label: 'En contacto',
+    description: 'Hablado — persiguiendo respuesta (intentos 1-3)',
     color: '#3b82f6',
-    dot: 'bg-frio',
+    dot: 'bg-en-contacto',
     ring: 'border-blue-300',
     soft: 'bg-blue-50',
     text: 'text-blue-600',
   },
   {
-    key: 'tibio',
-    label: 'Tibio',
-    description: 'Respondió, hay interés',
+    key: 'demo-enviada',
+    label: 'Demo enviada',
+    description: 'Vio su página — secuencia de seguimiento d1→d14',
     color: '#f59e0b',
-    dot: 'bg-tibio',
+    dot: 'bg-demo-enviada',
     ring: 'border-amber-300',
     soft: 'bg-amber-50',
     text: 'text-amber-600',
   },
   {
-    key: 'caliente',
-    label: 'Caliente',
-    description: 'Muy interesado, negociando',
+    key: 'negociando',
+    label: 'Negociando',
+    description: 'Precio / objeciones — la reunión es una fecha, no una etapa',
     color: '#ef4444',
-    dot: 'bg-caliente',
+    dot: 'bg-negociando',
     ring: 'border-red-300',
     soft: 'bg-red-50',
     text: 'text-red-600',
-  },
-  {
-    key: 'reunion',
-    label: 'Reunión',
-    description: 'Reunión agendada / realizada',
-    color: '#8b5cf6',
-    dot: 'bg-reunion',
-    ring: 'border-violet-300',
-    soft: 'bg-violet-50',
-    text: 'text-violet-600',
   },
   {
     key: 'cliente',
@@ -79,12 +69,12 @@ export const STAGES: StageConfig[] = [
   {
     // Demo-first: la página se construyó, la vio, y no la compró. NO es un
     // "perdido" cualquiera — el activo existe y es la lista de reactivación
-    // a 90 días ("todavía tengo guardada la muestra que le habíamos hecho").
-    key: 'no-acepto',
-    label: 'No aceptó',
-    description: 'Vio su página hecha y no la compró — reactivable en 90 días',
+    // a 30/60/90 días ("todavía tengo guardada la muestra que le hicimos").
+    key: 'reactivacion',
+    label: 'Reactivación',
+    description: 'Vio su página hecha y no la compró — reheat a 30/60/90 días',
     color: '#14b8a6',
-    dot: 'bg-teal-400',
+    dot: 'bg-reactivacion',
     ring: 'border-teal-300',
     soft: 'bg-teal-50',
     text: 'text-teal-600',
@@ -105,14 +95,32 @@ export const STAGES: StageConfig[] = [
  *  visible, countable and recoverable by dragging them back). */
 export const BOARD_STAGES: Temperature[] = [
   'nuevo',
-  'frio',
-  'tibio',
-  'caliente',
-  'reunion',
+  'en-contacto',
+  'demo-enviada',
+  'negociando',
   'cliente',
-  'no-acepto',
+  'reactivacion',
   'perdido',
 ];
+
+// Etapas del pipeline v1 → v2 (renombrado acción-sobre-temperatura, ago 2026).
+// Se usa para normalizar filas viejas de Supabase y localStorage del mock:
+// los leads guardados con claves antiguas se re-mapean al leer, sin migrar.
+export const LEGACY_TEMP_MAP: Record<string, Temperature> = {
+  frio: 'en-contacto',
+  tibio: 'en-contacto',
+  caliente: 'negociando',
+  reunion: 'negociando',
+  'no-acepto': 'reactivacion',
+};
+
+/** Normaliza una etapa leída (filas viejas, encuestas, LLM) al union actual.
+ *  Valor desconocido → 'nuevo' (nunca saca al lead del tablero). */
+export const normalizeTemperature = (t: string | null | undefined): Temperature => {
+  const key = (t ?? '') as string;
+  if (STAGES.some((s) => s.key === key)) return key as Temperature;
+  return LEGACY_TEMP_MAP[key] ?? 'nuevo';
+};
 
 export const stageConfig = (t: Temperature): StageConfig =>
   STAGES.find((s) => s.key === t) ?? STAGES[0];

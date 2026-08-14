@@ -11,7 +11,7 @@ export const CSV_HEADERS = [
   'Sitio web',
   'Industria',
   'Servicio',
-  'Temperatura',
+  'Etapa',
   'Presupuesto',
   'MRR',
   'Fuente',

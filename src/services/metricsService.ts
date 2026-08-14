@@ -4,8 +4,11 @@ import { SERVICES } from '../lib/constants';
 import { taskDone } from '../lib/objectives';
 
 // Ordering used to decide "reached at least this stage" for funnel math.
-const ORDER: Temperature[] = ['nuevo', 'frio', 'tibio', 'caliente', 'reunion', 'cliente'];
+const ORDER: Temperature[] = ['nuevo', 'en-contacto', 'demo-enviada', 'negociando', 'cliente'];
 const rank = (t: Temperature) => ORDER.indexOf(t);
+
+/** Etapas "muertas" para el pipeline abierto (reactivación = cerrada, con activo). */
+const CLOSED: Temperature[] = ['cliente', 'perdido', 'reactivacion'];
 
 /** Count of leads currently in each stage. */
 export function funnel(leads: Lead[]): FunnelStage[] {
@@ -29,44 +32,49 @@ export interface Totals {
   // INCLUDES "perdido": a lost lead was still contacted, and it must count
   // against the conversion rate (convGlobal = clientes / contactadas). (bug #18)
   contactadas: number;
-  tibios: number;
-  // Point-in-time count of leads currently in "caliente" ("negociando ahora"),
-  // intentionally NOT cumulative like tibios/reuniones. (bug #19)
-  calientes: number;
-  reuniones: number;
+  enContacto: number;
+  // Point-in-time count of leads currently in "negociando" ("negociando ahora"),
+  // intentionally NOT cumulative like enContacto/demos. (bug #19)
+  negociando: number;
+  demos: number;
   clientes: number;
   perdidos: number;
   pipelineValue: number; // $ of open (non-cliente, non-perdido) leads
   wonValue: number;
   mrrActive: number; // recurring revenue locked in (retainers of won clients)
-  mrrPipeline: number; // potential recurring revenue in open deals
-  convContactoTibio: number; // %
-  convTibioReunion: number;
+  mrrPipeline: number; // recurring revenue still open in the pipeline
+  convContactoDemo: number; // demos / contactadas
+  convDemoNegociando: number; // negociando / demos
   convGlobal: number; // clientes / contactadas
 }
 
 export function totals(leads: Lead[]): Totals {
   const contactadas = leads.filter((l) => l.temperature !== 'nuevo').length;
-  const tibiosPlus = leads.filter((l) => rank(l.temperature) >= rank('tibio') && l.temperature !== 'perdido');
-  const reunionesPlus = leads.filter((l) => rank(l.temperature) >= rank('reunion') && l.temperature !== 'perdido');
-  const clientes = leads.filter((l) => l.temperature === 'cliente');
-  const open = leads.filter(
-    (l) => l.temperature !== 'cliente' && l.temperature !== 'perdido' && l.temperature !== 'no-acepto'
+  const enContactoPlus = leads.filter(
+    (l) => rank(l.temperature) >= rank('en-contacto') && !CLOSED.includes(l.temperature)
   );
+  const demosPlus = leads.filter(
+    (l) => rank(l.temperature) >= rank('demo-enviada') && !CLOSED.includes(l.temperature)
+  );
+  const clientes = leads.filter((l) => l.temperature === 'cliente');
+  const open = leads.filter((l) => !CLOSED.includes(l.temperature));
 
   return {
     contactadas,
-    tibios: tibiosPlus.length,
-    calientes: leads.filter((l) => l.temperature === 'caliente').length,
-    reuniones: reunionesPlus.length,
+    enContacto: enContactoPlus.length,
+    demos: demosPlus.length,
+    negociando: leads.filter((l) => l.temperature === 'negociando').length,
     clientes: clientes.length,
     perdidos: leads.filter((l) => l.temperature === 'perdido').length,
     pipelineValue: open.reduce((s, l) => s + l.value, 0),
     wonValue: clientes.reduce((s, l) => s + l.value, 0),
     mrrActive: clientes.reduce((s, l) => s + l.mrr, 0),
     mrrPipeline: open.reduce((s, l) => s + l.mrr, 0),
-    convContactoTibio: pct(tibiosPlus.length, contactadas),
-    convTibioReunion: pct(reunionesPlus.length, tibiosPlus.length),
+    convContactoDemo: pct(demosPlus.length, contactadas),
+    convDemoNegociando: pct(
+      leads.filter((l) => l.temperature === 'negociando').length,
+      demosPlus.length
+    ),
     convGlobal: pct(clientes.length, contactadas),
   };
 }
@@ -87,9 +95,13 @@ export function employeeStats(
       return {
         user,
         contacted,
-        tibio: own.filter((l) => rank(l.temperature) >= rank('tibio') && l.temperature !== 'perdido').length,
-        caliente: own.filter((l) => l.temperature === 'caliente').length,
-        reuniones: own.filter((l) => rank(l.temperature) >= rank('reunion') && l.temperature !== 'perdido').length,
+        enContacto: own.filter(
+          (l) => rank(l.temperature) >= rank('en-contacto') && !CLOSED.includes(l.temperature)
+        ).length,
+        demos: own.filter(
+          (l) => rank(l.temperature) >= rank('demo-enviada') && !CLOSED.includes(l.temperature)
+        ).length,
+        negociando: own.filter((l) => l.temperature === 'negociando').length,
         clientes,
         perdidos: own.filter((l) => l.temperature === 'perdido').length,
         tasksDone: ownTasks.filter((t) => taskDone(t)).length,
@@ -134,7 +146,7 @@ export function byService(leads: Lead[]): ServiceStats[] {
       st.won++;
       st.wonValue += l.value;
       st.mrr += l.mrr;
-    } else if (l.temperature !== 'perdido' && l.temperature !== 'no-acepto') {
+    } else if (!CLOSED.includes(l.temperature)) {
       st.openValue += l.value;
     }
   });
@@ -144,10 +156,10 @@ export function byService(leads: Lead[]): ServiceStats[] {
 }
 
 /** % of decided deals that were won (won / (won + lost)).
- *  'no-acepto' cuenta como perdido: vio la página y decidió que no. */
+ *  'reactivacion' cuenta como perdido: vio la página y decidió que no. */
 export function winRate(leads: Lead[]): number {
   const won = leads.filter((l) => l.temperature === 'cliente').length;
-  const lost = leads.filter((l) => l.temperature === 'perdido' || l.temperature === 'no-acepto').length;
+  const lost = leads.filter((l) => l.temperature === 'perdido' || l.temperature === 'reactivacion').length;
   return pct(won, won + lost);
 }
 
@@ -159,7 +171,7 @@ export function avgTicket(leads: Lead[]): number {
 
 /** Open pipeline value per stage (for a value-weighted funnel). */
 export function pipelineByStage(leads: Lead[]): { temperature: Temperature; value: number }[] {
-  const stages: Temperature[] = ['nuevo', 'frio', 'tibio', 'caliente', 'reunion'];
+  const stages: Temperature[] = ['nuevo', 'en-contacto', 'demo-enviada', 'negociando'];
   return stages.map((temperature) => ({
     temperature,
     value: leads.filter((l) => l.temperature === temperature).reduce((s, l) => s + l.value, 0),

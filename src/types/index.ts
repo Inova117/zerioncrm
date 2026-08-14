@@ -33,17 +33,23 @@ export interface Credential {
 // Leads (prospective clients)
 // ---------------------------------------------------------------------------
 
-/** Pipeline stage === "temperature". Ordered coldest → won.
- *  'no-acepto' = vio su página ya hecha y no la compró (demo-first): cerrado
- *  como perdido, pero con el activo construido — la lista de reactivación. */
+/** Pipeline stage === next ACTION with a date (funnel demo-first). Ordered
+ *  coldest → won:
+ *    nuevo         → en cola, sin contactar
+ *    en-contacto   → hablado; persiguiendo respuesta (reintentos con fecha)
+ *    demo-enviada  → vio su página ya hecha; vive la secuencia de toques d1-d14
+ *    negociando    → precio/objeciones; una reunión es una FECHA (meetingAt),
+ *                    no una etapa
+ *    cliente       → pagó
+ *    reactivacion  → vio la demo y no compró; reheat a 30/60/90 días
+ *    perdido       → no avanzó (3 intentos sin contacto o rechazo definitivo) */
 export type Temperature =
   | 'nuevo'
-  | 'frio'
-  | 'tibio'
-  | 'caliente'
-  | 'reunion'
+  | 'en-contacto'
+  | 'demo-enviada'
+  | 'negociando'
   | 'cliente'
-  | 'no-acepto'
+  | 'reactivacion'
   | 'perdido';
 
 /** Where the prospect was found / first touched. */
@@ -127,8 +133,15 @@ export interface Lead {
   createdAt: ISODate;
   updatedAt: ISODate;
   lastContactAt: ISODate | null;
-  /** Scheduled meeting date, when the lead reaches "reunion". */
+  /** Scheduled meeting date (a date INSIDE "negociando" — not a stage). */
   meetingAt: ISODate | null;
+  /** Fecha del PRÓXIMO toque de seguimiento (la vista HOY trabaja con esto).
+   *  null = fuera de la cola de seguimiento (nuevo/cliente/perdido). */
+  nextActionAt: ISODate | null;
+  /** Número del próximo toque en la secuencia de la etapa (1-based; 0 = sin
+   *  secuencia). demo-enviada: 1-6 (d1→d14). en-contacto: intentos 1-3.
+   *  reactivacion: reheats 1-3 (30/60/90). negociando: seguimiento abierto. */
+  touch: number;
   /** Google-Maps enrichment from the scraper (null for hand-entered leads). */
   enrichment?: LeadEnrichment | null;
   /** Meta (Facebook) lead id — 15-17 dígitos que Meta genera para rastrear un
@@ -234,7 +247,7 @@ export interface CallSurveyAnswers {
   oferta: 'si' | 'no';
   /** ¿Aceptó ver la página? (amarrada | sin-hora | no) */
   hora: 'amarrada' | 'sin-hora' | 'no';
-  /** ¿Cómo terminó? (cliente | reunion | caliente | tibio | no-acepto | perdido) */
+  /** ¿Cómo terminó? (cliente | negociando | demo-enviada | en-contacto | reactivacion | perdido) */
   desenlace: string;
 }
 
@@ -248,10 +261,10 @@ export interface FunnelStage {
 
 export interface EmployeeStats {
   user: User;
-  contacted: number; // total leads owned
-  tibio: number;
-  caliente: number;
-  reuniones: number;
+  contacted: number; // total leads owned that left "nuevo"
+  enContacto: number; // hablados (en-contacto o más, sin perdidos/reactivación)
+  demos: number; // demo-enviada o más (pipeline activo caliente)
+  negociando: number; // point-in-time: leads en "negociando" ahora
   clientes: number;
   perdidos: number;
   tasksDone: number;

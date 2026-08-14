@@ -40,6 +40,11 @@ export default {
         reunion: '#8b5cf6',
         cliente: '#10b981',
         perdido: '#94a3b8',
+        // Pipeline v2: acción-sobre-temperatura (funnel demo-first)
+        'en-contacto': '#3b82f6',
+        'demo-enviada': '#f59e0b',
+        negociando: '#ef4444',
+        reactivacion: '#14b8a6',
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],

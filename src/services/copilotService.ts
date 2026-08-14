@@ -152,20 +152,20 @@ export function leadBrief(lead: Lead): string {
 // ===========================================================================
 const DESENLACE_TO_TEMP: Record<string, Temperature> = {
   cliente: 'cliente',
-  reunion: 'reunion',
-  caliente: 'caliente',
-  tibio: 'tibio',
-  'no-acepto': 'no-acepto',
+  negociando: 'negociando',
+  'demo-enviada': 'demo-enviada',
+  'en-contacto': 'en-contacto',
+  reactivacion: 'reactivacion',
   perdido: 'perdido',
 };
 
 const NEXT_ACTION_BY_DESENLACE: Record<string, string> = {
   cliente: 'Publicar la página HOY, mandar accesos y confirmar la llamada de entrega de mañana.',
-  reunion: 'Confirmar la cita/reunión por escrito y preparar la muestra antes.',
-  caliente: 'Enviar el link de la página por WhatsApp en <5 min y escribir a la hora amarrada.',
-  tibio: 'Seguimiento: acordar una hora exacta para mostrarle la página ya hecha.',
-  'no-acepto': 'Dar de baja la demo el viernes y reactivar en 90 días con un caso de éxito del rubro.',
-  perdido: 'Reactivar en 90 días — sin contacto antes.',
+  negociando: 'Confirmar la cita/reunión por escrito y preparar la muestra antes.',
+  'demo-enviada': 'Enviar el link de la página por WhatsApp en <5 min: mañana a las 10 arranca la secuencia de seguimiento.',
+  'en-contacto': 'Seguimiento: acordar una hora exacta para mostrarle la página ya hecha.',
+  reactivacion: 'Archivar la demo y reactivar en 30 días con un caso de éxito del rubro.',
+  perdido: 'Sin contacto antes — si reaparece, retómalo manualmente.',
 };
 
 export function summarizeFromSurvey(s: CallSurveyAnswers, lead: Lead): CallSummary {
@@ -503,7 +503,7 @@ export const listRecentCopilotCalls: (days: number) => Promise<CopilotCallRecord
 // El resultado alimenta moveLead directo: una temperatura fuera del union (el
 // proveedor Kimi va solo por prompt, sin schema) sacaría al lead de todas las
 // columnas del Kanban. Se valida contra la lista real antes de devolver.
-const VALID_TEMPS: readonly string[] = ['nuevo', 'frio', 'tibio', 'caliente', 'reunion', 'cliente', 'no-acepto', 'perdido'];
+const VALID_TEMPS: readonly string[] = ['nuevo', 'en-contacto', 'demo-enviada', 'negociando', 'cliente', 'reactivacion', 'perdido'];
 
 async function supaSummary(lead: Lead, transcript: string): Promise<CallSummary> {
   const raw = await callFn({
@@ -602,8 +602,8 @@ async function mockSuggest(args: SuggestArgs, onDelta: (t: string) => void, sign
 async function mockSummary(lead: Lead, transcript: string): Promise<CallSummary> {
   await new Promise((r) => setTimeout(r, 600));
   const t = transcript.toLowerCase();
-  let temperature: Temperature = 'frio';
-  let nextAction = 'Volver a llamar en 3 días con el dato del negocio.';
+  let temperature: Temperature = 'en-contacto';
+  let nextAction = 'Volver a llamar en 2 días con el dato del negocio.';
   // "ya LE pagué" (a nosotros) — el "le" es obligatorio: "ya pagué publicidad
   // en Facebook" es una queja de gasto pasado, no un pago confirmado.
   if (/transferencia (hecha|enviada|lista)|ya le (pague|deposite|transferi)|(mande|envie) (la transferencia|el comprobante|el deposito)|pago (confirmado|recibido)|recibido el pago/i.test(t)) {
@@ -611,13 +611,13 @@ async function mockSummary(lead: Lead, transcript: string): Promise<CallSummary>
     nextAction = 'Publicar la página HOY, mandar accesos y confirmar la llamada de entrega de mañana.';
   } else if (/(vi|revise|abri) la pagina.{0,40}(no|pero)|la pagina.{0,30}no (me convenc|la quiero|me interesa|me gusto)|no (la|lo) voy a (tomar|comprar|coger)|asi no mas dejemoslo|mejor no,? gracias/i.test(t)) {
     // Vio su página construida y dijo que no: demo muerta → reactivación.
-    temperature = 'no-acepto';
-    nextAction = 'Dar de baja la demo el viernes y reactivar en 90 días con caso de éxito del rubro.';
+    temperature = 'reactivacion';
+    nextAction = 'Archivar la demo y reactivar en 30 días con caso de éxito del rubro.';
   } else if (/jueves|manana|lunes|martes|miercoles|viernes|agend|cita|reunion|demo/i.test(t)) {
-    temperature = 'caliente';
+    temperature = 'negociando';
     nextAction = 'Preparar el diseño de muestra y confirmar la cita agendada.';
   } else if (/interes|cuanto|precio|informacion|whatsapp/i.test(t)) {
-    temperature = 'tibio';
+    temperature = 'en-contacto';
     nextAction = 'Enviar info puntual por WhatsApp y llamar mañana a la misma hora.';
   }
   return {

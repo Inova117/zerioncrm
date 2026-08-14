@@ -28,12 +28,22 @@ do $$ begin
 exception when duplicate_object then null; end $$;
 
 do $$ begin
-  create type temperature_t as enum ('nuevo','frio','tibio','caliente','reunion','cliente','no-acepto','perdido');
+  -- Pipeline v2 (ago 2026): etapas = PRÓXIMA ACCIÓN con fecha, no temperatura.
+  -- Los valores legacy (frio..no-acepto) quedan al final por compatibilidad con
+  -- restores viejos; PG no permite borrar valores de enum.
+  create type temperature_t as enum ('nuevo','en-contacto','demo-enviada','negociando','cliente','reactivacion','perdido','frio','tibio','caliente','reunion','no-acepto');
 exception when duplicate_object then null; end $$;
 
 -- Migración (bases existentes): etapa demo-first "vio su página hecha y no la
 -- compró" — cerrado pero reactivable a 90 días. Idempotente.
 alter type temperature_t add value if not exists 'no-acepto' before 'perdido';
+
+-- Pipeline v2 (ago 2026): las etapas nuevas del embudo demo-first. No-op en
+-- bases frescas (ya vienen en el create type) y agregan en las existentes.
+alter type temperature_t add value if not exists 'en-contacto' after 'nuevo';
+alter type temperature_t add value if not exists 'demo-enviada' after 'en-contacto';
+alter type temperature_t add value if not exists 'negociando' after 'demo-enviada';
+alter type temperature_t add value if not exists 'reactivacion' after 'cliente';
 
 do $$ begin
   create type source_t as enum ('linkedin','instagram','email','whatsapp','referido','web','evento','llamada','scraper','otro');
@@ -94,6 +104,9 @@ create table if not exists public.leads (
   updated_at      timestamptz not null default now(),
   last_contact_at timestamptz,
   meeting_at      timestamptz,
+  -- Pipeline v2: sistema de seguimiento con fecha (vista HOY).
+  next_action_at  timestamptz,
+  touch           int not null default 0,
   enrichment      jsonb
 );
 
@@ -108,6 +121,16 @@ alter table public.leads add column if not exists mrr numeric not null default 0
 -- Guion de llamada específico por prospecto (Sales Copilot): se lee en pantalla
 -- durante la llamada; '' = se usa el guion genérico Hormozi.
 alter table public.leads add column if not exists script text not null default '';
+
+-- Pipeline v2 (ago 2026): seguimiento con fecha + contador de toque. Idempotente
+-- para bases existentes; la vista HOY trabaja con next_action_at.
+alter table public.leads add column if not exists next_action_at timestamptz;
+alter table public.leads add column if not exists touch int not null default 0;
+
+-- Migrar filas existentes a las etapas v2 (no-op si no quedan filas viejas).
+update public.leads set temperature = 'en-contacto'  where temperature in ('frio', 'tibio');
+update public.leads set temperature = 'negociando'   where temperature in ('caliente', 'reunion');
+update public.leads set temperature = 'reactivacion' where temperature = 'no-acepto';
 
 -- Integración Meta (Facebook): id de lead que Meta genera (15-17 dígitos) y el
 -- click id (fbclid/fbc). Llaves de match de máxima prioridad para la Conversions

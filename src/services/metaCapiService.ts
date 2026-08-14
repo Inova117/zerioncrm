@@ -11,7 +11,7 @@
 //     fallo de Meta (o de red) no debe romper el mover de una tarjeta.
 //   • NO-OP en modo mock: sin `supabase` (dev/demos) no hay a quién avisar.
 //   • Allow-list de etapas: solo las etapas del embudo que Meta optimiza generan
-//     evento. `frio`, `no-acepto` y `perdido` NO se envían.
+//     evento. `en-contacto`, `reactivacion` y `perdido` NO se envían.
 // ---------------------------------------------------------------------------
 import type { Temperature } from '../types';
 import { supabase } from '../lib/supabaseClient';
@@ -21,17 +21,15 @@ import { supabase } from '../lib/supabaseClient';
  * allow-list `ALLOWED_EVENTS` de supabase/functions/meta-capi/index.ts. Las
  * etapas que NO aparecen aquí no generan ningún evento hacia Meta.
  *
- *   nuevo    → Lead              (entra al embudo)
- *   tibio    → QualifiedLead     (mostró interés real)
- *   caliente → QualifiedLead     (negociando; misma señal de calidad)
- *   reunion  → MeetingScheduled  (agendó)
- *   cliente  → Purchase          (conversión — lo que más pesa para el algoritmo)
+ *   nuevo         → Lead              (entra al embudo)
+ *   demo-enviada  → QualifiedLead     (vio su página hecha — señal de calidad)
+ *   negociando    → QualifiedLead     (negociando; misma señal de calidad)
+ *   cliente       → Purchase          (conversión — lo que más pesa para el algoritmo)
  */
 const EVENT_BY_STAGE: Partial<Record<Temperature, string>> = {
   nuevo: 'Lead',
-  tibio: 'QualifiedLead',
-  caliente: 'QualifiedLead',
-  reunion: 'MeetingScheduled',
+  'demo-enviada': 'QualifiedLead',
+  negociando: 'QualifiedLead',
   cliente: 'Purchase',
 };
 

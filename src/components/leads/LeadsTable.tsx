@@ -101,7 +101,7 @@ export function LeadsTable({ leads, usersById, onOpenLead }: LeadsTableProps) {
             {sorted.map((lead) => {
               const owner = usersById.get(lead.assignedTo);
               const closed =
-                lead.temperature === 'cliente' || lead.temperature === 'perdido' || lead.temperature === 'no-acepto';
+                lead.temperature === 'cliente' || lead.temperature === 'perdido' || lead.temperature === 'reactivacion';
               const fu = followUpLevel(lead.lastContactAt);
               const fuText = fu === 'stale' ? 'text-red-500' : fu === 'due' ? 'text-amber-600' : 'text-surface-500';
               return (

@@ -4,6 +4,7 @@ import type { Comment, Contact, Lead, Task, Temperature, User } from '../types';
 import { leadsService } from '../services/leadsService';
 import type { NewLeadInput, NewContactInput } from '../services/leadsService';
 import { notifyMetaStageChange } from '../services/metaCapiService';
+import { stageFollowUpPatch } from '../lib/followUp';
 import { tasksService } from '../services/tasksService';
 import type { NewTaskInput } from '../services/tasksService';
 import { usersService } from '../services/usersService';
@@ -146,8 +147,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
       // otro campo (teléfono, valor…) no reenvía un evento de embudo. El drag y
       // el Copilot pasan por move() y disparan allá; el update() interno de
       // move() no pasa por aquí, así que no hay doble envío.
+      //
+      // Pipeline v2: igual que move(), el cambio de etapa define SU próxima
+      // acción con fecha (stageFollowUpPatch). Los campos que el usuario llenó
+      // a mano (nextActionAt/touch) SIEMPRE ganan sobre el automático.
       const prev = allLeads.find((l) => l.id === id);
-      const updated = await leadsService.update(id, patch);
+      let finalPatch = patch;
+      if (patch.temperature !== undefined && prev && prev.temperature !== patch.temperature) {
+        finalPatch = { ...stageFollowUpPatch(prev, patch.temperature), ...patch };
+      }
+      const updated = await leadsService.update(id, finalPatch);
       if (updated) setAllLeads((prevLeads) => prevLeads.map((l) => (l.id === id ? updated : l)));
       if (
         patch.temperature !== undefined &&

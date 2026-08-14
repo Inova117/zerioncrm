@@ -9,9 +9,9 @@ export function PulseBar({ leads }: { leads: Lead[] }) {
 
   const items = [
     { label: 'Contactadas', value: String(t.contactadas), dot: 'bg-frio' },
-    { label: 'Tibios+', value: String(t.tibios), dot: 'bg-tibio' },
-    { label: 'Calientes', value: String(t.calientes), dot: 'bg-caliente' },
-    { label: 'Reuniones', value: String(t.reuniones), dot: 'bg-reunion' },
+    { label: 'En contacto', value: String(t.enContacto), dot: 'bg-en-contacto' },
+    { label: 'Demos enviadas', value: String(t.demos), dot: 'bg-demo-enviada' },
+    { label: 'Negociando', value: String(t.negociando), dot: 'bg-negociando' },
     { label: 'Clientes', value: String(t.clientes), dot: 'bg-cliente' },
     { label: 'Pipeline', value: fmtMoney(t.pipelineValue), dot: 'bg-brand-500' },
     { label: 'MRR activo', value: t.mrrActive > 0 ? `${fmtMoney(t.mrrActive)}/mes` : '—', dot: 'bg-emerald-500' },

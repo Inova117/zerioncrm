@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Lead, Source, Service, Temperature, User } from '../../types';
 import { Modal } from '../ui/Modal';
 import { SOURCES, SERVICES, STAGES } from '../../lib/constants';
+import { isoToLocalInput, localInputToIso } from '../../lib/followUp';
 import type { NewLeadInput } from '../../services/leadsService';
 
 interface LeadFormModalProps {
@@ -52,6 +53,8 @@ const toForm = (l: Lead): NewLeadInput => ({
   value: l.value,
   mrr: l.mrr,
   assignedTo: l.assignedTo,
+  nextActionAt: l.nextActionAt ?? null,
+  touch: l.touch ?? 0,
 });
 
 export function LeadFormModal({
@@ -195,6 +198,26 @@ export function LeadFormModal({
                 </option>
               ))}
             </select>
+          </div>
+          <div>
+            <label className="label">Próximo seguimiento</label>
+            <input
+              type="datetime-local"
+              className="input"
+              value={isoToLocalInput(form.nextActionAt ?? null)}
+              onChange={(e) => set('nextActionAt', localInputToIso(e.target.value))}
+            />
+          </div>
+          <div>
+            <label className="label">Toque de la secuencia</label>
+            <input
+              type="number"
+              min={0}
+              max={9}
+              className="input"
+              value={form.touch ?? 0}
+              onChange={(e) => set('touch', Math.max(0, Number(e.target.value) || 0))}
+            />
           </div>
           <div>
             <label className="label">Tipo de servicio</label>

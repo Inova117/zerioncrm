@@ -8,22 +8,21 @@ import type { Temperature } from '../types';
 describe('metaEventForStage — mapa etapa CRM → evento Meta', () => {
   it('mapea las etapas del embudo que Meta optimiza', () => {
     expect(metaEventForStage('nuevo')).toBe('Lead');
-    expect(metaEventForStage('tibio')).toBe('QualifiedLead');
-    expect(metaEventForStage('caliente')).toBe('QualifiedLead');
-    expect(metaEventForStage('reunion')).toBe('MeetingScheduled');
+    expect(metaEventForStage('demo-enviada')).toBe('QualifiedLead');
+    expect(metaEventForStage('negociando')).toBe('QualifiedLead');
     expect(metaEventForStage('cliente')).toBe('Purchase');
   });
 
   it('NO reporta las etapas fuera del embudo optimizable', () => {
-    expect(metaEventForStage('frio')).toBeNull();
-    expect(metaEventForStage('no-acepto')).toBeNull();
+    expect(metaEventForStage('en-contacto')).toBeNull();
+    expect(metaEventForStage('reactivacion')).toBeNull();
     expect(metaEventForStage('perdido')).toBeNull();
   });
 
   it('solo emite eventos de la allow-list de la Conversions API', () => {
     const allowed = new Set(['Lead', 'QualifiedLead', 'MeetingScheduled', 'Purchase']);
     const stages: Temperature[] = [
-      'nuevo', 'frio', 'tibio', 'caliente', 'reunion', 'cliente', 'no-acepto', 'perdido',
+      'nuevo', 'en-contacto', 'demo-enviada', 'negociando', 'cliente', 'reactivacion', 'perdido',
     ];
     for (const s of stages) {
       const ev = metaEventForStage(s);

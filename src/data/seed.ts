@@ -72,7 +72,7 @@ export const seedCredentials: Credential[] = [
 let pos = 0;
 const p = () => pos++;
 
-const rawLeads: Omit<Lead, 'service' | 'mrr' | 'script'>[] = [
+const rawLeads: Omit<Lead, 'service' | 'mrr' | 'script' | 'nextActionAt' | 'touch'>[] = [
   {
     id: 'lead-1', company: 'Cafetería Aroma', contactName: 'Marta Ruiz', role: 'Dueña',
     email: 'marta@aroma.mx', phone: '+52 55 1234 5678', website: 'aroma.mx',
@@ -94,7 +94,7 @@ const rawLeads: Omit<Lead, 'service' | 'mrr' | 'script'>[] = [
     email: 'ana@vargaslegal.com', phone: '+52 81 3456 7890', website: 'vargaslegal.com',
     industry: 'Legal', source: 'referido', channel: 'Referido por cliente actual',
     reason: 'Necesitan presencia digital seria y captación de leads por Google.',
-    temperature: 'frio', value: 4500, position: p(), assignedTo: U_LUCIA,
+    temperature: 'en-contacto', value: 4500, position: p(), assignedTo: U_LUCIA,
     createdAt: ago(6), updatedAt: ago(4), lastContactAt: ago(4), meetingAt: null,
   },
   {
@@ -102,7 +102,7 @@ const rawLeads: Omit<Lead, 'service' | 'mrr' | 'script'>[] = [
     email: 'pablo@ecoverde.mx', phone: '+52 55 4567 8901', website: 'ecoverde.mx',
     industry: 'E-commerce', source: 'email', channel: 'Correo en frío',
     reason: 'Venden por WhatsApp, quieren una tienda online real.',
-    temperature: 'frio', value: 5200, position: p(), assignedTo: U_SARA,
+    temperature: 'en-contacto', value: 5200, position: p(), assignedTo: U_SARA,
     createdAt: ago(8), updatedAt: ago(5), lastContactAt: ago(5), meetingAt: null,
   },
   {
@@ -110,7 +110,7 @@ const rawLeads: Omit<Lead, 'service' | 'mrr' | 'script'>[] = [
     email: 'luis@sonrisadental.com', phone: '+52 33 5678 9012', website: 'sonrisadental.com',
     industry: 'Salud', source: 'instagram', channel: 'Comentario + DM',
     reason: 'Quieren agenda de citas online y campañas de captación.',
-    temperature: 'tibio', value: 7000, position: p(), assignedTo: U_DIEGO,
+    temperature: 'demo-enviada', value: 7000, position: p(), assignedTo: U_DIEGO,
     createdAt: ago(12), updatedAt: ago(2), lastContactAt: ago(2), meetingAt: null,
   },
   {
@@ -118,7 +118,7 @@ const rawLeads: Omit<Lead, 'service' | 'mrr' | 'script'>[] = [
     email: 'valeria@lumen.mx', phone: '+52 55 6789 0123', website: 'lumen.mx',
     industry: 'Moda', source: 'referido', channel: 'Referido por Aroma',
     reason: 'Marca en crecimiento, quiere e-commerce + branding.',
-    temperature: 'tibio', value: 8500, position: p(), assignedTo: U_LUCIA,
+    temperature: 'en-contacto', value: 8500, position: p(), assignedTo: U_LUCIA,
     createdAt: ago(15), updatedAt: ago(3), lastContactAt: ago(3), meetingAt: null,
   },
   {
@@ -126,7 +126,7 @@ const rawLeads: Omit<Lead, 'service' | 'mrr' | 'script'>[] = [
     email: 'roberto@nova.com', phone: '+52 81 7890 1234', website: 'novaconstruye.com',
     industry: 'Construcción', source: 'linkedin', channel: 'LinkedIn + llamada',
     reason: 'Proyecto grande de portal de propiedades. Presupuesto alto.',
-    temperature: 'caliente', value: 15000, position: p(), assignedTo: U_DIEGO,
+    temperature: 'negociando', value: 15000, position: p(), assignedTo: U_DIEGO,
     createdAt: ago(20), updatedAt: ago(1), lastContactAt: ago(1), meetingAt: ahead(3),
   },
   {
@@ -134,7 +134,7 @@ const rawLeads: Omit<Lead, 'service' | 'mrr' | 'script'>[] = [
     email: 'elena@idiomasglobal.com', phone: '+52 55 8901 2345', website: 'idiomasglobal.com',
     industry: 'Educación', source: 'web', channel: 'Formulario del sitio',
     reason: 'Plataforma de cursos online + pasarela de pago.',
-    temperature: 'caliente', value: 11000, position: p(), assignedTo: U_SARA,
+    temperature: 'negociando', value: 11000, position: p(), assignedTo: U_SARA,
     createdAt: ago(18), updatedAt: ago(2), lastContactAt: ago(2), meetingAt: ahead(5),
   },
   {
@@ -142,7 +142,7 @@ const rawLeads: Omit<Lead, 'service' | 'mrr' | 'script'>[] = [
     email: 'miguel@laterraza.mx', phone: '+52 33 9012 3456', website: 'laterraza.mx',
     industry: 'Restaurantes', source: 'evento', channel: 'Networking en expo',
     reason: 'Reunión agendada para propuesta de menú digital + reservas.',
-    temperature: 'reunion', value: 6500, position: p(), assignedTo: U_LUCIA,
+    temperature: 'negociando', value: 6500, position: p(), assignedTo: U_LUCIA,
     createdAt: ago(25), updatedAt: ago(1), lastContactAt: ago(1), meetingAt: ahead(2),
   },
   {
@@ -150,7 +150,7 @@ const rawLeads: Omit<Lead, 'service' | 'mrr' | 'script'>[] = [
     email: 'andrea@techstart.io', phone: '+52 55 0123 4567', website: 'techstart.io',
     industry: 'Tecnología', source: 'linkedin', channel: 'LinkedIn',
     reason: 'Startup que necesita landing + dashboard. Reunión de descubrimiento hecha.',
-    temperature: 'reunion', value: 9800, position: p(), assignedTo: U_DIEGO,
+    temperature: 'negociando', value: 9800, position: p(), assignedTo: U_DIEGO,
     createdAt: ago(28), updatedAt: ago(4), lastContactAt: ago(4), meetingAt: ago(2),
   },
   {
@@ -248,7 +248,7 @@ const rawLeads: Omit<Lead, 'service' | 'mrr' | 'script'>[] = [
     email: 'pedro@espiga.ec', phone: '+593 98 765 4321', website: '',
     industry: 'Panadería', source: 'scraper', channel: 'Scraper · uio-panaderias · run #1',
     reason: 'Panadería · Quito — sin sitio web, alta demanda local.',
-    temperature: 'frio', value: 0, position: p(), assignedTo: ADMIN_ID,
+    temperature: 'en-contacto', value: 0, position: p(), assignedTo: ADMIN_ID,
     createdAt: ago(5), updatedAt: ago(5), lastContactAt: ago(5), meetingAt: null,
     enrichment: { rating: 4.6, reviewCount: 34, city: 'Quito', segment: 'no_website', whatTheyDo: 'Pan artesanal y pastelería', score: 71, profile: 'uio-panaderias', runId: 1 },
   },
@@ -263,11 +263,21 @@ const seedServices: Service[] = [
 ];
 const seedMrr = [0, 0, 0, 0, 1500, 0, 0, 2500, 0, 3000, 1200, 800, 0, 0, 0, 0, 0, 0, 0];
 
+// Pipeline v2 (seguimiento con fecha): toque actual + próxima acción.
+// lead-5 (demo enviada, toque 2) y lead-6 (reintento, hoy) alimentan la vista HOY.
+const seedTouch = [0, 0, 0, 0, 2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+const seedNextActionAt: (string | null)[] = [
+  null, null, null, null, ahead(0), ahead(0), ahead(1), null, ahead(2), null,
+  null, null, null, null, null, null, null, null, null, null, null,
+];
+
 export const seedLeads: Lead[] = rawLeads.map((l, i) => ({
   ...l,
   service: seedServices[i] ?? 'otro',
   mrr: seedMrr[i] ?? 0,
   script: '',
+  nextActionAt: seedNextActionAt[i] ?? null,
+  touch: seedTouch[i] ?? 0,
 }));
 
 // ---- Contacts (stakeholders per account) -----------------------------------
@@ -290,7 +300,7 @@ export const seedComments: Comment[] = [
     body: 'Respondió el DM, pidió más info sobre el sistema de citas. Le mando propuesta mañana.',
     createdAt: ago(2, 3) },
   { id: 'c2', leadId: 'lead-5', authorId: U_DIEGO, type: 'stage_change',
-    body: 'Movió de Frío a Tibio', createdAt: ago(2, 2) },
+    body: 'Movió de En contacto a Demo enviada', createdAt: ago(2, 2) },
   { id: 'c3', leadId: 'lead-7', authorId: U_DIEGO, type: 'contact',
     body: 'Llamada de 20 min. Muy interesados, piden cotización formal.', createdAt: ago(3) },
   { id: 'c4', leadId: 'lead-7', authorId: U_DIEGO, type: 'comment',
@@ -309,7 +319,7 @@ const rawTasks: Omit<Task, 'recurring' | 'target' | 'progress' | 'periodKey'>[] 
     done: false, assignedTo: U_LUCIA, leadId: null, dueDate: ahead(0), createdAt: ago(0), completedAt: null },
   { id: 't2', title: 'Responder DMs pendientes', notes: '', cadence: 'daily',
     done: true, assignedTo: U_LUCIA, leadId: null, dueDate: ahead(0), createdAt: ago(0), completedAt: ago(0, 2) },
-  { id: 't3', title: 'Seguimiento a leads tibios', notes: 'Aroma, Lumen', cadence: 'daily',
+  { id: 't3', title: 'Seguimiento de demos enviadas', notes: 'Aroma, Lumen', cadence: 'daily',
     done: false, assignedTo: U_LUCIA, leadId: 'lead-6', dueDate: ahead(0), createdAt: ago(0), completedAt: null },
   { id: 't4', title: 'Enviar 5 propuestas', notes: '', cadence: 'weekly',
     done: false, assignedTo: U_DIEGO, leadId: null, dueDate: ahead(3), createdAt: ago(2), completedAt: null },

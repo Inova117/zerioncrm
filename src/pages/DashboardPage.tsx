@@ -3,11 +3,11 @@ import { Link as RouterLink } from 'react-router-dom';
 import {
   Building2,
   Flame,
-  CalendarCheck,
+  MessageCircle,
+  Send,
   Trophy,
   TrendingUp,
   DollarSign,
-  Thermometer,
   Handshake,
   ClipboardList,
   ArrowRight,
@@ -96,28 +96,28 @@ export function DashboardPage() {
               icon={<Building2 className="h-4 w-4" />}
             />
             <StatCard
-              label="Tibios o más"
-              value={t.tibios}
-              hint={`${t.convContactoTibio}% de contactadas`}
-              icon={<Thermometer className="h-4 w-4" />}
+              label="En contacto"
+              value={t.enContacto}
+              hint="Hablados, persiguiendo respuesta"
+              icon={<MessageCircle className="h-4 w-4" />}
+              accent="text-blue-600"
+              accentBg="bg-blue-50"
+            />
+            <StatCard
+              label="Demos enviadas"
+              value={t.demos}
+              hint={`${t.convContactoDemo}% de contactadas`}
+              icon={<Send className="h-4 w-4" />}
               accent="text-amber-600"
               accentBg="bg-amber-50"
             />
             <StatCard
-              label="Calientes"
-              value={t.calientes}
-              hint="Negociando ahora"
+              label="Negociando"
+              value={t.negociando}
+              hint={`${t.convDemoNegociando}% de las demos`}
               icon={<Flame className="h-4 w-4" />}
               accent="text-red-600"
               accentBg="bg-red-50"
-            />
-            <StatCard
-              label="Reuniones"
-              value={t.reuniones}
-              hint={`${t.convTibioReunion}% de los tibios`}
-              icon={<CalendarCheck className="h-4 w-4" />}
-              accent="text-violet-600"
-              accentBg="bg-violet-50"
             />
             <StatCard
               label="Clientes cerrados"

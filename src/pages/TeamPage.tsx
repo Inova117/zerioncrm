@@ -93,8 +93,8 @@ export function TeamPage() {
               <p className="text-[10px] uppercase tracking-wide text-surface-400">Contact.</p>
             </div>
             <div>
-              <p className="text-base font-semibold text-red-600">{s.caliente}</p>
-              <p className="text-[10px] uppercase tracking-wide text-surface-400">Calientes</p>
+              <p className="text-base font-semibold text-red-600">{s.negociando}</p>
+              <p className="text-[10px] uppercase tracking-wide text-surface-400">Negociando</p>
             </div>
             <div>
               <p className="text-base font-semibold text-emerald-600">{s.clientes}</p>

@@ -5,6 +5,7 @@ import { DataProvider } from './context/DataContext';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
+import { HoyPage } from './pages/HoyPage';
 import { LeadFinderPage } from './pages/LeadFinderPage';
 import { CopilotPage } from './pages/CopilotPage';
 import { CopilotMetricsPage } from './pages/CopilotMetricsPage';
@@ -41,6 +42,7 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/" element={<Private><DashboardPage /></Private>} />
+          <Route path="/hoy" element={<Private><HoyPage /></Private>} />
           <Route path="/lead-finder" element={<Private><LeadFinderPage /></Private>} />
           <Route path="/copilot" element={<Private><CopilotPage /></Private>} />
           <Route path="/copilot/metricas" element={<Private><CopilotMetricsPage /></Private>} />

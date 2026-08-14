@@ -3,7 +3,8 @@
 // camelCase. Keep ALL of that translation here so components/services never see
 // raw rows. (resolves the camelCase↔snake_case gap, audit#1 #12)
 // ============================================================================
-import type { User, Lead, Contact, Comment, Task, Discovery, Role, Temperature, Source, Service, TaskCadence, ActivityType, RoadmapDay, RoadmapActivity, RoadmapPhase, RoadmapActivityStatus, RoadmapClient, RoadmapProduct, RoadmapClientStatus, CashMove } from '../types';
+import type { User, Lead, Contact, Comment, Task, Discovery, Role, Source, Service, TaskCadence, ActivityType, RoadmapDay, RoadmapActivity, RoadmapPhase, RoadmapActivityStatus, RoadmapClient, RoadmapProduct, RoadmapClientStatus, CashMove } from '../types';
+import { normalizeTemperature } from '../lib/constants';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -32,7 +33,9 @@ export const rowToLead = (r: any): Lead => ({
   channel: r.channel ?? '',
   reason: r.reason ?? '',
   script: r.script ?? '',
-  temperature: (r.temperature ?? 'nuevo') as Temperature,
+  // Filas viejas (pipeline v1) llegan con frio/tibio/caliente/reunion/no-acepto:
+  // se normalizan al pipeline v2 al leer. Nunca saca al lead del tablero.
+  temperature: normalizeTemperature(r.temperature),
   service: (r.service ?? 'otro') as Service,
   value: Number(r.value ?? 0),
   mrr: Number(r.mrr ?? 0),
@@ -42,6 +45,8 @@ export const rowToLead = (r: any): Lead => ({
   updatedAt: r.updated_at,
   lastContactAt: r.last_contact_at,
   meetingAt: r.meeting_at,
+  nextActionAt: r.next_action_at ?? null,
+  touch: Number(r.touch ?? 0),
   enrichment: r.enrichment ?? null,
   metaLeadId: r.meta_lead_id ?? null,
   fbclid: r.fbclid ?? null,
@@ -69,6 +74,8 @@ export const leadToRow = (l: Partial<Lead>): Record<string, unknown> => {
   if (l.assignedTo !== undefined) row.assigned_to = l.assignedTo;
   if (l.lastContactAt !== undefined) row.last_contact_at = l.lastContactAt;
   if (l.meetingAt !== undefined) row.meeting_at = l.meetingAt;
+  if (l.nextActionAt !== undefined) row.next_action_at = l.nextActionAt;
+  if (l.touch !== undefined) row.touch = l.touch;
   if (l.enrichment !== undefined) row.enrichment = l.enrichment;
   if (l.metaLeadId !== undefined) row.meta_lead_id = l.metaLeadId;
   if (l.fbclid !== undefined) row.fbclid = l.fbclid;

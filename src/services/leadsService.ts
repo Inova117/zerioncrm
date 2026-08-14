@@ -2,6 +2,7 @@ import type { Lead, Contact, Comment, Temperature, ActivityType } from '../types
 import { table, delay } from './db';
 import { uid, nowISO } from '../lib/utils';
 import { stageLabel } from '../lib/constants';
+import { stageFollowUpPatch, normalizeLead } from '../lib/followUp';
 import { supabase } from '../lib/supabaseClient';
 import { rowToLead, leadToRow, rowToComment, rowToContact, contactToRow } from './mappers';
 import { notifyMetaStageChange } from './metaCapiService';
@@ -16,9 +17,9 @@ export interface NewContactInput {
 
 export type NewLeadInput = Omit<
   Lead,
-  'id' | 'createdAt' | 'updatedAt' | 'position' | 'lastContactAt' | 'meetingAt'
+  'id' | 'createdAt' | 'updatedAt' | 'position' | 'lastContactAt' | 'meetingAt' | 'nextActionAt' | 'touch'
 > &
-  Partial<Pick<Lead, 'lastContactAt' | 'meetingAt'>>;
+  Partial<Pick<Lead, 'lastContactAt' | 'meetingAt' | 'nextActionAt' | 'touch'>>;
 
 export interface LeadsService {
   list(): Promise<Lead[]>;
@@ -71,6 +72,8 @@ const supabaseLeadsService: LeadsService = {
       position: (await maxPosition(input.temperature)) + 1,
       last_contact_at: input.lastContactAt ?? nowISO(),
       meeting_at: input.meetingAt ?? null,
+      next_action_at: input.nextActionAt ?? null,
+      touch: input.touch ?? 0,
     };
     const { data, error } = await supabase!.from('leads').insert(row).select().single();
     if (error) throw error;
@@ -98,8 +101,10 @@ const supabaseLeadsService: LeadsService = {
       temperature,
       lastContactAt: nowISO(),
       position: (await maxPosition(temperature)) + 1, // land at bottom of destination
+      // Pipeline v2: la etapa nueva define SU próxima acción con fecha
+      // (demo → secuencia d1-d14, reactivación → reheat +30, etc.).
+      ...stageFollowUpPatch(current, temperature),
     };
-    if (temperature === 'reunion' && !current.meetingAt) patch.meetingAt = nowISO();
 
     const updated = await this.update(id, patch);
     await this.addActivity(
@@ -221,7 +226,8 @@ const supabaseLeadsService: LeadsService = {
 const mockLeadsService: LeadsService = {
   async list() {
     await delay();
-    return [...table.get('leads')];
+    // Normaliza filas viejas del localStorage (pipeline v1 → v2) al leer.
+    return table.get('leads').map(normalizeLead);
   },
 
   async create(input) {
@@ -234,6 +240,8 @@ const mockLeadsService: LeadsService = {
       position: maxPos + 1,
       lastContactAt: input.lastContactAt ?? nowISO(),
       meetingAt: input.meetingAt ?? null,
+      nextActionAt: input.nextActionAt ?? null,
+      touch: input.touch ?? 0,
       createdAt: nowISO(),
       updatedAt: nowISO(),
     };
@@ -264,8 +272,9 @@ const mockLeadsService: LeadsService = {
       lastContactAt: nowISO(),
       position:
         table.get('leads').filter((l) => l.temperature === temperature).reduce((m, l) => Math.max(m, l.position), 0) + 1,
+      // Pipeline v2: la etapa nueva define SU próxima acción con fecha.
+      ...stageFollowUpPatch(current, temperature),
     };
-    if (temperature === 'reunion' && !current.meetingAt) patch.meetingAt = nowISO();
     const updated = await this.update(id, patch);
     await this.addActivity(
       id,

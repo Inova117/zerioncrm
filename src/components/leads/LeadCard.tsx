@@ -1,9 +1,10 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Building2, CalendarClock, MessageCircle, AlertCircle, Layers, Repeat } from 'lucide-react';
+import { Building2, CalendarClock, MessageCircle, AlertCircle, Layers, Repeat, BellRing } from 'lucide-react';
 import type { Lead, User } from '../../types';
 import { Avatar } from '../ui/Avatar';
 import { sourceLabel, serviceLabel, stageConfig } from '../../lib/constants';
+import { followUpBucket, touchInfo } from '../../lib/followUp';
 import { cn, fmtMoney, fmtDate, fromNow, colorFromString, initials, followUpLevel } from '../../lib/utils';
 
 function CompanyAvatar({ name }: { name: string }) {
@@ -19,10 +20,25 @@ function CompanyAvatar({ name }: { name: string }) {
 
 /** Pure presentation — shared by the sortable card and the drag overlay. */
 function CardBody({ lead, owner, commentCount = 0 }: { lead: Lead; owner?: User; commentCount?: number }) {
-  const closed = lead.temperature === 'cliente' || lead.temperature === 'perdido';
+  const closed = lead.temperature === 'cliente' || lead.temperature === 'perdido' || lead.temperature === 'reactivacion';
   const fu = followUpLevel(lead.lastContactAt);
   const fuDot = fu === 'stale' ? 'bg-red-500' : fu === 'due' ? 'bg-amber-500' : 'bg-emerald-500';
   const fuText = fu === 'stale' ? 'text-red-500' : fu === 'due' ? 'text-amber-600' : 'text-surface-400';
+
+  // Pipeline v2: el próximo toque con fecha manda — el semáforo de la tarjeta.
+  const touch = touchInfo(lead);
+  const bucket = followUpBucket(lead.nextActionAt);
+  const fuBadge =
+    !closed && touch && lead.nextActionAt
+      ? cn(
+          'badge',
+          bucket === 'overdue'
+            ? 'bg-red-50 text-red-600'
+            : bucket === 'today'
+              ? 'bg-amber-50 text-amber-700'
+              : 'bg-surface-100 text-surface-500'
+        )
+      : null;
 
   return (
     <>
@@ -63,6 +79,12 @@ function CardBody({ lead, owner, commentCount = 0 }: { lead: Lead; owner?: User;
           <span className="badge bg-violet-50 text-violet-600">
             <CalendarClock className="h-3 w-3" />
             {fmtDate(lead.meetingAt)}
+          </span>
+        )}
+        {fuBadge && (
+          <span className={fuBadge}>
+            <BellRing className="h-3 w-3" />
+            {touch!.touch}/{touch!.total > 0 ? touch!.total : '∞'} · {fmtDate(lead.nextActionAt, 'd MMM · HH:mm')}
           </span>
         )}
         {commentCount > 0 && (

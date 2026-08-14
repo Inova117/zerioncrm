@@ -20,7 +20,7 @@ const lead: Lead = {
   channel: '',
   reason: '',
   script: '',
-  temperature: 'tibio',
+  temperature: 'en-contacto',
   service: 'web',
   value: 0,
   mrr: 0,
@@ -30,6 +30,8 @@ const lead: Lead = {
   updatedAt: '2026-08-03T00:00:00.000Z',
   lastContactAt: null,
   meetingAt: null,
+  nextActionAt: null,
+  touch: 0,
 };
 
 const survey = (over: Partial<CallSurveyAnswers>): CallSurveyAnswers => ({
@@ -37,7 +39,7 @@ const survey = (over: Partial<CallSurveyAnswers>): CallSurveyAnswers => ({
   objecion: '',
   oferta: 'si',
   hora: 'amarrada',
-  desenlace: 'caliente',
+  desenlace: 'demo-enviada',
   ...over,
 });
 
@@ -49,28 +51,28 @@ describe('summarizeFromSurvey', () => {
     expect(s.summary).toContain('Cerré — pago confirmado');
   });
 
-  it('desenlace caliente → temperature caliente y link por WhatsApp', () => {
-    const s = summarizeFromSurvey(survey({ desenlace: 'caliente' }), lead);
-    expect(s.temperature).toBe('caliente');
+  it('desenlace demo-enviada → temperature demo-enviada y link por WhatsApp', () => {
+    const s = summarizeFromSurvey(survey({ desenlace: 'demo-enviada' }), lead);
+    expect(s.temperature).toBe('demo-enviada');
     expect(s.nextAction).toContain('Enviar el link de la página');
   });
 
-  it('desenlace no-acepto → reactivación 90 días (demo muerta)', () => {
-    const s = summarizeFromSurvey(survey({ desenlace: 'no-acepto', hora: 'no' }), lead);
-    expect(s.temperature).toBe('no-acepto');
-    expect(s.nextAction).toContain('reactivar en 90 días');
+  it('desenlace reactivacion → reheat a 30 días (demo muerta)', () => {
+    const s = summarizeFromSurvey(survey({ desenlace: 'reactivacion', hora: 'no' }), lead);
+    expect(s.temperature).toBe('reactivacion');
+    expect(s.nextAction).toContain('reactivar en 30 días');
     expect(s.summary).toContain('No aceptó ver la página.');
   });
 
   it('desenlace perdido → temperature perdido', () => {
     const s = summarizeFromSurvey(survey({ desenlace: 'perdido' }), lead);
     expect(s.temperature).toBe('perdido');
-    expect(s.nextAction).toContain('90 días');
+    expect(s.nextAction).toContain('Sin contacto antes');
   });
 
   it('sin desenlace → cae a la temperatura actual del lead (no inventa)', () => {
     const s = summarizeFromSurvey(survey({ desenlace: '' }), lead);
-    expect(s.temperature).toBe('tibio');
+    expect(s.temperature).toBe('en-contacto');
     expect(s.nextAction).toBe('');
   });
 

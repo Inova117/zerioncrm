@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Plus, Search, KanbanSquare, LayoutList, Columns3, Flame, Clock, Upload, Download, Bot, Users } from 'lucide-react';
+import { Plus, Search, KanbanSquare, LayoutList, Columns3, Flame, Clock, Upload, Download, Bot, Users, Send } from 'lucide-react';
 import { AppLayout } from '../components/layout/AppLayout';
 import { KanbanBoard } from '../components/leads/KanbanBoard';
 import { LeadsTable } from '../components/leads/LeadsTable';
@@ -84,7 +84,8 @@ export function LeadsPage() {
   // Quick-filter chips + search applied on top.
   const visibleLeads = useMemo(() => {
     let list = scopedLeads;
-    if (chips.has('hot')) list = list.filter((l) => l.temperature === 'caliente');
+    if (chips.has('hot')) list = list.filter((l) => l.temperature === 'negociando');
+    if (chips.has('demo')) list = list.filter((l) => l.temperature === 'demo-enviada');
     if (chips.has('stale'))
       list = list.filter(
         (l) =>
@@ -159,7 +160,8 @@ export function LeadsPage() {
   if (!user) return null;
 
   const chipDefs = [
-    { key: 'hot', label: 'Calientes', icon: Flame, show: true },
+    { key: 'hot', label: 'Negociando', icon: Flame, show: true },
+    { key: 'demo', label: 'Demos enviadas', icon: Send, show: true },
     { key: 'stale', label: 'Sin seguimiento', icon: Clock, show: true },
     { key: 'scraper', label: 'Scraper AI', icon: Bot, show: true },
   ].filter((c) => c.show);
@@ -167,7 +169,7 @@ export function LeadsPage() {
   return (
     <AppLayout
       title="Prospectos"
-      subtitle="Arrastra cada empresa entre etapas según su temperatura."
+      subtitle="Arrastra cada empresa entre las etapas de tu embudo."
       fullBleed
       actions={
         <>

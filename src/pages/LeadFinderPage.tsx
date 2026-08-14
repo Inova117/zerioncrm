@@ -44,6 +44,8 @@ function toLead(d: Discovery): Lead {
     updatedAt: d.createdAt,
     lastContactAt: null,
     meetingAt: null,
+    nextActionAt: null,
+    touch: 0,
     enrichment: d.enrichment ?? null,
   };
 }
