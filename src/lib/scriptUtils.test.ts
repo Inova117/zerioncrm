@@ -113,4 +113,20 @@ describe('fillLeadVars', () => {
     const out = fillLeadVars('[RESEÑAS], [RATING], [SOCIALES]', lead);
     expect(out).toBe('muy buenas reseñas, excelente calificación, redes sociales');
   });
+
+  it('limpia el sufijo " - Ciudad" del nombre que guarda el scraper', () => {
+    const scraperLead = {
+      company: 'Elite Peluquería - Ambato',
+      enrichment: { city: 'Ambato', rating: 4.6, reviewCount: 35 },
+    };
+    expect(fillLeadVars('[EMPRESA]', scraperLead)).toBe('Elite Peluquería');
+    // Sin ciudad en el enrichment → no recorta (nunca inventar)
+    expect(fillLeadVars('[EMPRESA]', { company: 'Elite Peluquería - Ambato' })).toBe(
+      'Elite Peluquería - Ambato'
+    );
+    // Ciudad distinta al sufijo → no recorta
+    expect(
+      fillLeadVars('[EMPRESA]', { company: 'Elite Peluquería - Ambato', enrichment: { city: 'Quito' } })
+    ).toBe('Elite Peluquería - Ambato');
+  });
 });

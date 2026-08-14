@@ -49,7 +49,7 @@ export function fillLeadVars(text: string, lead?: ScriptLeadVars | null): string
   const nombre = firstName(lead?.contactName ?? '');
   const rubro = lead?.industry?.trim().toLowerCase() || 'negocios como el suyo';
   const ciudad = lead?.enrichment?.city?.trim() || 'su zona';
-  const empresa = lead?.company?.trim() || 'su negocio';
+  const empresa = empresaLimpia(lead);
   const reseñas = lead?.enrichment?.reviewCount
     ? `${lead.enrichment.reviewCount} reseñas`
     : 'muy buenas reseñas';
@@ -66,6 +66,23 @@ export function fillLeadVars(text: string, lead?: ScriptLeadVars | null): string
     .replaceAll('[RESEÑAS]', reseñas)
     .replaceAll('[RATING]', rating)
     .replaceAll('[SOCIALES]', sociales);
+}
+
+/** El scraper a veces guarda el nombre con la ciudad pegada
+ *  ("Elite Peluquería - Ambato") — se ve técnico y feo hablado. Si el sufijo
+ *  tras el guion coincide con enrichment.city, se recorta: "Elite Peluquería".
+ *  Solo recorta cuando la ciudad coincide exactamente — nunca inventar. */
+function empresaLimpia(lead?: ScriptLeadVars | null): string {
+  const raw = lead?.company?.trim() || 'su negocio';
+  const city = lead?.enrichment?.city?.trim();
+  if (!city) return raw;
+  const re = new RegExp(`\\s*[—–-]\\s*${escapeRegExp(city)}\\s*$`, 'i');
+  return raw.replace(re, '');
+}
+
+/** Escapa caracteres especiales de regex para coincidencia literal. */
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 /** Nombre de la primera red social del negocio ("https://instagram.com/x" →
