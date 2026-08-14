@@ -127,10 +127,11 @@ alter table public.leads add column if not exists script text not null default '
 alter table public.leads add column if not exists next_action_at timestamptz;
 alter table public.leads add column if not exists touch int not null default 0;
 
--- Migrar filas existentes a las etapas v2 (no-op si no quedan filas viejas).
-update public.leads set temperature = 'en-contacto'  where temperature in ('frio', 'tibio');
-update public.leads set temperature = 'negociando'   where temperature in ('caliente', 'reunion');
-update public.leads set temperature = 'reactivacion' where temperature = 'no-acepto';
+-- Migración de DATOS (filas viejas → etapas v2) vive aparte en
+-- migrations/20260814000001_pipeline_v2_data.sql: los valores de enum nuevos
+-- no se pueden usar en la misma transacción que los agrega (error 55P04).
+-- Igual la app normaliza filas legacy al leer (LEGACY_TEMP_MAP), así que
+-- aplicar ese archivo es limpieza opcional.
 
 -- Integración Meta (Facebook): id de lead que Meta genera (15-17 dígitos) y el
 -- click id (fbclid/fbc). Llaves de match de máxima prioridad para la Conversions
