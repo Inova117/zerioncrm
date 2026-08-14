@@ -87,4 +87,30 @@ describe('fillLeadVars', () => {
   it('deja intacto el texto sin variables', () => {
     expect(fillLeadVars('Hola, ¿cómo le va?', lead)).toBe('Hola, ¿cómo le va?');
   });
+
+  it('resuelve [RESEÑAS], [RATING] y [SOCIALES] con datos del scraper', () => {
+    const enriched = {
+      company: 'Elite Peluquería',
+      contactName: 'Luis Pérez',
+      industry: 'Peluquería',
+      enrichment: {
+        city: 'Ambato',
+        rating: 4.6,
+        reviewCount: 35,
+        socials: ['https://instagram.com/elitepeluqueria'],
+      },
+    };
+    const out = fillLeadVars(
+      'vi que [EMPRESA] tiene [RESEÑAS] en Google, [RATING], y hasta [SOCIALES]',
+      enriched
+    );
+    expect(out).toBe(
+      'vi que Elite Peluquería tiene 35 reseñas en Google, 4.6 estrellas, y hasta Instagram'
+    );
+  });
+
+  it('fallbacks de reseñas/rating/sociales sin enriquecimiento', () => {
+    const out = fillLeadVars('[RESEÑAS], [RATING], [SOCIALES]', lead);
+    expect(out).toBe('muy buenas reseñas, excelente calificación, redes sociales');
+  });
 });

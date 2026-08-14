@@ -9,7 +9,15 @@ export interface ScriptLeadVars {
   contactName?: string;
   industry?: string;
   temperature?: string;
-  enrichment?: { city?: string } | null;
+  enrichment?: {
+    city?: string;
+    /** Google rating del negocio (4.6, 4.9…). Alimenta [RESEÑAS]. */
+    rating?: number;
+    /** Nº de reseñas de Google (35, 128…). Alimenta [RESEÑAS]. */
+    reviewCount?: number;
+    /** Perfiles sociales del negocio (Instagram, Facebook…). Alimenta [SOCIALES]. */
+    socials?: string[] | null;
+  } | null;
 }
 
 /** Primer nombre de un nombre completo ("Marta Ruiz" → "Marta"). */
@@ -32,6 +40,9 @@ export function saludoNombre(full?: string): string {
  *  [rubro]    → industria en minúscula / "negocios como el suyo"
  *  [CIUDAD]   → ciudad / "su zona"
  *  [EMPRESA]  → nombre del negocio / "su negocio"
+ *  [RESEÑAS]  → "35 reseñas" / "muy buenas reseñas"
+ *  [RATING]   → "4.6 estrellas" / "excelente calificación"
+ *  [SOCIALES] → "hasta Instagram" / "redes sociales"
  *  Cada variable tiene un fallback que suena natural hablado. */
 export function fillLeadVars(text: string, lead?: ScriptLeadVars | null): string {
   const saludo = saludoNombre(lead?.contactName);
@@ -39,12 +50,33 @@ export function fillLeadVars(text: string, lead?: ScriptLeadVars | null): string
   const rubro = lead?.industry?.trim().toLowerCase() || 'negocios como el suyo';
   const ciudad = lead?.enrichment?.city?.trim() || 'su zona';
   const empresa = lead?.company?.trim() || 'su negocio';
+  const reseñas = lead?.enrichment?.reviewCount
+    ? `${lead.enrichment.reviewCount} reseñas`
+    : 'muy buenas reseñas';
+  const rating = lead?.enrichment?.rating
+    ? `${lead.enrichment.rating} estrellas`
+    : 'excelente calificación';
+  const sociales = firstSocial(lead?.enrichment?.socials);
   return text
     .replaceAll('[SALUDO]', saludo)
     .replaceAll('[NOMBRE]', nombre ? `${nombre}, de ZerionStudio` : 'de ZerionStudio')
     .replaceAll('[rubro]', rubro)
     .replaceAll('[CIUDAD]', ciudad)
-    .replaceAll('[EMPRESA]', empresa);
+    .replaceAll('[EMPRESA]', empresa)
+    .replaceAll('[RESEÑAS]', reseñas)
+    .replaceAll('[RATING]', rating)
+    .replaceAll('[SOCIALES]', sociales);
+}
+
+/** Nombre de la primera red social del negocio ("https://instagram.com/x" →
+ *  "Instagram") — para el cumplido "…y hasta [SOCIALES]…". Sin redes,
+ *  el fallback "redes sociales". */
+function firstSocial(socials?: string[] | null): string {
+  const url = socials?.find((s) => /instagram|facebook|tiktok/i.test(s));
+  if (!url) return 'redes sociales';
+  const m = url.match(/instagram|facebook|tiktok/i);
+  const name = m ? m[0] : 'redes';
+  return name.charAt(0).toUpperCase() + name.slice(1);
 }
 
 /**
