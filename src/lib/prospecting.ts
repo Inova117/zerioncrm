@@ -24,6 +24,10 @@ export function digitalLevel(score: number): DigitalLevel {
  * analyze-site). Nunca inventa: sin technical, buckets conservadores.
  */
 export function opportunityScore(d: Discovery, service: ProspectionService): number {
+  return Math.min(100, uncappedScore(d, service)); // el kit promete 0-100
+}
+
+function uncappedScore(d: Discovery, service: ProspectionService): number {
   const t = d.enrichment?.technical ?? null;
   const hasWeb = Boolean(String(d.website ?? '').trim());
 

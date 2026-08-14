@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Radar, Briefcase, MapPin, Download, Globe, Sparkles, Search, Loader2,
-  AlertCircle, Languages, ArrowDownWideNarrow, Save, CheckSquare, Square, Compass,
+  AlertCircle, Languages, ArrowDownWideNarrow, Save, CheckSquare, Square, Compass, BarChart3,
 } from 'lucide-react';
 import { AppLayout } from '../components/layout/AppLayout';
 import { LeadFinderCard } from '../components/leads/LeadFinderCard';
 import { LeadCandidateModal } from '../components/leads/LeadCandidateModal';
 import { LeadDetailModal } from '../components/leads/LeadDetailModal';
 import { LeadFormModal } from '../components/leads/LeadFormModal';
+import { ProspectionReport } from '../components/leads/ProspectionReport';
 import { EmptyState, PageLoader } from '../components/ui/misc';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
@@ -17,7 +18,7 @@ import { cn, normalizePhone } from '../lib/utils';
 import { toCSV, downloadCSV } from '../lib/csv';
 import { CSV_HEADERS, leadsToRows } from '../lib/leadsCsv';
 
-type Tab = 'search' | 'discovered';
+type Tab = 'search' | 'discovered' | 'report';
 
 /** Wrap a discovery as a pseudo-Lead so the card can render it. */
 function toLead(d: Discovery): Lead {
@@ -275,6 +276,27 @@ export function LeadFinderPage() {
     downloadCSV(`lead-finder-${new Date().toISOString().slice(0, 10)}.csv`, csv);
   }
 
+  /** Re-dispara el análisis técnico para webs que aún no tienen technical. */
+  function reanalyzePending() {
+    const ids = searchResults
+      .filter((d) => d.website.trim() && !d.enrichment?.technical)
+      .slice(0, 15)
+      .map((d) => d.id);
+    if (!ids.length) return;
+    setAnalyzing(true);
+    analyzeSites(ids)
+      .catch(() => undefined)
+      .then(async () => {
+        try {
+          const fresh = await listDiscoveries();
+          setSearchResults(fresh.filter((d) => searchResults.some((r) => r.id === d.id)));
+        } catch {
+          /* keep current results */
+        }
+        setAnalyzing(false);
+      });
+  }
+
   if (!user) return null;
 
   const emptyForTab =
@@ -361,11 +383,19 @@ export function LeadFinderPage() {
         {/* Tabs */}
         <div className="flex items-center gap-1 border-b border-surface-200">
           <Tab label="Resultados" icon={Search} active={tab === 'search'} count={searchResults.length} onClick={() => { setTab('search'); setSelected(new Set()); }} />
+          <Tab label="Informe" icon={BarChart3} active={tab === 'report'} count={searchResults.length} onClick={() => { setTab('report'); setSelected(new Set()); }} />
           <Tab label="Descubiertos" icon={Compass} active={tab === 'discovered'} count={discovered.length} onClick={() => { setTab('discovered'); setSelected(new Set()); }} />
         </div>
 
         {/* Content */}
-        {tab === 'discovered' && loadingDisc ? (
+        {tab === 'report' ? (
+          <ProspectionReport
+            discoveries={searchResults}
+            analyzing={analyzing}
+            onSave={(d) => save([d])}
+            onReanalyze={reanalyzePending}
+          />
+        ) : tab === 'discovered' && loadingDisc ? (
           <PageLoader />
         ) : activeList.length === 0 ? (
           <EmptyState icon={<Radar className="h-10 w-10" />} title={emptyForTab.title} description={emptyForTab.desc} />

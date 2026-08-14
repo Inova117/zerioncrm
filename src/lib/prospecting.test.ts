@@ -22,6 +22,10 @@ describe('opportunityScore — servicio web', () => {
     expect(s).toBeGreaterThanOrEqual(95);
     expect(s).toBeLessThanOrEqual(100);
   });
+  it('sin web con muchas reseñas no supera 100 (cap)', () => {
+    const s = opportunityScore(disc({ website: '', enrichment: { reviewCount: 400 } }), 'web');
+    expect(s).toBeLessThanOrEqual(100);
+  });
   it('cert vencido = 88-94', () => {
     const s = opportunityScore(disc({ enrichment: { technical: tech({ certExpired: true }) } }), 'web');
     expect(s).toBeGreaterThanOrEqual(88);
