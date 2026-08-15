@@ -15,8 +15,8 @@ import { leadsService } from './leadsService';
 import type { NewLeadInput } from './leadsService';
 import { supabase } from '../lib/supabaseClient';
 import { table, delay } from './db';
-import { rowToDiscovery } from './mappers';
-import type { Discovery, SiteTechnical } from '../types';
+import { rowToDiscovery, rowToSearch } from './mappers';
+import type { Discovery, SearchSummary, SiteTechnical } from '../types';
 import { uid } from '../lib/utils';
 
 export interface FindLeadsParams {
@@ -129,6 +129,16 @@ async function supabaseDeleteDiscovery(id: string): Promise<void> {
   if (error) throw error;
 }
 
+async function supabaseListSearches(): Promise<SearchSummary[]> {
+  const { data, error } = await supabase!
+    .from('lead_searches')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(20);
+  if (error) throw error;
+  return (data ?? []).map(rowToSearch);
+}
+
 // ===========================================================================
 // Mock
 // ===========================================================================
@@ -221,6 +231,25 @@ async function mockFindLeads(params: FindLeadsParams): Promise<FindLeadsResult> 
   }
 
   table.set('discoveries', [...existing, ...fresh]);
+  // Historial: cada corrida queda guardada (results = snapshot SIN technical;
+  // el informe al reabrir cruza con discoveries actuales para el technical).
+  const searches = table.get('searches') as SearchSummary[];
+  table.set('searches', [
+    ...searches,
+    {
+      id: uid('search-'),
+      businessType: params.businessType,
+      location: params.location,
+      status: 'done',
+      found: fresh.length,
+      duplicates,
+      noWebsite,
+      results: fresh,
+      error: null,
+      createdAt: new Date().toISOString(),
+      finishedAt: new Date().toISOString(),
+    },
+  ]);
   await sleep(700); // simulate agent latency
   return { found: cap, duplicates, noWebsite, discoveries: fresh };
 }
@@ -235,6 +264,13 @@ async function mockDeleteDiscovery(id: string): Promise<void> {
   table.set(
     'discoveries',
     table.get('discoveries').filter((d) => d.id !== id)
+  );
+}
+
+async function mockListSearches(): Promise<SearchSummary[]> {
+  await delay();
+  return [...(table.get('searches') as SearchSummary[])].sort((a, b) =>
+    a.createdAt < b.createdAt ? 1 : -1
   );
 }
 
@@ -296,3 +332,4 @@ export const findLeads = supabase ? supabaseFindLeads : mockFindLeads;
 export const listDiscoveries = supabase ? supabaseListDiscoveries : mockListDiscoveries;
 export const deleteDiscovery = supabase ? supabaseDeleteDiscovery : mockDeleteDiscovery;
 export const analyzeSites = supabase ? supabaseAnalyzeSites : mockAnalyzeSites;
+export const listSearches = supabase ? supabaseListSearches : mockListSearches;

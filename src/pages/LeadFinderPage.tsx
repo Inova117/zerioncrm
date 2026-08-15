@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Radar, Briefcase, MapPin, Download, Globe, Sparkles, Search, Loader2,
-  AlertCircle, Languages, ArrowDownWideNarrow, Save, CheckSquare, Square, Compass, BarChart3,
+  AlertCircle, Languages, ArrowDownWideNarrow, Save, CheckSquare, Square, Compass, BarChart3, History,
 } from 'lucide-react';
 import { AppLayout } from '../components/layout/AppLayout';
 import { LeadFinderCard } from '../components/leads/LeadFinderCard';
@@ -12,13 +12,13 @@ import { ProspectionReport } from '../components/leads/ProspectionReport';
 import { EmptyState, PageLoader } from '../components/ui/misc';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
-import { findLeads, listDiscoveries, deleteDiscovery, discoveryToInput, analyzeSites } from '../services/leadFinderService';
-import type { Discovery, Lead, Temperature } from '../types';
+import { findLeads, listDiscoveries, deleteDiscovery, discoveryToInput, analyzeSites, listSearches } from '../services/leadFinderService';
+import type { Discovery, Lead, SearchSummary, Temperature } from '../types';
 import { cn, normalizePhone } from '../lib/utils';
 import { toCSV, downloadCSV } from '../lib/csv';
 import { CSV_HEADERS, leadsToRows } from '../lib/leadsCsv';
 
-type Tab = 'search' | 'discovered' | 'report';
+type Tab = 'search' | 'discovered' | 'report' | 'history';
 
 /** Wrap a discovery as a pseudo-Lead so the card can render it. */
 function toLead(d: Discovery): Lead {
@@ -66,6 +66,8 @@ export function LeadFinderPage() {
   const [assignee, setAssignee] = useState<string>(user?.id ?? '');
   const [running, setRunning] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
+  const [searches, setSearches] = useState<SearchSummary[]>([]);
+  const [loadingSearches, setLoadingSearches] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Results
@@ -148,9 +150,21 @@ export function LeadFinderPage() {
     }
   }, []);
 
+  const loadSearches = useCallback(async () => {
+    setLoadingSearches(true);
+    try {
+      setSearches(await listSearches());
+    } catch (e) {
+      console.error('[lead-finder] no se pudo cargar el historial:', e);
+    } finally {
+      setLoadingSearches(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadDiscoveries();
-  }, [loadDiscoveries]);
+    void loadSearches();
+  }, [loadDiscoveries, loadSearches]);
 
   const activeList = tab === 'search' ? searchResults : discovered;
 
@@ -174,6 +188,26 @@ export function LeadFinderPage() {
   const allSelected = selectableIds.length > 0 && selectableIds.every((id) => selected.has(id));
   const selectedCount = selectableIds.filter((id) => selected.has(id)).length;
 
+  /**
+   * Análisis técnico fire-and-forget de un lote de discoveries (máx 15 por
+   * llamada a analyze-site). Refresca searchResults con el technical fresco.
+   */
+  function runAnalysis(ids: string[]) {
+    if (!ids.length) return;
+    setAnalyzing(true);
+    analyzeSites(ids)
+      .catch(() => undefined)
+      .then(async () => {
+        try {
+          const fresh = await listDiscoveries();
+          setSearchResults((prev) => fresh.filter((d) => prev.some((r) => r.id === d.id)));
+        } catch {
+          /* keep current results */
+        }
+        setAnalyzing(false);
+      });
+  }
+
   async function runSearch(e: React.FormEvent) {
     e.preventDefault();
     if (!bizType.trim() || !location.trim() || running) return;
@@ -192,26 +226,15 @@ export function LeadFinderPage() {
       setSelected(new Set());
       setTab('search');
       await loadDiscoveries(); // the new ones are now persisted
+      void loadSearches(); // historial con la corrida nueva
       // Análisis técnico de las webs encontradas (fire-and-forget: no bloquea
       // la UI; la tabla se refresca sola cuando el análisis termina).
-      const withWeb = res.discoveries
-        .filter((d) => String(d.website ?? '').trim())
-        .slice(0, 15)
-        .map((d) => d.id);
-      if (withWeb.length) {
-        setAnalyzing(true);
-        analyzeSites(withWeb)
-          .catch(() => undefined)
-          .then(async () => {
-            try {
-              const fresh = await listDiscoveries();
-              setSearchResults(fresh.filter((d) => res.discoveries.some((r) => r.id === d.id)));
-            } catch {
-              /* keep current results */
-            }
-            setAnalyzing(false);
-          });
-      }
+      runAnalysis(
+        res.discoveries
+          .filter((d) => String(d.website ?? '').trim())
+          .slice(0, 15)
+          .map((d) => d.id)
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo completar la búsqueda.');
     } finally {
@@ -278,23 +301,34 @@ export function LeadFinderPage() {
 
   /** Re-dispara el análisis técnico para webs que aún no tienen technical. */
   function reanalyzePending() {
-    const ids = searchResults
-      .filter((d) => d.website.trim() && !d.enrichment?.technical)
-      .slice(0, 15)
-      .map((d) => d.id);
-    if (!ids.length) return;
-    setAnalyzing(true);
-    analyzeSites(ids)
-      .catch(() => undefined)
-      .then(async () => {
-        try {
-          const fresh = await listDiscoveries();
-          setSearchResults(fresh.filter((d) => searchResults.some((r) => r.id === d.id)));
-        } catch {
-          /* keep current results */
-        }
-        setAnalyzing(false);
-      });
+    runAnalysis(
+      searchResults
+        .filter((d) => d.website.trim() && !d.enrichment?.technical)
+        .slice(0, 15)
+        .map((d) => d.id)
+    );
+  }
+
+  /** Reabre una búsqueda pasada: hidrata el snapshot con el technical fresco
+   *  de lead_discoveries y analiza las webs que sigan pendientes. */
+  async function openSearch(s: SearchSummary) {
+    if (s.status !== 'done' || !s.results.length) return;
+    let all: Discovery[] = [];
+    try {
+      all = await listDiscoveries();
+    } catch {
+      /* si falla, se usa el snapshot tal cual */
+    }
+    const byPlace = new Map(all.map((d) => [d.placeId, d]));
+    const merged = s.results.map((r) => byPlace.get(r.placeId) ?? r);
+    setSearchResults(merged);
+    setTab('report');
+    runAnalysis(
+      merged
+        .filter((d) => d.website.trim() && !d.enrichment?.technical)
+        .slice(0, 15)
+        .map((d) => d.id)
+    );
   }
 
   if (!user) return null;
@@ -385,10 +419,44 @@ export function LeadFinderPage() {
           <Tab label="Resultados" icon={Search} active={tab === 'search'} count={searchResults.length} onClick={() => { setTab('search'); setSelected(new Set()); }} />
           <Tab label="Informe" icon={BarChart3} active={tab === 'report'} count={searchResults.length} onClick={() => { setTab('report'); setSelected(new Set()); }} />
           <Tab label="Descubiertos" icon={Compass} active={tab === 'discovered'} count={discovered.length} onClick={() => { setTab('discovered'); setSelected(new Set()); }} />
+          <Tab label="Búsquedas" icon={History} active={tab === 'history'} count={searches.length} onClick={() => { setTab('history'); setSelected(new Set()); }} />
         </div>
 
         {/* Content */}
-        {tab === 'report' ? (
+        {tab === 'history' ? (
+          loadingSearches ? (
+            <PageLoader />
+          ) : searches.length === 0 ? (
+            <EmptyState icon={<History className="h-10 w-10" />} title="Aún no hay búsquedas" description="Las búsquedas que corras quedarán aquí — ábrelas para ver su informe de nuevo." />
+          ) : (
+            <div className="space-y-2">
+              {searches.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => void openSearch(s)}
+                  disabled={s.status !== 'done' || !s.results.length}
+                  className="card flex w-full flex-wrap items-center gap-3 p-4 text-left transition-shadow hover:shadow-card-hover disabled:opacity-60"
+                >
+                  <span className={cn(
+                    'badge shrink-0',
+                    s.status === 'done' ? 'bg-emerald-50 text-emerald-600' : s.status === 'failed' ? 'bg-red-50 text-red-600' : 'bg-amber-50 text-amber-600'
+                  )}>
+                    {s.status === 'done' ? 'Lista' : s.status === 'failed' ? 'Falló' : 'En curso'}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold text-surface-900">{s.businessType} · {s.location}</span>
+                    <span className="block text-xs text-surface-500">
+                      {s.found} encontrados · {s.noWebsite} sin web · {new Date(s.createdAt).toLocaleString('es-EC', { dateStyle: 'short', timeStyle: 'short' })}
+                      {s.error ? ` · ${s.error}` : ''}
+                    </span>
+                  </span>
+                  <span className="text-xs font-medium text-brand-600">Ver informe →</span>
+                </button>
+              ))}
+            </div>
+          )
+        ) : tab === 'report' ? (
           <ProspectionReport
             discoveries={searchResults}
             analyzing={analyzing}

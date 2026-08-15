@@ -204,6 +204,25 @@ export interface Discovery {
 }
 
 // ---------------------------------------------------------------------------
+// Lead Finder — a SEARCH run (row of lead_searches). El informe de la búsqueda
+// se rehidrata desde `results` (snapshot de discoveries) cruzado con
+// lead_discoveries (que tienen el technical fresco).
+// ---------------------------------------------------------------------------
+export interface SearchSummary {
+  id: UUID;
+  businessType: string;
+  location: string;
+  status: 'running' | 'ingesting' | 'done' | 'failed';
+  found: number;
+  duplicates: number;
+  noWebsite: number;
+  results: Discovery[]; // snapshot guardado al finalizar la búsqueda
+  error: string | null;
+  createdAt: ISODate;
+  finishedAt: ISODate | null;
+}
+
+// ---------------------------------------------------------------------------
 // Contacts — the people (stakeholders) at a prospect/account
 // ---------------------------------------------------------------------------
 export interface Contact {
