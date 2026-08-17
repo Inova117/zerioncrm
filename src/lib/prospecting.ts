@@ -8,6 +8,7 @@
 // edge function analyze-site con paridad (bloque scoring-pure, test-pure.mjs).
 // ============================================================================
 import type { Discovery, OfferLine, SiteTechnical } from '../types';
+import { nicheFor } from './nicheCatalog';
 import type { NichePrimary } from './nicheCatalog';
 import { fillLeadVars } from './scriptUtils';
 
@@ -245,4 +246,44 @@ export function agentMessage(d: Discovery): string {
     company: d.company,
     enrichment: d.enrichment ?? null,
   });
+}
+
+// --- Servicio ganador + mensaje + score (informe y UI) -----------------------
+
+/** Servicio ganador de un discovery: usa el `offer` persistido o lo recalcula
+ *  con el scoring dual (cubre mock y discoveries viejos sin offer). */
+export function offerOf(d: Discovery): OfferLine {
+  const e = d.enrichment;
+  if (e?.offer === 'web' || e?.offer === 'aaas') return e.offer;
+  const niche = nicheFor(d.industry ?? '');
+  const web = webScore({ website: d.website, technical: e?.technical ?? null, reviewCount: e?.reviewCount ?? 0 });
+  const agent = agentScore({
+    nichePrimary: niche,
+    reviewCount: e?.reviewCount ?? 0,
+    rating: e?.rating,
+    price: e?.price,
+    hasPhone: Boolean(d.phone),
+  });
+  return offerLine(web, agent);
+}
+
+/** Mensaje frío correcto según el servicio ganador. */
+export function offerMessage(d: Discovery): string {
+  return offerOf(d) === 'aaas' ? agentMessage(d) : coldMessage(d);
+}
+
+/** Score del servicio ganador (para barras y ordenación del informe). */
+export function offerScore(d: Discovery): number {
+  const e = d.enrichment;
+  if (offerOf(d) === 'aaas') {
+    if (e?.agentScore != null) return e.agentScore;
+    return agentScore({
+      nichePrimary: nicheFor(d.industry ?? ''),
+      reviewCount: e?.reviewCount ?? 0,
+      rating: e?.rating,
+      price: e?.price,
+      hasPhone: Boolean(d.phone),
+    });
+  }
+  return webScore({ website: d.website, technical: e?.technical ?? null, reviewCount: e?.reviewCount ?? 0 });
 }

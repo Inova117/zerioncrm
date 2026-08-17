@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { opportunityScore, nichoStats, coldMessage, issuesOf, webScore, agentScore, offerLine, meetsThreshold, agentMessage } from './prospecting';
+import { opportunityScore, nichoStats, coldMessage, issuesOf, webScore, agentScore, offerLine, meetsThreshold, agentMessage, offerOf, offerMessage, offerScore } from './prospecting';
 import type { Discovery, SiteTechnical } from '../types';
 
 const tech = (over: Partial<SiteTechnical> = {}): SiteTechnical => ({
@@ -177,6 +177,23 @@ describe('agentMessage', () => {
     expect(msg).toContain('secretaria virtual');
     expect(msg).not.toContain('usted');
     expect(msg).not.toContain('[EMPRESA]');
+  });
+});
+
+describe('offerOf / offerMessage / offerScore', () => {
+  it('usa el offer persistido si existe', () => {
+    expect(offerOf(disc({ enrichment: { offer: 'aaas' } }))).toBe('aaas');
+  });
+  it('clínica sin offer → aaas (agente gana) y mensaje de agente', () => {
+    const d = disc({ industry: 'clínicas dentales', enrichment: { rating: 4.8, reviewCount: 200, price: '$$$' } });
+    expect(offerOf(d)).toBe('aaas');
+    expect(offerMessage(d)).toContain('secretaria virtual');
+    expect(offerScore(d)).toBeGreaterThanOrEqual(90);
+  });
+  it('abogado sin web → web y mensaje de web', () => {
+    const d = disc({ industry: 'abogados', website: '' });
+    expect(offerOf(d)).toBe('web');
+    expect(offerMessage(d)).toContain('no tiene página web');
   });
 });
 

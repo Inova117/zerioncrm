@@ -6,7 +6,7 @@
 import { useMemo, useState } from 'react';
 import { Copy, Download, Flame, Gauge, Globe, Lock, MessageCircle, RefreshCw, Save, SearchX } from 'lucide-react';
 import type { Discovery } from '../../types';
-import { coldMessage, digitalLevel, issuesOf, nichoStats, opportunityScore } from '../../lib/prospecting';
+import { offerMessage, offerScore, offerOf, digitalLevel, issuesOf, nichoStats } from '../../lib/prospecting';
 import type { DigitalLevel } from '../../lib/prospecting';
 import { waLink, webLink } from '../../lib/utils';
 interface Props {
@@ -39,7 +39,7 @@ function scoreColor(score: number): string {
 export function ProspectionReport({ discoveries, analyzing, onSave, onReanalyze }: Props) {
   const stats = useMemo(() => nichoStats(discoveries), [discoveries]);
   const sorted = useMemo(
-    () => [...discoveries].sort((a, b) => opportunityScore(b, 'web') - opportunityScore(a, 'web')),
+    () => [...discoveries].sort((a, b) => offerScore(b) - offerScore(a)),
     [discoveries]
   );
   const top = sorted.slice(0, 5);
@@ -74,10 +74,11 @@ export function ProspectionReport({ discoveries, analyzing, onSave, onReanalyze 
         web: d.website || null,
         telefono: d.phone || null,
         email: d.email || null,
-        score: opportunityScore(d, 'web'),
-        nivel_digital: digitalLevel(opportunityScore(d, 'web')),
+        score: offerScore(d),
+        servicio: offerOf(d),
+        nivel_digital: digitalLevel(offerScore(d)),
         problemas: issuesOf(d),
-        mensaje: coldMessage(d),
+        mensaje: offerMessage(d),
       })),
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
@@ -147,11 +148,11 @@ export function ProspectionReport({ discoveries, analyzing, onSave, onReanalyze 
         </div>
         <div className="divide-y divide-surface-100">
           {sorted.map((d) => {
-            const score = opportunityScore(d, 'web');
+            const score = offerScore(d);
             const level = digitalLevel(score);
             const color = scoreColor(score);
             const issues = issuesOf(d);
-            const msg = coldMessage(d);
+            const msg = offerMessage(d);
             return (
               <div key={d.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
                 <div className="min-w-0 flex-1 basis-52">
@@ -216,10 +217,10 @@ export function ProspectionReport({ discoveries, analyzing, onSave, onReanalyze 
         <h3 className="mb-2 text-base font-semibold text-surface-900">Top {top.length} — mensajes listos para enviar</h3>
         <div className="grid gap-4 lg:grid-cols-2">
           {top.map((d) => {
-            const score = opportunityScore(d, 'web');
+            const score = offerScore(d);
             const level = digitalLevel(score);
             const color = scoreColor(score);
-            const msg = coldMessage(d);
+            const msg = offerMessage(d);
             return (
               <div key={d.id} className="card flex flex-col gap-2 p-4">
                 <div className="flex items-center justify-between gap-2">
