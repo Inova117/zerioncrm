@@ -6,6 +6,10 @@
 [build.environment]
   NODE_VERSION = "20"
 
+# Netlify Functions (scheduled function de prospección diaria)
+[functions]
+  directory = "netlify/functions"
+
 # Single-Page-App fallback: every route is served by index.html so that
 # client-side routes (/leads, /tareas, /equipo) work on direct load & refresh.
 [[redirects]]
