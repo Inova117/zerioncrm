@@ -121,9 +121,9 @@ describe('monthlyRollups', () => {
     ];
     const m = monthlyRollups(days, meta);
     expect(m.map((r) => r.monthKey)).toEqual(['2026-08', '2026-09', '2026-10']);
-    expect(m[0]).toMatchObject({ incomeObj: 2000, incomeReal: 800, webs: 2, aaas: 1, pctIncome: 40 });
-    expect(m[1]).toMatchObject({ incomeObj: 2200, incomeReal: 1000, mrrObj: 1250 });
-    expect(m[2]).toMatchObject({ incomeObj: 2500, incomeReal: 0 });
+    expect(m[0]).toMatchObject({ incomeObj: 2400, incomeReal: 800, webs: 2, aaas: 1, pctIncome: 33 });
+    expect(m[1]).toMatchObject({ incomeObj: 2500, incomeReal: 1000, mrrObj: 1250 });
+    expect(m[2]).toMatchObject({ incomeObj: 2800, incomeReal: 0 });
   });
 });
 

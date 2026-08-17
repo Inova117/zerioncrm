@@ -1,5 +1,6 @@
 import type {
   CashMove,
+  RoadmapActivity,
   RoadmapActivityStatus,
   RoadmapClient,
   RoadmapDay,
@@ -18,7 +19,7 @@ import {
   rowToRoadmapClient,
   rowToRoadmapDay,
 } from './mappers';
-import { defaultActivities, defaultDays, defaultMeta } from '../data/roadmapDefaults';
+import { SEED_VERSION, defaultActivities, defaultDays, defaultMeta } from '../data/roadmapDefaults';
 
 // ============================================================================
 // Roadmap Zerion (Guía Diaria V1) — servicio dual mock/Supabase.
@@ -46,6 +47,21 @@ async function ownerId(): Promise<string | null> {
   const { data } = await supabase!.auth.getSession();
   return data.session?.user?.id ?? null;
 }
+
+/** Fila de roadmap_activities lista para insert (columnas snake_case). */
+const activityRow = (owner: string, a: RoadmapActivity) => ({
+  owner_id: owner,
+  week: a.week,
+  phase: a.phase,
+  title: a.title,
+  responsible: a.responsible,
+  due_date: a.dueDate,
+  status: a.status,
+  is_gate: a.isGate,
+  sort: a.sort,
+  hours: a.hours,
+  reparto: a.reparto,
+});
 
 const supabaseRoadmapService: RoadmapService = {
   async load() {
@@ -80,19 +96,7 @@ const supabaseRoadmapService: RoadmapService = {
     if (activities.length === 0) {
       const { data, error } = await supabase!
         .from('roadmap_activities')
-        .insert(
-          defaultActivities().map((a) => ({
-            owner_id: owner,
-            week: a.week,
-            phase: a.phase,
-            title: a.title,
-            responsible: a.responsible,
-            due_date: a.dueDate,
-            status: a.status,
-            is_gate: a.isGate,
-            sort: a.sort,
-          }))
-        )
+        .insert(defaultActivities().map((a) => activityRow(owner, a)))
         .select();
       if (error) throw error;
       activities = (data ?? []).map(rowToRoadmapActivity);
@@ -103,6 +107,27 @@ const supabaseRoadmapService: RoadmapService = {
         .from('roadmap_meta')
         .upsert({ owner_id: owner, data: meta }, { onConflict: 'owner_id' });
       if (error) throw error;
+    }
+
+    // Auto-migración de contenido: si la semilla es más nueva que la guardada,
+    // re-siembra actividades + metas mensuales (preserva diario y finanzas).
+    if ((meta.seedVersion ?? 1) < SEED_VERSION) {
+      const { error: dErr } = await supabase!
+        .from('roadmap_activities')
+        .delete()
+        .eq('owner_id', owner);
+      if (dErr) throw dErr;
+      const { data, error } = await supabase!
+        .from('roadmap_activities')
+        .insert(defaultActivities().map((a) => activityRow(owner, a)))
+        .select();
+      if (error) throw error;
+      activities = (data ?? []).map(rowToRoadmapActivity);
+      meta = { ...meta, monthlyGoals: defaultMeta().monthlyGoals, seedVersion: SEED_VERSION };
+      const { error: mErr } = await supabase!
+        .from('roadmap_meta')
+        .upsert({ owner_id: owner, data: meta }, { onConflict: 'owner_id' });
+      if (mErr) throw mErr;
     }
 
     return { meta, days, activities, clients, cash };
@@ -193,6 +218,13 @@ const mockRoadmapService: RoadmapService = {
     }
     if (!meta) {
       meta = defaultMeta();
+      table.set('roadmapMeta', [meta]);
+    }
+    // Auto-migración de contenido (misma lógica que Supabase).
+    if ((meta.seedVersion ?? 1) < SEED_VERSION) {
+      activities = defaultActivities();
+      table.set('roadmapActivities', activities);
+      meta = { ...meta, monthlyGoals: defaultMeta().monthlyGoals, seedVersion: SEED_VERSION };
       table.set('roadmapMeta', [meta]);
     }
     return { meta, days, activities, clients, cash };

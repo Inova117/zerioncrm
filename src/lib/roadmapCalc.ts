@@ -59,6 +59,8 @@ export interface KpiRow {
   key: string;
   label: string;
   target: number;
+  /** Etiqueta de objetivo en rango (p.ej. "75-100/sem"), si existe. */
+  targetLabel?: string;
   display: 'number' | 'pct' | 'money';
   value: number;
   killText: string | null;
@@ -267,6 +269,7 @@ export function computeKpis(
       key: def.key,
       label: def.label,
       target: def.target,
+      targetLabel: def.targetLabel,
       display: def.display,
       value,
       killText: def.kill?.text ?? null,

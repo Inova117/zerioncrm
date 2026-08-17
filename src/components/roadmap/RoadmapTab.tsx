@@ -2,7 +2,7 @@ import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { AlertCircle, CheckCircle2, Clock, Flag, Square } from 'lucide-react';
 import type { CashMove, RoadmapActivity, RoadmapActivityStatus, RoadmapClient, RoadmapDay, RoadmapPhase } from '../../types';
-import { PLAN_WEEKS, weekRange } from '../../data/roadmapDefaults';
+import { ICP_TEXT, LISTA_MIX, MARKETING_CHANNELS, PLAN_WEEKS, REPARTO_LEGEND, weekRange } from '../../data/roadmapDefaults';
 import { cashBalance, gateCheck, gateKindForWeek, todayKey, totals } from '../../lib/roadmapCalc';
 import { cn } from '../../lib/utils';
 
@@ -72,6 +72,37 @@ export function RoadmapTab({ activities, days, clients, cash, setActivityStatus 
         <p className="mt-2 text-xs text-surface-400">
           Clic en el cuadro para marcar hecho · otro clic para cancelar · otro para volver. Las filas con 🚩 son gates: su veredicto se calcula solo.
         </p>
+        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-surface-500">
+          {REPARTO_LEGEND.map((r) => (
+            <span key={r.key} className="flex items-center gap-1">
+              <span>{r.emoji}</span> {r.label}
+            </span>
+          ))}
+        </div>
+      </section>
+
+      {/* Estrategia y canales */}
+      <section className="card p-4">
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div>
+            <h3 className="text-sm font-semibold text-surface-800">ICP (un solo perfil)</h3>
+            <p className="mt-1 text-sm text-surface-600">{ICP_TEXT}</p>
+            <p className="mt-2 text-xs text-surface-400">
+              <strong className="text-surface-500">Lista de 100:</strong> {LISTA_MIX}
+            </p>
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-surface-800">Marketing (en orden)</h3>
+            <ol className="mt-1 space-y-1.5 text-sm">
+              {MARKETING_CHANNELS.map((c, i) => (
+                <li key={c.canal} className="text-surface-600">
+                  <span className="mr-1 font-semibold text-surface-400">{i + 1}.</span>
+                  <strong className="text-surface-700">{c.canal}.</strong> {c.detalle}
+                </li>
+              ))}
+            </ol>
+          </div>
+        </div>
       </section>
 
       {/* Semanas */}
@@ -114,7 +145,11 @@ export function RoadmapTab({ activities, days, clients, cash, setActivityStatus 
                       </p>
                       <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-surface-400">
                         <span className={cn('badge', PHASE_BADGE[a.phase])}>{a.phase}</span>
+                        <span title={REPARTO_LEGEND.find((r) => r.key === a.reparto)?.label}>
+                          {REPARTO_LEGEND.find((r) => r.key === a.reparto)?.emoji ?? '🟩'}
+                        </span>
                         <span>· {a.responsible}</span>
+                        {a.hours > 0 && <span>· {a.hours}h</span>}
                         {a.dueDate && (
                           <span className={cn('inline-flex items-center gap-1', overdue && 'font-semibold text-caliente')}>
                             <Clock className="h-3 w-3" />

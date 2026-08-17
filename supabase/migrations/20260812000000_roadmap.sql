@@ -37,6 +37,9 @@ create table if not exists public.roadmap_activities (
   created_at  timestamptz not null default now()
 );
 create index if not exists roadmap_activities_owner_idx on public.roadmap_activities(owner_id, week, sort);
+-- v2 (merge con ROADMAP-ZERION-12-SEMANAS.md): horas estimadas + reparto de trabajo
+alter table public.roadmap_activities add column if not exists hours   int  not null default 0;
+alter table public.roadmap_activities add column if not exists reparto text not null default 'verde';
 
 -- Clientes con mensualidad (hoja FINANZAS → MRR actual) ----------------------
 create table if not exists public.roadmap_clients (

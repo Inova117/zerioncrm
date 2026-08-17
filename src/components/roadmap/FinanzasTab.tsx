@@ -3,7 +3,7 @@ import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { DollarSign, Plus, Repeat, Save, ShieldCheck, Trash2, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
 import type { CashMove, RoadmapClient, RoadmapClientStatus, RoadmapMeta, RoadmapProduct } from '../../types';
-import { REF_COSTS } from '../../data/roadmapDefaults';
+import { REF_COSTS, BURN_PERSONAL, REGLA_CAJA } from '../../data/roadmapDefaults';
 import { cashBalance, reserveStatus, todayKey } from '../../lib/roadmapCalc';
 import { Modal } from '../ui/Modal';
 import { StatCard } from '../dashboard/StatCard';
@@ -283,9 +283,22 @@ export function FinanzasTab({ meta, clients, cash, createClient, updateClient, r
         </section>
       </div>
 
-      <p className="text-xs text-surface-400">
-        <strong className="text-surface-500">Costos de referencia:</strong> {REF_COSTS}
-      </p>
+      <section className="card p-4">
+        <h2 className="mb-2 text-sm font-semibold text-surface-800">Finanzas del plan</h2>
+        <dl className="space-y-2 text-sm">
+          <div className="flex items-start justify-between gap-4">
+            <dt className="text-surface-500">Burn personal mínimo</dt>
+            <dd className="font-medium text-surface-800">{fmtMoney(BURN_PERSONAL)}/mes (Latacunga)</dd>
+          </div>
+          <div className="flex items-start justify-between gap-4">
+            <dt className="text-surface-500">Regla de caja</dt>
+            <dd className="max-w-md text-right text-xs text-surface-600">{REGLA_CAJA}</dd>
+          </div>
+        </dl>
+        <p className="mt-3 border-t border-surface-100 pt-3 text-xs text-surface-400">
+          <strong className="text-surface-500">Costos de referencia:</strong> {REF_COSTS}
+        </p>
+      </section>
 
       <ClientFormModal open={modalOpen} onClose={() => setModalOpen(false)} initial={editing} onSave={handleClientSave} />
     </div>

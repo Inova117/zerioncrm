@@ -350,6 +350,11 @@ export interface EmployeeStats {
 // ---------------------------------------------------------------------------
 export type RoadmapActivityStatus = 'pendiente' | 'hecho' | 'cancelado';
 
+/** Reparto de trabajo (del ROADMAP-ZERION-12-SEMANAS.md):
+ *  verde = lo ejecuta Martin · naranja = Martin con plantilla del coach ·
+ *  azul = lo hace el sistema (agente, automatización, reportes). */
+export type RoadmapReparto = 'verde' | 'naranja' | 'azul';
+
 /** Fases del roadmap (columna "Fase" del Excel). */
 export type RoadmapPhase =
   | 'Estrategia'
@@ -373,7 +378,7 @@ export interface RoadmapDay {
   notes: string;
 }
 
-/** Actividad del roadmap (hoja ROADMAP). */
+/** Actividad del roadmap (hoja ROADMAP + ROADMAP-ZERION-12-SEMANAS.md). */
 export interface RoadmapActivity {
   id: string;
   week: number; // 1..12
@@ -384,6 +389,10 @@ export interface RoadmapActivity {
   status: RoadmapActivityStatus;
   isGate: boolean; // fila de control con veredicto computado
   sort: number;
+  /** Carga de trabajo estimada en horas (del documento principal). */
+  hours: number;
+  /** Quién la ejecuta (verde/naranja/azul). */
+  reparto: RoadmapReparto;
 }
 
 export type RoadmapProduct = 'web' | 'aaas' | 'otro';
@@ -417,6 +426,8 @@ export interface RoadmapMeta {
   reserve: number; // reserva intocable ($)
   /** Metas mensuales: '2026-08' → { income, mrr }. */
   monthlyGoals: Record<string, { income: number; mrr: number }>;
+  /** Versión de la semilla de contenido (para auto-migrar actividades/metas). */
+  seedVersion?: number;
 }
 
 /** Documento completo que carga el módulo. */

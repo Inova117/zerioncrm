@@ -12,6 +12,7 @@ import type { RoadmapClient, RoadmapDay, RoadmapMeta } from '../../types';
 import { StatCard } from '../dashboard/StatCard';
 import { computeKpis, monthlyRollups, totals } from '../../lib/roadmapCalc';
 import type { KpiRow } from '../../lib/roadmapCalc';
+import { INFO_KPIS, SUPUESTOS } from '../../data/roadmapDefaults';
 import { fmtMoney, cn } from '../../lib/utils';
 
 interface PanelTabProps {
@@ -44,6 +45,7 @@ const fmtKpi = (r: KpiRow): string => {
 };
 
 const fmtKpiTarget = (r: KpiRow): string => {
+  if (r.targetLabel) return r.targetLabel;
   if (r.display === 'pct') return `${Math.round(r.target * 100)}%`;
   if (r.display === 'money') return fmtMoney(r.target);
   return String(r.target);
@@ -217,7 +219,29 @@ export function PanelTab({ meta, days, clients, saveMeta }: PanelTabProps) {
               <KpiBadge r={k} />
             </li>
           ))}
+          {INFO_KPIS.map((k) => (
+            <li key={k.label} className="flex flex-wrap items-center gap-x-4 gap-y-1 py-2.5">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-surface-800">{k.label}</p>
+                <p className="text-xs text-surface-400">{k.text}</p>
+              </div>
+              <span className="badge bg-surface-100 text-surface-500">Info</span>
+            </li>
+          ))}
         </ul>
+      </section>
+
+      {/* Notas y supuestos */}
+      <section className="card p-4">
+        <div className="mb-2 flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 text-amber-500" />
+          <h2 className="text-sm font-semibold text-surface-800">Notas y supuestos (honestidad)</h2>
+        </div>
+        <ol className="list-decimal space-y-1.5 pl-5 text-sm text-surface-600">
+          {SUPUESTOS.map((s, i) => (
+            <li key={i}>{s}</li>
+          ))}
+        </ol>
       </section>
     </div>
   );

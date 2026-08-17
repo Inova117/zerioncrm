@@ -13,7 +13,7 @@ import {
   Save,
 } from 'lucide-react';
 import type { RoadmapDay, RoadmapMeta } from '../../types';
-import { PROCESS_STEPS, ROUTINE, dayTargets } from '../../data/roadmapDefaults';
+import { CONTENT_PLAN, ONE_LINER_WEB, PROCESS_STEPS, ROUTINE, dayTargets } from '../../data/roadmapDefaults';
 import { todayInPlan, todayKey } from '../../lib/roadmapCalc';
 import { cn } from '../../lib/utils';
 
@@ -253,10 +253,54 @@ export function HoyTab({ meta, days, saveDay, saveMeta }: HoyTabProps) {
             <span className="flex-1">Tus prospectos de hoy viven en el Kanban</span>
             <span className="text-xs text-surface-400">Abrir Prospectos →</span>
           </Link>
+
+          {/* Plan de contenidos */}
+          <section className="card p-4">
+            <div className="mb-2 flex items-center gap-2">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-50 text-orange-600">
+                <ClipboardList className="h-4 w-4" />
+              </span>
+              <h2 className="text-sm font-semibold text-surface-800">Plan de contenidos (Rule of 100)</h2>
+            </div>
+            <dl className="space-y-1.5 text-sm">
+              <div>
+                <dt className="text-xs font-medium uppercase tracking-wide text-surface-400">Cadencia</dt>
+                <dd className="text-surface-700">{CONTENT_PLAN.cadencia}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium uppercase tracking-wide text-surface-400">Hook</dt>
+                <dd className="text-surface-700">{CONTENT_PLAN.hook}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium uppercase tracking-wide text-surface-400">Retain</dt>
+                <dd className="text-surface-700">{CONTENT_PLAN.retain}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium uppercase tracking-wide text-surface-400">Reward</dt>
+                <dd className="text-surface-700">{CONTENT_PLAN.reward}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium uppercase tracking-wide text-surface-400">Material</dt>
+                <dd className="text-surface-700">{CONTENT_PLAN.material}</dd>
+              </div>
+            </dl>
+          </section>
         </div>
 
         {/* Columna derecha */}
         <div className="space-y-5">
+          {/* One-liner web */}
+          <section className="card p-4">
+            <div className="mb-2 flex items-center gap-2">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-50 text-brand-600">
+                <Flame className="h-4 w-4" />
+              </span>
+              <h2 className="text-sm font-semibold text-surface-800">One-liner de web</h2>
+            </div>
+            <p className="text-sm italic leading-relaxed text-surface-700">“{ONE_LINER_WEB}”</p>
+            <p className="mt-1.5 text-xs text-surface-400">La demo ES el vendedor.</p>
+          </section>
+
           {/* Pitch */}
           <section className="card p-4">
             <div className="mb-3 flex items-center gap-2">

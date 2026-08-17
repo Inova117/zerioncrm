@@ -3,7 +3,7 @@
 // camelCase. Keep ALL of that translation here so components/services never see
 // raw rows. (resolves the camelCase↔snake_case gap, audit#1 #12)
 // ============================================================================
-import type { User, Lead, Contact, Comment, Task, Discovery, SearchSummary, ProspectingCampaign, Role, Source, Service, TaskCadence, ActivityType, RoadmapDay, RoadmapActivity, RoadmapPhase, RoadmapActivityStatus, RoadmapClient, RoadmapProduct, RoadmapClientStatus, CashMove } from '../types';
+import type { User, Lead, Contact, Comment, Task, Discovery, SearchSummary, ProspectingCampaign, Role, Source, Service, TaskCadence, ActivityType, RoadmapDay, RoadmapActivity, RoadmapPhase, RoadmapActivityStatus, RoadmapReparto, RoadmapClient, RoadmapProduct, RoadmapClientStatus, CashMove } from '../types';
 import { normalizeTemperature } from '../lib/constants';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -247,6 +247,8 @@ export const rowToRoadmapActivity = (r: any): RoadmapActivity => ({
   status: (r.status ?? 'pendiente') as RoadmapActivityStatus,
   isGate: r.is_gate ?? false,
   sort: Number(r.sort ?? 0),
+  hours: Number(r.hours ?? 0),
+  reparto: (r.reparto ?? 'verde') as RoadmapReparto,
 });
 
 // ---- roadmap_clients ⇆ RoadmapClient ----------------------------------------
