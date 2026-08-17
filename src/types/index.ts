@@ -231,6 +231,26 @@ export interface SearchSummary {
 }
 
 // ---------------------------------------------------------------------------
+// Prospección automática diaria — una campaña configurada por el fundador.
+// El scheduler (Fase 4) la ejecuta cada mañana: Apify → analyze → scoring →
+// filtro por umbral → leads asignados al vendedor.
+// ---------------------------------------------------------------------------
+export interface ProspectingCampaign {
+  id: UUID;
+  ownerId: UUID; // quien la crea/gestiona (admin)
+  name: string; // etiqueta legible, ej. "Clínicas Guayaquil"
+  niche: string; // businessType para Apify, ej. "clínicas dentales"
+  location: string; // ciudad/zona, ej. "Guayaquil"
+  limitPerDay: number; // cuántos negocios por corrida (default 30)
+  thresholds: Record<OfferLine, number>; // { web: 70, aaas: 70 }
+  assignedTo: UUID; // a quién se asignan los leads ganadores
+  active: boolean; // si el scheduler la ejecuta
+  demoAgentUrl: string; // URL de la demo única del AI agent ('' = sin demo)
+  createdAt: ISODate;
+  updatedAt: ISODate;
+}
+
+// ---------------------------------------------------------------------------
 // Contacts — the people (stakeholders) at a prospect/account
 // ---------------------------------------------------------------------------
 export interface Contact {

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Radar, Briefcase, MapPin, Download, Globe, Sparkles, Search, Loader2,
-  AlertCircle, Languages, ArrowDownWideNarrow, Save, CheckSquare, Square, Compass, BarChart3, History,
+  AlertCircle, Languages, ArrowDownWideNarrow, Save, CheckSquare, Square, Compass, BarChart3, History, Rocket,
 } from 'lucide-react';
 import { AppLayout } from '../components/layout/AppLayout';
 import { LeadFinderCard } from '../components/leads/LeadFinderCard';
@@ -9,16 +9,18 @@ import { LeadCandidateModal } from '../components/leads/LeadCandidateModal';
 import { LeadDetailModal } from '../components/leads/LeadDetailModal';
 import { LeadFormModal } from '../components/leads/LeadFormModal';
 import { ProspectionReport } from '../components/leads/ProspectionReport';
+import { CampaignsPanel } from '../components/leads/CampaignsPanel';
 import { EmptyState, PageLoader } from '../components/ui/misc';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { findLeads, listDiscoveries, deleteDiscovery, discoveryToInput, analyzeSites, listSearches } from '../services/leadFinderService';
-import type { Discovery, Lead, SearchSummary, Temperature } from '../types';
+import { listCampaigns, saveCampaign, deleteCampaign } from '../services/campaignsService';
+import type { Discovery, Lead, SearchSummary, ProspectingCampaign, Temperature } from '../types';
 import { cn, normalizePhone } from '../lib/utils';
 import { toCSV, downloadCSV } from '../lib/csv';
 import { CSV_HEADERS, leadsToRows } from '../lib/leadsCsv';
 
-type Tab = 'search' | 'discovered' | 'report' | 'history';
+type Tab = 'search' | 'discovered' | 'report' | 'history' | 'campaigns';
 
 /** Wrap a discovery as a pseudo-Lead so the card can render it. */
 function toLead(d: Discovery): Lead {
@@ -68,6 +70,8 @@ export function LeadFinderPage() {
   const [analyzing, setAnalyzing] = useState(false);
   const [searches, setSearches] = useState<SearchSummary[]>([]);
   const [loadingSearches, setLoadingSearches] = useState(false);
+  const [campaigns, setCampaigns] = useState<ProspectingCampaign[]>([]);
+  const [loadingCampaigns, setLoadingCampaigns] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Results
@@ -89,6 +93,7 @@ export function LeadFinderPage() {
 
   const usersById = useMemo(() => new Map(users.map((u) => [u.id, u])), [users]);
   const activeEmployees = useMemo(() => users.filter((u) => u.role === 'employee' && u.active), [users]);
+  const assignable = useMemo(() => users.filter((u) => u.active), [users]);
 
   // A discovery is "saved" when a lead already matches it — by Google place_id
   // OR by phone (mirrors the Edge Function dedup), so a business saved outside
@@ -161,10 +166,22 @@ export function LeadFinderPage() {
     }
   }, []);
 
+  const loadCampaigns = useCallback(async () => {
+    setLoadingCampaigns(true);
+    try {
+      setCampaigns(await listCampaigns());
+    } catch (e) {
+      console.error('[lead-finder] no se pudo cargar las campañas:', e);
+    } finally {
+      setLoadingCampaigns(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadDiscoveries();
     void loadSearches();
-  }, [loadDiscoveries, loadSearches]);
+    void loadCampaigns();
+  }, [loadDiscoveries, loadSearches, loadCampaigns]);
 
   const activeList = tab === 'search' ? searchResults : discovered;
 
@@ -331,6 +348,16 @@ export function LeadFinderPage() {
     );
   }
 
+  async function handleSaveCampaign(c: ProspectingCampaign) {
+    await saveCampaign(c);
+    await loadCampaigns();
+  }
+
+  async function handleDeleteCampaign(id: string) {
+    await deleteCampaign(id);
+    await loadCampaigns();
+  }
+
   if (!user) return null;
 
   const emptyForTab =
@@ -420,10 +447,20 @@ export function LeadFinderPage() {
           <Tab label="Informe" icon={BarChart3} active={tab === 'report'} count={searchResults.length} onClick={() => { setTab('report'); setSelected(new Set()); }} />
           <Tab label="Descubiertos" icon={Compass} active={tab === 'discovered'} count={discovered.length} onClick={() => { setTab('discovered'); setSelected(new Set()); }} />
           <Tab label="Búsquedas" icon={History} active={tab === 'history'} count={searches.length} onClick={() => { setTab('history'); setSelected(new Set()); }} />
+          {isAdmin && <Tab label="Campañas" icon={Rocket} active={tab === 'campaigns'} count={campaigns.length} onClick={() => { setTab('campaigns'); setSelected(new Set()); }} />}
         </div>
 
         {/* Content */}
-        {tab === 'history' ? (
+        {tab === 'campaigns' ? (
+          <CampaignsPanel
+            campaigns={campaigns}
+            loading={loadingCampaigns}
+            assignable={assignable}
+            ownerId={user?.id ?? ''}
+            onSave={handleSaveCampaign}
+            onDelete={handleDeleteCampaign}
+          />
+        ) : tab === 'history' ? (
           loadingSearches ? (
             <PageLoader />
           ) : searches.length === 0 ? (

@@ -587,6 +587,30 @@ create policy "daily_activity self" on public.daily_activity for all
   using (public.is_admin() or user_id = auth.uid())
   with check (public.is_admin() or user_id = auth.uid());
 
+-- Prospección automática diaria: campañas configurables ---------------------
+create table if not exists public.prospecting_campaigns (
+  id              uuid primary key default gen_random_uuid(),
+  owner_id        uuid not null references public.profiles(id),
+  name            text not null default '',
+  niche           text not null,
+  location        text not null,
+  limit_per_day   int  not null default 30,
+  thresholds      jsonb not null default '{"web":70,"aaas":70}',
+  assigned_to     uuid not null references public.profiles(id),
+  active          boolean not null default true,
+  demo_agent_url  text not null default '',
+  created_at      timestamptz not null default now(),
+  updated_at      timestamptz not null default now()
+);
+alter table public.prospecting_campaigns enable row level security;
+drop policy if exists "campaigns read" on public.prospecting_campaigns;
+create policy "campaigns read" on public.prospecting_campaigns for select
+  using (public.is_admin() or owner_id = auth.uid());
+drop policy if exists "campaigns write" on public.prospecting_campaigns;
+create policy "campaigns write" on public.prospecting_campaigns for all
+  using (owner_id = auth.uid())
+  with check (owner_id = auth.uid());
+
 -- ============================================================================
 -- VERIFICACIÓN — corre esto después para confirmar que todo quedó bien:
 --
@@ -594,9 +618,9 @@ create policy "daily_activity self" on public.daily_activity for all
 --   where table_schema = 'public' order by 1;
 --   -- Debe listar: comments, contacts, copilot_calls, copilot_memory,
 --   --   daily_activity, leads, lead_discoveries, lead_searches, profiles,
---   --   roadmap_activities, roadmap_cash, roadmap_clients, roadmap_days,
---   --   roadmap_meta, tasks
+--   --   prospecting_campaigns, roadmap_activities, roadmap_cash,
+--   --   roadmap_clients, roadmap_days, roadmap_meta, tasks
 --
 --   select count(*) as policies from pg_policies where schemaname = 'public';
---   -- Debe dar: 28 (22 base + 5 del roadmap + 1 de daily_activity)
+--   -- Debe dar: 30 (22 base + 5 del roadmap + 1 de daily_activity + 2 de campaigns)
 -- ============================================================================

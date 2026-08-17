@@ -3,7 +3,7 @@
 // camelCase. Keep ALL of that translation here so components/services never see
 // raw rows. (resolves the camelCase↔snake_case gap, audit#1 #12)
 // ============================================================================
-import type { User, Lead, Contact, Comment, Task, Discovery, SearchSummary, Role, Source, Service, TaskCadence, ActivityType, RoadmapDay, RoadmapActivity, RoadmapPhase, RoadmapActivityStatus, RoadmapClient, RoadmapProduct, RoadmapClientStatus, CashMove } from '../types';
+import type { User, Lead, Contact, Comment, Task, Discovery, SearchSummary, ProspectingCampaign, Role, Source, Service, TaskCadence, ActivityType, RoadmapDay, RoadmapActivity, RoadmapPhase, RoadmapActivityStatus, RoadmapClient, RoadmapProduct, RoadmapClientStatus, CashMove } from '../types';
 import { normalizeTemperature } from '../lib/constants';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -22,6 +22,36 @@ export const rowToSearch = (r: any): SearchSummary => ({
   createdAt: r.created_at,
   finishedAt: r.finished_at ?? null,
 });
+
+// ---- prospecting_campaigns ⇆ ProspectingCampaign ---------------------------
+export const rowToCampaign = (r: any): ProspectingCampaign => ({
+  id: r.id,
+  ownerId: r.owner_id,
+  name: r.name ?? '',
+  niche: r.niche ?? '',
+  location: r.location ?? '',
+  limitPerDay: Number(r.limit_per_day ?? 30),
+  thresholds: (r.thresholds ?? { web: 70, aaas: 70 }) as ProspectingCampaign['thresholds'],
+  assignedTo: r.assigned_to,
+  active: Boolean(r.active),
+  demoAgentUrl: r.demo_agent_url ?? '',
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
+});
+
+/** Columnas que escribe el cliente (owner_id se fija al crear, no se actualiza). */
+export const campaignToRow = (c: Partial<ProspectingCampaign>): Record<string, unknown> => {
+  const row: Record<string, unknown> = {};
+  if (c.name !== undefined) row.name = c.name;
+  if (c.niche !== undefined) row.niche = c.niche;
+  if (c.location !== undefined) row.location = c.location;
+  if (c.limitPerDay !== undefined) row.limit_per_day = c.limitPerDay;
+  if (c.thresholds !== undefined) row.thresholds = c.thresholds;
+  if (c.assignedTo !== undefined) row.assigned_to = c.assignedTo;
+  if (c.active !== undefined) row.active = c.active;
+  if (c.demoAgentUrl !== undefined) row.demo_agent_url = c.demoAgentUrl;
+  return row;
+};
 
 // ---- profiles ⇆ User -------------------------------------------------------
 export const rowToUser = (r: any): User => ({
