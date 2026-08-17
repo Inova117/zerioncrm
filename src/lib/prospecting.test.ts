@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { opportunityScore, nichoStats, coldMessage, issuesOf } from './prospecting';
+import { opportunityScore, nichoStats, coldMessage, issuesOf, webScore, agentScore, offerLine, meetsThreshold, agentMessage } from './prospecting';
 import type { Discovery, SiteTechnical } from '../types';
 
 const tech = (over: Partial<SiteTechnical> = {}): SiteTechnical => ({
@@ -110,9 +110,73 @@ describe('coldMessage', () => {
     expect(msg).not.toContain('[EMPRESA]');
     expect(msg).not.toContain('[PROBLEMA]');
     expect(msg).not.toContain('Buenas'); // guion: nunca «Buenas»
+    expect(msg).not.toContain('usted'); // tono neutro formal, sin ustedeo
     expect(msg).toContain('120 reseñas');
     expect(msg).toContain('certificado');
     expect(msg).not.toContain('$'); // sin precios en frío
+  });
+});
+
+describe('webScore (primitiva pura)', () => {
+  it('sin web = 95', () => {
+    expect(webScore({ website: '' })).toBe(95);
+  });
+  it('sin web + muchas reseñas capa en 100', () => {
+    expect(webScore({ website: '', reviewCount: 400 })).toBe(100);
+  });
+  it('cert vencido = 88', () => {
+    expect(webScore({ website: 'https://x.ec', technical: tech({ certExpired: true }) })).toBe(88);
+  });
+  it('web sin technical = 70 (incertidumbre)', () => {
+    expect(webScore({ website: 'https://x.ec' })).toBe(70);
+  });
+});
+
+describe('agentScore (primitiva pura)', () => {
+  it('clínica con volumen + rating + $$$ + phone = 100', () => {
+    const s = agentScore({ nichePrimary: 'aaas', reviewCount: 200, rating: 4.8, price: '$$$', hasPhone: true });
+    expect(s).toBe(100); // 40+20+20+15+5
+  });
+  it('nicho web se penaliza fuerte', () => {
+    const s = agentScore({ nichePrimary: 'web', reviewCount: 200, rating: 4.8, price: '$$$', hasPhone: true });
+    expect(s).toBe(30); // 40+20+15+5 = 80, -50 por nicho web
+  });
+  it('nicho ambiguo sin señales queda bajo', () => {
+    const s = agentScore({ nichePrimary: 'ambigua', reviewCount: 5, hasPhone: false });
+    expect(s).toBe(0);
+  });
+  it('señales débiles suman moderado', () => {
+    const s = agentScore({ nichePrimary: 'aaas', reviewCount: 50, rating: 4.2, hasPhone: true });
+    expect(s).toBe(60); // 25 + 10 + 20 + 5
+  });
+});
+
+describe('offerLine + meetsThreshold', () => {
+  it('gana el mayor; empate → web', () => {
+    expect(offerLine(90, 40)).toBe('web');
+    expect(offerLine(30, 80)).toBe('aaas');
+    expect(offerLine(70, 70)).toBe('web');
+  });
+  it('umbral default 70', () => {
+    expect(meetsThreshold('web', 70)).toBe(true);
+    expect(meetsThreshold('aaas', 69)).toBe(false);
+  });
+  it('umbrales custom por servicio', () => {
+    expect(meetsThreshold('web', 75, { web: 80 })).toBe(false);
+    expect(meetsThreshold('aaas', 65, { aaas: 60 })).toBe(true);
+  });
+});
+
+describe('agentMessage', () => {
+  it('resuelve variables, sin ustedeo y con el dolor de atención', () => {
+    const msg = agentMessage(
+      disc({ enrichment: { rating: 4.8, reviewCount: 200, city: 'Quito' } })
+    );
+    expect(msg).toContain('200 reseñas');
+    expect(msg).toContain('4.8 estrellas');
+    expect(msg).toContain('secretaria virtual');
+    expect(msg).not.toContain('usted');
+    expect(msg).not.toContain('[EMPRESA]');
   });
 });
 

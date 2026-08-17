@@ -2,8 +2,13 @@
 // prospecting — scoring de oportunidad, estadísticas de nicho y mensaje frío
 // del sistema de prospección integrado (kit prospeccion-clientes).
 // Lógica PURA (sin React/Supabase) → testeable con vitest.
+//
+// Desde Fase 2 de "prospección automática por servicio", el scoring se expone
+// como funciones primitivas (webScore / agentScore) para duplicarlas en la
+// edge function analyze-site con paridad (bloque scoring-pure, test-pure.mjs).
 // ============================================================================
-import type { Discovery } from '../types';
+import type { Discovery, OfferLine, SiteTechnical } from '../types';
+import type { NichePrimary } from './nicheCatalog';
 import { fillLeadVars } from './scriptUtils';
 
 export type ProspectionService = 'web' | 'seo' | 'marketing';
@@ -18,55 +23,131 @@ export function digitalLevel(score: number): DigitalLevel {
   return 'bajo';
 }
 
-/**
- * Score de oportunidad 0-100 según el servicio que se vende. Reglas del kit
- * prospeccion-clientes, adaptadas a los datos que tenemos (technical del
- * analyze-site). Nunca inventa: sin technical, buckets conservadores.
- */
-export function opportunityScore(d: Discovery, service: ProspectionService): number {
-  return Math.min(100, uncappedScore(d, service)); // el kit promete 0-100
+// ---------------------------------------------------------------------------
+// webScore — necesidad de página web (0-100). Primitiva pura para paridad.
+// ---------------------------------------------------------------------------
+
+export interface WebScoreInput {
+  website: string;
+  technical?: SiteTechnical | null;
+  reviewCount?: number;
 }
 
-function uncappedScore(d: Discovery, service: ProspectionService): number {
+/** Bonus 0-10 por reseñas (negocio vivo = dueño que responde). */
+function reviewBonus(n: number): number {
+  if (n >= 100) return 10;
+  if (n >= 30) return 5;
+  return 0;
+}
+
+export function webScore(input: WebScoreInput): number {
+  const t = input.technical ?? null;
+  const hasWeb = Boolean(String(input.website ?? '').trim());
+  const bonus = reviewBonus(input.reviewCount ?? 0);
+
+  if (!hasWeb) return Math.min(100, 95 + bonus); // oportunidad máxima
+  if (!t) return 70; // web declarada, aún sin analizar → incertidumbre media
+  if (!t.accessible) return 70 + Math.min(17, bonus); // no se pudo ver → no inventar
+  if (t.certExpired) return 88 + Math.min(6, bonus);
+  if (!t.hasViewport) return 80 + Math.min(9, bonus);
+  if (!t.hasMetaDescription || !t.hasH1) return 75 + Math.min(10, bonus);
+  if (t.loadTimeMs > 3000) return 65 + Math.min(14, bonus);
+  if (!t.openGraph && t.stackHints.length === 0) return 55 + Math.min(14, bonus);
+  return 20 + Math.min(29, bonus + 14); // moderna: oportunidad baja
+}
+
+// ---------------------------------------------------------------------------
+// agentScore — necesidad de secretaria virtual / AI agent (0-100).
+// Señales proxy del scraper (Gmaps/Apify): volumen de reseñas, rating, nicho,
+// precio, canal activo. Más ruidosa que webScore; se documenta la incertidumbre.
+// ---------------------------------------------------------------------------
+
+export interface AgentScoreInput {
+  nichePrimary: NichePrimary; // de nicheCatalog
+  reviewCount?: number;
+  rating?: number;
+  price?: string;
+  hasPhone: boolean;
+}
+
+export function agentScore(input: AgentScoreInput): number {
+  const { nichePrimary, reviewCount = 0, rating, price, hasPhone } = input;
+  let s = 0;
+
+  if (reviewCount >= 100) s += 40;
+  else if (reviewCount >= 30) s += 25;
+  else if (reviewCount >= 10) s += 10;
+
+  if (rating != null) {
+    if (rating >= 4.5) s += 20;
+    else if (rating >= 4.0) s += 10;
+  }
+
+  if (nichePrimary === 'aaas') s += 20; // nicho de agendamiento
+  // 'ambigua' (restaurantes) → compite en igualdad (ni bonus ni penalización)
+
+  if (price === '$$$') s += 15;
+  else if (price === '$$') s += 10;
+
+  if (hasPhone) s += 5;
+
+  if (nichePrimary === 'web') s -= 50; // no se le ofrece agente a un abogado
+
+  return Math.max(0, Math.min(100, s));
+}
+
+/** Línea de oferta ganadora: gana el score mayor (regla de decisión dual). */
+export function offerLine(web: number, agent: number): OfferLine {
+  return web >= agent ? 'web' : 'aaas';
+}
+
+// ---------------------------------------------------------------------------
+// Umbrales de entrega (configurables por campaña y servicio).
+// ---------------------------------------------------------------------------
+
+export const DEFAULT_THRESHOLDS: Record<OfferLine, number> = { web: 70, aaas: 70 };
+
+export function meetsThreshold(
+  service: OfferLine,
+  score: number,
+  thresholds: Partial<Record<OfferLine, number>> = DEFAULT_THRESHOLDS
+): boolean {
+  return score >= (thresholds[service] ?? 70);
+}
+
+// ---------------------------------------------------------------------------
+// opportunityScore — API original (backwards-compatible) para la UI.
+// ---------------------------------------------------------------------------
+
+export function opportunityScore(d: Discovery, service: ProspectionService): number {
+  if (service === 'web') {
+    return webScore({
+      website: d.website,
+      technical: d.enrichment?.technical ?? null,
+      reviewCount: d.enrichment?.reviewCount ?? 0,
+    });
+  }
+
   const t = d.enrichment?.technical ?? null;
   const hasWeb = Boolean(String(d.website ?? '').trim());
-
-  if (service === 'web') {
-    if (!hasWeb) return 95 + ratingBonus(d); // oportunidad máxima
-    if (!t) return 70; // web declarada, aún sin analizar → incertidumbre media
-    if (!t.accessible) return 70 + Math.min(17, ratingBonus(d)); // no se pudo ver → no inventar
-    if (t.certExpired) return 88 + Math.min(6, ratingBonus(d));
-    if (!t.hasViewport) return 80 + Math.min(9, ratingBonus(d));
-    if (!t.hasMetaDescription || !t.hasH1) return 75 + Math.min(10, ratingBonus(d));
-    if (t.loadTimeMs > 3000) return 65 + Math.min(14, ratingBonus(d));
-    if (!t.openGraph && t.stackHints.length === 0) return 55 + Math.min(14, ratingBonus(d));
-    return 20 + Math.min(29, ratingBonus(d) + 14); // moderna: oportunidad baja
-  }
+  const bonus = reviewBonus(d.enrichment?.reviewCount ?? 0);
 
   if (service === 'seo') {
     if (!t) return 60;
     const missing = (!t.title ? 1 : 0) + (!t.hasMetaDescription ? 1 : 0) + (!t.hasH1 ? 1 : 0);
-    if (missing === 3) return 90 + Math.min(10, ratingBonus(d));
-    if (missing === 2) return 70 + Math.min(19, ratingBonus(d));
-    if (missing === 1) return 40 + Math.min(19, ratingBonus(d));
-    return 10 + Math.min(19, ratingBonus(d));
+    if (missing === 3) return Math.min(100, 90 + Math.min(10, bonus));
+    if (missing === 2) return Math.min(100, 70 + Math.min(19, bonus));
+    if (missing === 1) return Math.min(100, 40 + Math.min(19, bonus));
+    return Math.min(100, 10 + Math.min(19, bonus));
   }
 
   // marketing: oportunidad = sin redes / presencia social pobre
   const socials = t?.socials ?? [];
-  if (!t && !hasWeb) return 95 + ratingBonus(d);
+  if (!t && !hasWeb) return Math.min(100, 95 + bonus);
   if (!t) return 55;
-  if (socials.length === 0) return 90 + Math.min(10, ratingBonus(d));
-  if (socials.length <= 2) return 45 + Math.min(14, ratingBonus(d));
-  return 25 + Math.min(29, ratingBonus(d));
-}
-
-/** Bonus 0-10 por reseñas (negocio vivo = dueño que responde). */
-function ratingBonus(d: Discovery): number {
-  const n = d.enrichment?.reviewCount ?? 0;
-  if (n >= 100) return 10;
-  if (n >= 30) return 5;
-  return 0;
+  if (socials.length === 0) return Math.min(100, 90 + Math.min(10, bonus));
+  if (socials.length <= 2) return 45 + Math.min(14, bonus);
+  return 25 + Math.min(29, bonus);
 }
 
 // --- Problemas detectados (para fichas y mensajes) ---------------------------
@@ -140,18 +221,27 @@ export function nichoStats(list: Discovery[]): NicheStats {
 }
 
 // --- Mensaje frío de primer contacto -------------------------------------------
-// Alineado al guion co-diseñado: curiosidad genuina, voz USTED, cumplido con
-// reseñas reales del scraper, SIN precios (el precio se maneja en la llamada).
-// Sin [SALUDO]: sin nombre de contacto resolvería a «Buenas», prohibido en el
-// guion — se abre directo con «Le escribo porque…».
+// Tono neutro formal sin regionalismos: «su negocio / le escribo», SIN la
+// palabra «usted». Sin [SALUDO]: sin nombre resolvería a «Buenas», prohibido.
 
-const COLD_TEMPLATE = `Le escribo porque vi a [EMPRESA] en Google ([RESEÑAS]) y noté que [PROBLEMA]. ¿Podría preguntarle la razón? Trabajo con negocios de [CIUDAD] y me encargaría de arreglar eso sin que usted haga nada. No le cobro nada por verla: le preparo una muestra con la página ya hecha y usted decide.`;
+const COLD_TEMPLATE = `Le escribo porque vi a [EMPRESA] en Google ([RESEÑAS]) y noté que [PROBLEMA]. ¿Podría preguntarle la razón? Trabajo con negocios de [CIUDAD] y me encargaría de arreglar eso sin que tenga que hacer nada. No le cobro nada por verla: le preparo una muestra con la página ya hecha y decide.`;
 
 export function coldMessage(d: Discovery): string {
   const problem = issuesOf(d)[0] ?? 'su presencia en internet está desaprovechada';
   // minúscula tras "noté que" (el issue arranca en mayúscula)
   const lower = problem.charAt(0).toLowerCase() + problem.slice(1);
   return fillLeadVars(COLD_TEMPLATE.replace('[PROBLEMA]', lower), {
+    company: d.company,
+    enrichment: d.enrichment ?? null,
+  });
+}
+
+// --- Mensaje frío para AI agent (misma voz, dolor de atención) ----------------
+
+const AGENT_TEMPLATE = `Le escribo porque vi a [EMPRESA] en Google con [RESEÑAS] y [RATING] — ese volumen de clientes suele saturar el WhatsApp. ¿Le pasaría? Le muestro en 2 minutos cómo una secretaria virtual responde, agenda y hace el seguimiento mientras atiende. Le preparo la misma demo que ya usan otros negocios de [CIUDAD] y decide.`;
+
+export function agentMessage(d: Discovery): string {
+  return fillLeadVars(AGENT_TEMPLATE, {
     company: d.company,
     enrichment: d.enrichment ?? null,
   });

@@ -15,7 +15,7 @@
 // Verificación: curl -sI -X OPTIONS <url>/functions/v1/analyze-site | grep x-analyze-version
 // ============================================================================
 
-const VERSION = '2026-08-14.1';
+const VERSION = '2026-08-16.1';
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -104,6 +104,83 @@ function classifyFetchError(message) {
   return { cert: false, reason: m.slice(0, 120) || 'error desconocido' };
 }
 // analyze-pure-end
+
+// --- bloque puro de scoring dual: extraído por test-pure.mjs (paridad) ------
+// Replica src/lib/prospecting.ts (webScore/agentScore/offerLine) y
+// src/lib/nicheCatalog.ts (nicheFor). Si cambian las reglas en un lado y no en
+// el otro, el harness de paridad (test-pure.mjs) falla.
+// scoring-pure-begin
+const NICHES_PURE = [
+  { primary: 'web', syns: ['contab', 'contador', 'contadores', 'asesor fiscal', 'tributario', 'contabilidad'] },
+  { primary: 'web', syns: ['auto', 'autos', 'taller', 'mecanico', 'mecánico', 'mecánica', 'concesionar', 'lavadora de autos', 'lubricentro', 'carrocería'] },
+  { primary: 'web', syns: ['abogado', 'abogados', 'bufete', 'estudio juridico', 'estudio jurídico', 'firma legal'] },
+  { primary: 'web', syns: ['escuela', 'colegio', 'instituto', 'academia', 'centro educativo', 'guarderia', 'guardería'] },
+  { primary: 'web', syns: ['coach', 'coaching', 'mentor', 'consultor'] },
+  { primary: 'web', syns: ['psicolog', 'psicólog', 'psiquiatra', 'terapeuta'] },
+  { primary: 'aaas', syns: ['clinica', 'clínica', 'centro medico', 'centro médico', 'dental', 'dentista', 'odontolog', 'fisioterapia', 'consultorio'] },
+  { primary: 'aaas', syns: ['veterinaria', 'veterinario'] },
+  { primary: 'aaas', syns: ['optica', 'óptica', 'lentes', 'oftalmolog'] },
+  { primary: 'aaas', syns: ['peluqueria', 'peluquería', 'salon', 'salón', 'barberia', 'barbería', 'spa', 'estetica', 'estética', 'uñas'] },
+  { primary: 'aaas', syns: ['gimnasio', 'fitness', 'crossfit', 'entrenamiento', 'personal trainer'] },
+  { primary: 'ambigua', syns: ['restaurante', 'restaurantes', 'comida', 'cafeteria', 'cafetería', 'bar', 'pizzeria', 'pizzería', 'cevicheria', 'cevichería'] },
+];
+
+function nicheForPure(query) {
+  const q = (query || '').trim().toLowerCase();
+  if (!q) return 'ambigua';
+  for (const n of NICHES_PURE) {
+    if (n.syns.some((s) => q.includes(s))) return n.primary;
+  }
+  return 'ambigua';
+}
+
+function reviewBonusPure(n) {
+  if (n >= 100) return 10;
+  if (n >= 30) return 5;
+  return 0;
+}
+
+function webScorePure(input) {
+  const t = input.technical || null;
+  const hasWeb = Boolean(String(input.website || '').trim());
+  const bonus = reviewBonusPure(input.reviewCount || 0);
+  if (!hasWeb) return Math.min(100, 95 + bonus);
+  if (!t) return 70;
+  if (!t.accessible) return 70 + Math.min(17, bonus);
+  if (t.certExpired) return 88 + Math.min(6, bonus);
+  if (!t.hasViewport) return 80 + Math.min(9, bonus);
+  if (!t.hasMetaDescription || !t.hasH1) return 75 + Math.min(10, bonus);
+  if (t.loadTimeMs > 3000) return 65 + Math.min(14, bonus);
+  if (!t.openGraph && (t.stackHints || []).length === 0) return 55 + Math.min(14, bonus);
+  return 20 + Math.min(29, bonus + 14);
+}
+
+function agentScorePure(input) {
+  const nichePrimary = input.nichePrimary || 'ambigua';
+  const reviewCount = input.reviewCount || 0;
+  const rating = input.rating;
+  const price = input.price || '';
+  const hasPhone = Boolean(input.hasPhone);
+  let s = 0;
+  if (reviewCount >= 100) s += 40;
+  else if (reviewCount >= 30) s += 25;
+  else if (reviewCount >= 10) s += 10;
+  if (rating != null) {
+    if (rating >= 4.5) s += 20;
+    else if (rating >= 4.0) s += 10;
+  }
+  if (nichePrimary === 'aaas') s += 20;
+  if (price === '$$$') s += 15;
+  else if (price === '$$') s += 10;
+  if (hasPhone) s += 5;
+  if (nichePrimary === 'web') s -= 50;
+  return Math.max(0, Math.min(100, s));
+}
+
+function offerPure(web, agent) {
+  return web >= agent ? 'web' : 'aaas';
+}
+// scoring-pure-end
 
 // --- análisis de una web -----------------------------------------------------
 async function fetchWithTimeout(url: string): Promise<Response> {
@@ -217,14 +294,14 @@ Deno.serve(async (req) => {
   // Solo las filas del caller (o todas si es admin) — el update usa service_role,
   // así que el ownership se valida AQUÍ, a mano.
   const isAdmin = caller.role === 'admin';
-  let q = admin.from('lead_discoveries').select('id, website, enrichment').in('id', ids);
+  let q = admin.from('lead_discoveries').select('id, website, enrichment, industry, phone').in('id', ids);
   if (!isAdmin) q = q.eq('assigned_to', caller.id);
   const { data: rows, error: selErr } = q;
   if (selErr) return json({ error: selErr.message }, 500);
   if (!rows?.length) return json({ error: 'No se encontraron discoveries para analizar' }, 404);
 
   const targets = rows.filter((r) => String(r.website ?? '').trim());
-  const items: Array<{ id: string; technical: Record<string, unknown> }> = [];
+  const items: Array<{ id: string; technical: Record<string, unknown>; score: number; agentScore: number; offer: string }> = [];
   let failed = 0;
 
   let i = 0;
@@ -233,7 +310,18 @@ Deno.serve(async (req) => {
       const t = targets[i++];
       try {
         const technical = await analyzeSite(String(t.website));
-        items.push({ id: String(t.id), technical });
+        const enrichment = (t.enrichment ?? {}) as Record<string, unknown>;
+        const reviewCount = Number(enrichment.reviewCount ?? 0);
+        const rating = enrichment.rating != null ? Number(enrichment.rating) : undefined;
+        const score = webScorePure({ website: String(t.website ?? ''), technical, reviewCount });
+        const agentScore = agentScorePure({
+          nichePrimary: nicheForPure(String(t.industry ?? '')),
+          reviewCount,
+          rating,
+          price: String(enrichment.price ?? ''),
+          hasPhone: Boolean(String(t.phone ?? '').trim()),
+        });
+        items.push({ id: String(t.id), technical, score, agentScore, offer: offerPure(score, agentScore) });
       } catch {
         failed++;
       }
@@ -241,14 +329,14 @@ Deno.serve(async (req) => {
   }
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, targets.length) }, worker));
 
-  // Persistir: merge de technical dentro del enrichment existente.
+  // Persistir: merge de technical + scoring dentro del enrichment existente.
   let analyzed = 0;
   for (const it of items) {
     const row = targets.find((t) => String(t.id) === it.id);
     const prev = (row?.enrichment ?? {}) as Record<string, unknown>;
     const { error: upErr } = await admin
       .from('lead_discoveries')
-      .update({ enrichment: { ...prev, technical: it.technical } })
+      .update({ enrichment: { ...prev, technical: it.technical, score: it.score, agentScore: it.agentScore, offer: it.offer } })
       .eq('id', it.id);
     if (upErr) failed++;
     else analyzed++;
