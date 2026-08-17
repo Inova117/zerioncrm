@@ -23,11 +23,18 @@ export interface CopilotSettings {
   priceOnce: string;
   /** Plan mensual opcional HABLADO (se resuelve donde el playbook dice [MENSUAL]). */
   priceMonthly: string;
+  /** Setup del AI agent, una vez, HABLADO (donde el guion dice [SETUP]). */
+  agentSetup: string;
+  /** Mensualidad del AI agent, HABLADA (donde el guion dice [RETENER]). */
+  agentMonthly: string;
 }
 
 /** Defaults del sistema — el único lugar del código donde vive un monto. */
 export const DEFAULT_PRICE_ONCE = 'trescientos con IVA incluido';
 export const DEFAULT_PRICE_MONTHLY = 'unos cuarenta al mes con IVA';
+/** Setup (una vez) y mensualidad del AI agent — la secretaria virtual. */
+export const DEFAULT_AGENT_SETUP = 'doscientos cincuenta';
+export const DEFAULT_AGENT_RETENER = 'doscientos cincuenta al mes';
 
 const KEY = 'zerioncrm:copilotSettings';
 const EMPTY: CopilotSettings = {
@@ -38,6 +45,8 @@ const EMPTY: CopilotSettings = {
   proof: '',
   priceOnce: '',
   priceMonthly: '',
+  agentSetup: '',
+  agentMonthly: '',
 };
 
 export function getCopilotSettings(): CopilotSettings {
@@ -63,20 +72,26 @@ export function hasCopilotSettings(): boolean {
 }
 
 /** Los precios hablados vigentes (Settings, o el default del sistema). */
-export function getPrecios(): { once: string; monthly: string } {
+export function getPrecios(): { once: string; monthly: string; agentSetup: string; agentMonthly: string } {
   const s = getCopilotSettings();
   return {
     once: s.priceOnce.trim() || DEFAULT_PRICE_ONCE,
     monthly: s.priceMonthly.trim() || DEFAULT_PRICE_MONTHLY,
+    agentSetup: s.agentSetup.trim() || DEFAULT_AGENT_SETUP,
+    agentMonthly: s.agentMonthly.trim() || DEFAULT_AGENT_RETENER,
   };
 }
 
-/** Resuelve los placeholders [PRECIO]/[MENSUAL] de un texto del playbook.
- *  Se usa en TODO lo que se muestra directo al vendedor sin pasar por el LLM
- *  (battlecards instantáneas, jugadas de momento, mocks). */
+/** Resuelve los placeholders [PRECIO]/[MENSUAL]/[SETUP]/[RETENER] de un texto del
+ *  playbook. Se usa en TODO lo que se muestra directo al vendedor sin pasar por
+ *  el LLM (battlecards instantáneas, jugadas de momento, mocks). */
 export function fillPrecios(text: string): string {
   const p = getPrecios();
-  return text.replaceAll('[PRECIO]', p.once).replaceAll('[MENSUAL]', p.monthly);
+  return text
+    .replaceAll('[PRECIO]', p.once)
+    .replaceAll('[MENSUAL]', p.monthly)
+    .replaceAll('[SETUP]', p.agentSetup)
+    .replaceAll('[RETENER]', p.agentMonthly);
 }
 
 /** Bloque de texto para inyectar en el system prompt del coach. */
@@ -88,6 +103,9 @@ export function settingsForPrompt(): string {
   // el playbook no trae ninguno, solo los placeholders.
   parts.push(
     `MIS PRECIOS (la única fuente de montos — donde el playbook diga [PRECIO] o [MENSUAL], son ESTOS, dichos tal cual): precio principal = "${p.once}", una sola vez; plan mensual opcional = "${p.monthly}".`
+  );
+  parts.push(
+    `MIS PRECIOS DEL AI AGENT (donde el guion diga [SETUP] o [RETENER]): setup = "${p.agentSetup}", una sola vez; mensualidad = "${p.agentMonthly}".`
   );
   if (s.pitch.trim()) parts.push(`Qué vendo y mi diferenciador: ${s.pitch.trim()}`);
   if (s.offer.trim()) parts.push(`Mis paquetes y precios: ${s.offer.trim()}`);

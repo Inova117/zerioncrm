@@ -9,6 +9,9 @@ export interface ScriptLeadVars {
   contactName?: string;
   industry?: string;
   temperature?: string;
+  /** Línea de oferta del lead (Service: 'web' | 'aaas' | …). Decide qué guion
+   *  muestra el panel (web vs AI agent). */
+  service?: string;
   enrichment?: {
     city?: string;
     /** Google rating del negocio (4.6, 4.9…). Alimenta [RESEÑAS]. */
@@ -17,6 +20,8 @@ export interface ScriptLeadVars {
     reviewCount?: number;
     /** Perfiles sociales del negocio (Instagram, Facebook…). Alimenta [SOCIALES]. */
     socials?: string[] | null;
+    /** Línea ganadora del scoring dual de prospección (si ya se calculó). */
+    offer?: 'web' | 'aaas' | null;
   } | null;
 }
 

@@ -6,6 +6,8 @@ import {
   saveCopilotSettings,
   DEFAULT_PRICE_ONCE,
   DEFAULT_PRICE_MONTHLY,
+  DEFAULT_AGENT_SETUP,
+  DEFAULT_AGENT_RETENER,
   type CopilotSettings,
 } from '../../lib/copilotSettings';
 
@@ -59,6 +61,20 @@ export function CopilotSettingsModal({ open, onClose, onSaved }: Props) {
           hint={`Vacío = "${DEFAULT_PRICE_MONTHLY}". Se ofrece opt-out después del sí.`}
           value={s.priceMonthly}
           onChange={(v) => set('priceMonthly', v)}
+          rows={1}
+        />
+        <Field
+          label="Setup del AI agent (una vez), HABLADO"
+          hint={`El guion del agente dice [SETUP]. Vacío = "${DEFAULT_AGENT_SETUP}".`}
+          value={s.agentSetup}
+          onChange={(v) => set('agentSetup', v)}
+          rows={1}
+        />
+        <Field
+          label="Mensualidad del AI agent, HABLADA"
+          hint={`El guion del agente dice [RETENER]. Vacío = "${DEFAULT_AGENT_RETENER}".`}
+          value={s.agentMonthly}
+          onChange={(v) => set('agentMonthly', v)}
           rows={1}
         />
         <Field
