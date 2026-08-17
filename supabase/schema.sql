@@ -67,6 +67,7 @@ exception when duplicate_object then null; end $$;
 
 do $$ begin
   create type service_t as enum ('web','app','ecommerce','branding','marketing','mantenimiento','consultoria','otro');
+  alter type service_t add value if not exists 'aaas';
 exception when duplicate_object then null; end $$;
 
 -- Profiles (1:1 con auth.users) ----------------------------------------------

@@ -152,6 +152,7 @@ export const sourceLabel = (s: Source): string =>
 // ---------------------------------------------------------------------------
 export const SERVICES: { key: Service; label: string }[] = [
   { key: 'web', label: 'Sitio web' },
+  { key: 'aaas', label: 'AI Agent' },
   { key: 'app', label: 'App / Software' },
   { key: 'ecommerce', label: 'E-commerce' },
   { key: 'branding', label: 'Branding / Diseño' },

@@ -69,6 +69,7 @@ export type Source =
 /** Agency service line the opportunity is about. */
 export type Service =
   | 'web'
+  | 'aaas'
   | 'app'
   | 'ecommerce'
   | 'branding'
@@ -76,6 +77,9 @@ export type Service =
   | 'mantenimiento'
   | 'consultoria'
   | 'otro';
+
+/** Línea de oferta que gana el scoring dual de prospección (web vs AI agent). */
+export type OfferLine = 'web' | 'aaas';
 
 /**
  * Structured extras carried from the ZerionScraperAI pipeline (Google Maps).
@@ -102,6 +106,10 @@ export interface LeadEnrichment {
   profile?: string; // scraper campaign profile name
   /** Análisis técnico de la web (Lead Finder → edge function analyze-site). */
   technical?: SiteTechnical | null;
+  /** Score de oportunidad para AI agent (0-100) — scoring dual de prospección. */
+  agentScore?: number;
+  /** Línea de oferta ganadora (web o aaas) según el scoring dual. */
+  offer?: OfferLine;
 }
 
 // ---------------------------------------------------------------------------
