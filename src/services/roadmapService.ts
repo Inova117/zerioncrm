@@ -112,22 +112,30 @@ const supabaseRoadmapService: RoadmapService = {
     // Auto-migración de contenido: si la semilla es más nueva que la guardada,
     // re-siembra actividades + metas mensuales (preserva diario y finanzas).
     if ((meta.seedVersion ?? 1) < SEED_VERSION) {
-      const { error: dErr } = await supabase!
-        .from('roadmap_activities')
-        .delete()
-        .eq('owner_id', owner);
-      if (dErr) throw dErr;
-      const { data, error } = await supabase!
-        .from('roadmap_activities')
-        .insert(defaultActivities().map((a) => activityRow(owner, a)))
-        .select();
-      if (error) throw error;
-      activities = (data ?? []).map(rowToRoadmapActivity);
-      meta = { ...meta, monthlyGoals: defaultMeta().monthlyGoals, seedVersion: SEED_VERSION };
-      const { error: mErr } = await supabase!
-        .from('roadmap_meta')
-        .upsert({ owner_id: owner, data: meta }, { onConflict: 'owner_id' });
-      if (mErr) throw mErr;
+      try {
+        const { error: dErr } = await supabase!
+          .from('roadmap_activities')
+          .delete()
+          .eq('owner_id', owner);
+        if (dErr) throw dErr;
+        const { data, error } = await supabase!
+          .from('roadmap_activities')
+          .insert(defaultActivities().map((a) => activityRow(owner, a)))
+          .select();
+        if (error) throw error;
+        activities = (data ?? []).map(rowToRoadmapActivity);
+        meta = { ...meta, monthlyGoals: defaultMeta().monthlyGoals, seedVersion: SEED_VERSION };
+        const { error: mErr } = await supabase!
+          .from('roadmap_meta')
+          .upsert({ owner_id: owner, data: meta }, { onConflict: 'owner_id' });
+        if (mErr) throw mErr;
+      } catch (e) {
+        // Columnas hours/reparto aún no aplicadas (falta el ALTER en la BD): no
+        // romper la carga. Se reintenta la migración en el próximo load, cuando
+        // las columnas existan. El módulo sigue funcionando con las actividades
+        // previas mientras tanto.
+        console.warn('[roadmap] migración v2 pospuesta (¿falta ALTER hours/reparto?):', e);
+      }
     }
 
     return { meta, days, activities, clients, cash };
