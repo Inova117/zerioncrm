@@ -614,6 +614,24 @@ create policy "campaigns write" on public.prospecting_campaigns for all
   using (owner_id = auth.uid())
   with check (owner_id = auth.uid());
 
+-- Espejo de supabase/migrations/20260817000000_prospecting_decisions.sql (Fase D).
+create table if not exists public.prospecting_decisions (
+  id           uuid primary key default gen_random_uuid(),
+  niche        text not null,
+  city         text not null,
+  service      text not null default 'web',
+  priority     int  not null default 50,
+  reason       text not null default '',
+  found        int  not null default 0,
+  created      int  not null default 0,
+  discoveries  int  not null default 0,
+  created_at   timestamptz not null default now()
+);
+alter table public.prospecting_decisions enable row level security;
+drop policy if exists "decisions read" on public.prospecting_decisions;
+create policy "decisions read" on public.prospecting_decisions for select
+  using (public.is_admin());
+
 -- ============================================================================
 -- VERIFICACIÓN — corre esto después para confirmar que todo quedó bien:
 --
@@ -621,9 +639,9 @@ create policy "campaigns write" on public.prospecting_campaigns for all
 --   where table_schema = 'public' order by 1;
 --   -- Debe listar: comments, contacts, copilot_calls, copilot_memory,
 --   --   daily_activity, leads, lead_discoveries, lead_searches, profiles,
---   --   prospecting_campaigns, roadmap_activities, roadmap_cash,
---   --   roadmap_clients, roadmap_days, roadmap_meta, tasks
+--   --   prospecting_campaigns, prospecting_decisions, roadmap_activities,
+--   --   roadmap_cash, roadmap_clients, roadmap_days, roadmap_meta, tasks
 --
 --   select count(*) as policies from pg_policies where schemaname = 'public';
---   -- Debe dar: 30 (22 base + 5 del roadmap + 1 de daily_activity + 2 de campaigns)
+--   -- Debe dar: 31 (22 base + 5 del roadmap + 1 de daily_activity + 2 de campaigns + 1 de decisions)
 -- ============================================================================

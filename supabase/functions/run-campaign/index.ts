@@ -19,7 +19,7 @@
 // Secret:  supabase secrets set CRON_SECRET=<random>
 // ============================================================================
 
-const VERSION = '2026-08-16.1';
+const VERSION = '2026-08-17.1';
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { normalizeDomain, normalizePhone, isSocialUrl } from '../_shared/normalize.ts';
@@ -182,6 +182,83 @@ function offerPure(web, agent) {
   return web >= agent ? 'web' : 'aaas';
 }
 // scoring-pure-end
+
+// --- bloque puro de decisión (Fase D): ciudades + nichos + saturación ---------
+// decision-pure-begin
+// Ciudades de Ecuador por poder adquisitivo (curado, tier 1→3). Espejo de
+// src/lib/cityCatalog.ts — mantener en paridad.
+const CITIES_PURE = [
+  { key: 'quito', label: 'Quito', tier: 1 },
+  { key: 'guayaquil', label: 'Guayaquil', tier: 1 },
+  { key: 'cuenca', label: 'Cuenca', tier: 2 },
+  { key: 'machala', label: 'Machala', tier: 2 },
+  { key: 'manta', label: 'Manta', tier: 2 },
+  { key: 'ambato', label: 'Ambato', tier: 2 },
+  { key: 'loja', label: 'Loja', tier: 3 },
+  { key: 'riobamba', label: 'Riobamba', tier: 3 },
+  { key: 'ibarra', label: 'Ibarra', tier: 3 },
+  { key: 'santo-domingo', label: 'Santo Domingo', tier: 3 },
+  { key: 'portoviejo', label: 'Portoviejo', tier: 3 },
+  { key: 'salinas', label: 'Salinas / La Libertad', tier: 3 },
+];
+
+// Nichos con KEY (para la saturación por nicho+ciudad). Espejo de
+// src/lib/nicheCatalog.ts. NICHES_PURE de scoring-pure no tiene key; esta lista
+// es la de decisión. (Deuda: 3 copias de sinónimos — patrón normalize del repo.)
+const NICHES_DECISION = [
+  { key: 'contabilidad', label: 'Contabilidad', primary: 'web', syns: ['contab', 'contador', 'contadores', 'asesor fiscal', 'tributario', 'contabilidad'] },
+  { key: 'autos', label: 'Autos', primary: 'web', syns: ['auto', 'autos', 'taller', 'mecanico', 'mecánico', 'mecánica', 'concesionar', 'lavadora de autos', 'lubricentro', 'carrocería'] },
+  { key: 'abogados', label: 'Abogados', primary: 'web', syns: ['abogado', 'abogados', 'bufete', 'estudio juridico', 'estudio jurídico', 'firma legal'] },
+  { key: 'escuelas', label: 'Escuelas', primary: 'web', syns: ['escuela', 'colegio', 'instituto', 'academia', 'centro educativo', 'guarderia', 'guardería'] },
+  { key: 'coaches', label: 'Coaches', primary: 'web', syns: ['coach', 'coaching', 'mentor', 'consultor'] },
+  { key: 'psicologos', label: 'Psicólogos', primary: 'web', syns: ['psicolog', 'psicólog', 'psiquiatra', 'terapeuta'] },
+  { key: 'clinicas', label: 'Clínicas', primary: 'aaas', syns: ['clinica', 'clínica', 'centro medico', 'centro médico', 'dental', 'dentista', 'odontolog', 'fisioterapia', 'consultorio'] },
+  { key: 'veterinarias', label: 'Veterinarias', primary: 'aaas', syns: ['veterinaria', 'veterinario'] },
+  { key: 'opticas', label: 'Ópticas', primary: 'aaas', syns: ['optica', 'óptica', 'lentes', 'oftalmolog'] },
+  { key: 'peluquerias', label: 'Peluquerías', primary: 'aaas', syns: ['peluqueria', 'peluquería', 'salon', 'salón', 'barberia', 'barbería', 'spa', 'estetica', 'estética', 'uñas'] },
+  { key: 'gimnasios', label: 'Gimnasios', primary: 'aaas', syns: ['gimnasio', 'fitness', 'crossfit', 'entrenamiento', 'personal trainer'] },
+  { key: 'restaurantes', label: 'Restaurantes', primary: 'ambigua', syns: ['restaurante', 'restaurantes', 'comida', 'cafeteria', 'cafetería', 'bar', 'pizzeria', 'pizzería', 'cevicheria', 'cevichería'] },
+];
+
+function nicheKeyOf(query) {
+  const q = (query || '').trim().toLowerCase();
+  if (!q) return null;
+  for (const n of NICHES_DECISION) {
+    if (n.syns.some((s) => q.includes(s))) return n;
+  }
+  return null;
+}
+
+const DEFAULT_CAP_PURE = 150;
+const DEFAULT_NEW_RATE_MIN_PURE = 0.4;
+
+function saturationPure(input) {
+  const extracted = input.extracted || 0;
+  const lastFound = input.lastFound || 0;
+  const lastDuplicates = input.lastDuplicates || 0;
+  const attempts = lastFound + lastDuplicates;
+  const newRate = attempts > 0 ? lastFound / attempts : 1;
+  const byCap = extracted >= DEFAULT_CAP_PURE;
+  const byDiminishing = lastDuplicates > 0 && attempts > 0 && newRate < DEFAULT_NEW_RATE_MIN_PURE;
+  return {
+    extracted,
+    newRate,
+    saturated: byCap || byDiminishing,
+    reason: byCap ? 'pool-cap' : byDiminishing ? 'diminishing' : null,
+  };
+}
+
+function nextTargetPure(cityOrder, nicheOrder, sat) {
+  for (const cityKey of cityOrder) {
+    for (const nicheKey of nicheOrder) {
+      const key = `${nicheKey}:${cityKey}`;
+      const s = sat[key];
+      if (!s || !s.saturated) return { nicheKey, cityKey };
+    }
+  }
+  return null;
+}
+// decision-pure-end
 
 // --- análisis de una web -----------------------------------------------------
 async function fetchWithTimeout(url: string): Promise<Response> {
@@ -449,6 +526,113 @@ async function runCampaign(admin: ReturnType<typeof createClient>, campaign: Rec
   return { name, found, created, discoveries: insertedDiscovery };
 }
 
+// --- decisor autonómo (Fase D) --------------------------------------------------
+// Cada mañana elige nicho+ciudad: ciudades por tier, nichos por conversión
+// (feedback simple), saltando lo saturado. Luego corre la búsqueda y guarda la
+// decisión en prospecting_decisions. El feedback RICO (Laplace + objeciones) vive
+// en el cliente (src/lib/feedback.ts) y se usa en la UI; aquí va la versión
+// operativa mínima que corre en el backend sin navegador.
+function cityKeyFromName(name: string | null | undefined): string | null {
+  const s = (name ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+  if (!s) return null;
+  const city = CITIES_PURE.find((c) => s === c.key || s.includes(c.key) || c.key.includes(s));
+  return city ? city.key : null;
+}
+
+const DEMOS_SET = new Set(['demo-enviada', 'negociando', 'cliente', 'reactivacion']);
+
+async function decideAndRun(admin: ReturnType<typeof createClient>): Promise<Record<string, unknown>> {
+  const cityOrder = [...CITIES_PURE].sort((a, b) => a.tier - b.tier).map((c) => c.key);
+
+  // Feedback simple: ordenar nichos por conversión (cliente/demo/contactado).
+  const { data: leads } = await admin.from('leads').select('industry, temperature');
+  const byNiche = new Map<string, { key: string; label: string; primary: string; clients: number; demos: number; contacted: number }>();
+  for (const l of (leads ?? []) as Array<{ industry?: string; temperature?: string }>) {
+    const n = nicheKeyOf(l.industry);
+    if (!n) continue;
+    let e = byNiche.get(n.key);
+    if (!e) { e = { key: n.key, label: n.label, primary: n.primary, clients: 0, demos: 0, contacted: 0 }; byNiche.set(n.key, e); }
+    const t = l.temperature ?? 'nuevo';
+    if (t === 'cliente') e.clients++;
+    if (DEMOS_SET.has(t)) e.demos++;
+    if (t !== 'nuevo') e.contacted++;
+  }
+  const scoreOf = (e: { clients: number; demos: number; contacted: number }) =>
+    e.clients * 3 + e.demos * 2 + e.contacted;
+  const feedbackOrder = [...byNiche.values()]
+    .sort((a, b) => scoreOf(b) - scoreOf(a))
+    .map((e) => e.key);
+  const nicheOrder = [
+    ...feedbackOrder,
+    ...NICHES_DECISION.map((n) => n.key).filter((k) => !feedbackOrder.includes(k)),
+  ];
+
+  // Saturación: extracted por nicho+ciudad desde lead_discoveries.
+  const { data: discs } = await admin.from('lead_discoveries').select('industry, enrichment');
+  const raw: Record<string, { extracted: number; lastFound: number; lastDuplicates: number }> = {};
+  for (const d of (discs ?? []) as Array<{ industry?: string; enrichment?: { city?: string } | null }>) {
+    const n = nicheKeyOf(d.industry);
+    const cityKey = cityKeyFromName(d?.enrichment?.city ?? '');
+    if (!n || !cityKey) continue;
+    const key = `${n.key}:${cityKey}`;
+    const s = raw[key] ?? { extracted: 0, lastFound: 0, lastDuplicates: 0 };
+    s.extracted++;
+    raw[key] = s;
+  }
+  const sat: Record<string, ReturnType<typeof saturationPure>> = {};
+  for (const k of Object.keys(raw)) sat[k] = saturationPure(raw[k]);
+
+  const target = nextTargetPure(cityOrder, nicheOrder, sat);
+  if (!target) return { decision: null, rotated: true }; // todo saturado → rota de país
+
+  const niche = NICHES_DECISION.find((n) => n.key === target.nicheKey) ?? {
+    key: target.nicheKey, label: target.nicheKey, primary: 'web',
+  };
+  const city = CITIES_PURE.find((c) => c.key === target.cityKey) ?? { key: target.cityKey, label: target.cityKey, tier: 3 };
+
+  const reason = feedbackOrder.includes(target.nicheKey)
+    ? `Elegí ${niche.label} en ${city.label}: nicho con mejor conversión no saturado.`
+    : `Elegí ${niche.label} en ${city.label}: arranque en frío (sin datos de conversión), orden por defecto del catálogo (tier ${city.tier}).`;
+
+  // Asignar al primer admin activo.
+  const { data: owners } = await admin.from('profiles').select('id').eq('active', true).eq('role', 'admin').limit(1);
+  const assignedTo = String((owners?.[0] as { id?: string } | undefined)?.id ?? '');
+
+  const campaign = {
+    niche: niche.label,
+    location: city.label,
+    limitPerDay: 30,
+    thresholds: { web: 70, aaas: 70 },
+    assignedTo,
+    ownerId: assignedTo,
+  };
+  let result: Record<string, unknown>;
+  try {
+    result = await runCampaign(admin, campaign);
+  } catch (e) {
+    result = { error: String(e) };
+  }
+
+  await admin.from('prospecting_decisions').insert({
+    niche: target.nicheKey,
+    city: target.cityKey,
+    service: niche.primary === 'aaas' ? 'aaas' : 'web',
+    priority: 50,
+    reason,
+    found: Number(result.found ?? 0),
+    created: Number(result.created ?? 0),
+    discoveries: Number(result.discoveries ?? 0),
+  });
+
+  return {
+    decision: {
+      nicheKey: target.nicheKey, nicheLabel: niche.label,
+      cityKey: target.cityKey, cityLabel: city.label, reason,
+    },
+    result,
+  };
+}
+
 // --- handler -----------------------------------------------------------------
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...CORS } });
@@ -465,6 +649,7 @@ Deno.serve(async (req) => {
 
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
   const body = await req.json().catch(() => ({}));
+  if (body.action === 'decide') return json(await decideAndRun(admin));
   if (body.action !== 'run') return json({ error: 'Acción desconocida' }, 400);
 
   const { data: campaigns, error: cErr } = await admin

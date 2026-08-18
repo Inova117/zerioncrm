@@ -17,7 +17,7 @@ export default async () => {
     const resp = await fetch(`${SUPABASE_URL}/functions/v1/run-campaign`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-cron-secret': CRON_SECRET },
-      body: JSON.stringify({ action: 'run' }),
+      body: JSON.stringify({ action: 'decide' }),
     });
     const data = await resp.json().catch(() => ({}));
     console.log('[prospeccion-diaria]', resp.status, JSON.stringify(data));
