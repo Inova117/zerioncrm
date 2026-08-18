@@ -3,7 +3,7 @@
 // camelCase. Keep ALL of that translation here so components/services never see
 // raw rows. (resolves the camelCase↔snake_case gap, audit#1 #12)
 // ============================================================================
-import type { User, Lead, Contact, Comment, Task, Discovery, SearchSummary, ProspectingCampaign, Role, Source, Service, TaskCadence, ActivityType, RoadmapDay, RoadmapActivity, RoadmapPhase, RoadmapActivityStatus, RoadmapReparto, RoadmapClient, RoadmapProduct, RoadmapClientStatus, CashMove } from '../types';
+import type { User, Lead, Contact, Comment, Task, Discovery, SearchSummary, ProspectingCampaign, DecisionRecord, Role, Source, Service, TaskCadence, ActivityType, RoadmapDay, RoadmapActivity, RoadmapPhase, RoadmapActivityStatus, RoadmapReparto, RoadmapClient, RoadmapProduct, RoadmapClientStatus, CashMove } from '../types';
 import { normalizeTemperature } from '../lib/constants';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -21,6 +21,20 @@ export const rowToSearch = (r: any): SearchSummary => ({
   error: r.error ?? null,
   createdAt: r.created_at,
   finishedAt: r.finished_at ?? null,
+});
+
+// ---- prospecting_decisions ⇆ DecisionRecord ---------------------------------
+export const rowToDecision = (r: any): DecisionRecord => ({
+  id: r.id,
+  niche: r.niche ?? '',
+  city: r.city ?? '',
+  service: r.service ?? 'web',
+  priority: Number(r.priority ?? 50),
+  reason: r.reason ?? '',
+  found: Number(r.found ?? 0),
+  created: Number(r.created ?? 0),
+  discoveries: Number(r.discoveries ?? 0),
+  createdAt: r.created_at,
 });
 
 // ---- prospecting_campaigns ⇆ ProspectingCampaign ---------------------------

@@ -7,7 +7,7 @@
 // service functions, not the components.
 // ============================================================================
 
-import type { User, Credential, Lead, Contact, Comment, Task, Discovery, SearchSummary, ProspectingCampaign, RoadmapDay, RoadmapActivity, RoadmapClient, CashMove, RoadmapMeta } from '../types';
+import type { User, Credential, Lead, Contact, Comment, Task, Discovery, SearchSummary, ProspectingCampaign, DecisionRecord, RoadmapDay, RoadmapActivity, RoadmapClient, CashMove, RoadmapMeta } from '../types';
 import {
   seedUsers,
   seedCredentials,
@@ -33,6 +33,7 @@ export interface DBShape {
   discoveries: Discovery[];
   searches: SearchSummary[];
   campaigns: ProspectingCampaign[];
+  decisions: DecisionRecord[];
   roadmapDays: RoadmapDay[];
   roadmapActivities: RoadmapActivity[];
   roadmapClients: RoadmapClient[];
@@ -83,7 +84,7 @@ export function ensureSeeded(): void {
 
 /** Wipe everything and re-seed (used by the "restablecer datos" action). */
 export function resetDB(): void {
-  ['users', 'credentials', 'leads', 'contacts', 'comments', 'tasks', 'discoveries', 'searches', 'campaigns', 'session', 'seeded'].forEach(
+  ['users', 'credentials', 'leads', 'contacts', 'comments', 'tasks', 'discoveries', 'searches', 'campaigns', 'decisions', 'session', 'seeded'].forEach(
     (n) => localStorage.removeItem(key(n))
   );
   ['roadmapDays', 'roadmapActivities', 'roadmapClients', 'roadmapCash', 'roadmapMeta'].forEach((n) =>

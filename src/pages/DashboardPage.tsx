@@ -17,6 +17,7 @@ import { StatCard } from '../components/dashboard/StatCard';
 import { Funnel } from '../components/dashboard/Funnel';
 import { SourceChart } from '../components/dashboard/SourceChart';
 import { EmployeeLeaderboard } from '../components/dashboard/EmployeeLeaderboard';
+import { ProspectionDecisionsCard } from '../components/dashboard/ProspectionDecisionsCard';
 import { PageLoader } from '../components/ui/misc';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
@@ -150,6 +151,9 @@ export function DashboardPage() {
               accentBg="bg-brand-50"
             />
           </div>
+
+          {/* Prospección autónoma: la decisión de hoy */}
+          <ProspectionDecisionsCard />
 
           {/* Funnel + source */}
           <div className="grid gap-5 lg:grid-cols-2">

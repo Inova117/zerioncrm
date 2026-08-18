@@ -231,6 +231,23 @@ export interface SearchSummary {
 }
 
 // ---------------------------------------------------------------------------
+// Decisión del sistema autónomo de prospección (tabla prospecting_decisions).
+// Cada mañana el decisor registra qué nicho+ciudad eligió, por qué y cuánto trajo.
+// ---------------------------------------------------------------------------
+export interface DecisionRecord {
+  id: UUID;
+  niche: string;
+  city: string;
+  service: string; // web | aaas (informativo)
+  priority: number;
+  reason: string;
+  found: number;
+  created: number;
+  discoveries: number;
+  createdAt: ISODate;
+}
+
+// ---------------------------------------------------------------------------
 // Prospección automática diaria — una campaña configurada por el fundador.
 // El scheduler (Fase 4) la ejecuta cada mañana: Apify → analyze → scoring →
 // filtro por umbral → leads asignados al vendedor.
