@@ -8,6 +8,8 @@ import { useData } from '../context/DataContext';
 import { totals, byService, winRate, avgTicket, pipelineByStage } from '../services/metricsService';
 import { stageConfig } from '../lib/constants';
 import { fmtMoney, cn } from '../lib/utils';
+import { useNichePerformance } from '../hooks/useNichePerformance';
+import type { NichePerformance } from '../lib/feedback';
 
 /** Horizontal labelled bars (reused for revenue-by-service and pipeline-by-stage). */
 function Bars({
@@ -169,8 +171,79 @@ export function ReportsPage() {
               </table>
             </div>
           </div>
+
+          {/* Feedback loop: rendimiento por nicho (qué convierte de verdad) */}
+          <NichePerformancePanel />
         </div>
       )}
     </AppLayout>
+  );
+}
+
+function NichePerformancePanel() {
+  const perf = useNichePerformance();
+  if (!perf.length) return null;
+  const sorted = [...perf].sort((a, b) => b.priority - a.priority);
+  const badge = (p: NichePerformance['primary']) =>
+    p === 'aaas' ? 'AI Agent' : p === 'web' ? 'Web' : 'Mixto';
+
+  return (
+    <div className="card p-5">
+      <div className="mb-3">
+        <h2 className="text-sm font-semibold text-surface-800">Rendimiento por nicho (se aprende solo)</h2>
+        <p className="text-xs text-surface-400">
+          Qué nichos convierten de verdad, según las etapas y objeciones que registras. Con pocos datos arranca neutral (50) y se ajusta con el tiempo.
+        </p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[640px] text-sm">
+          <thead>
+            <tr className="border-b border-surface-200 text-left text-xs uppercase tracking-wide text-surface-400">
+              <th className="px-2 py-2 font-medium">Nicho</th>
+              <th className="px-2 py-2 font-medium">Servicio</th>
+              <th className="px-2 py-2 text-center font-medium">Leads</th>
+              <th className="px-2 py-2 text-center font-medium">Contactados</th>
+              <th className="px-2 py-2 text-center font-medium">Demos</th>
+              <th className="px-2 py-2 text-center font-medium">Cierre</th>
+              <th className="px-2 py-2 text-right font-medium">Prioridad</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((p) => (
+              <tr key={p.niche} className="border-b border-surface-100 last:border-0">
+                <td className="px-2 py-2.5 font-medium text-surface-800">{p.label}</td>
+                <td className="px-2 py-2.5">
+                  <span className={cn(
+                    'badge text-[11px]',
+                    p.primary === 'aaas' ? 'bg-violet-50 text-violet-600' : p.primary === 'web' ? 'bg-brand-50 text-brand-600' : 'bg-surface-100 text-surface-600'
+                  )}>
+                    {badge(p.primary)}
+                  </span>
+                </td>
+                <td className="px-2 py-2.5 text-center text-surface-600">{p.leads}</td>
+                <td className="px-2 py-2.5 text-center text-surface-600">{p.contacted}</td>
+                <td className="px-2 py-2.5 text-center text-surface-600">{p.demos}</td>
+                <td className="px-2 py-2.5 text-center text-surface-600">
+                  {p.demos > 0 ? `${Math.round(p.closeRate * 100)}%` : '—'}
+                </td>
+                <td className="px-2 py-2.5">
+                  <div className="flex items-center justify-end gap-2">
+                    <div className="h-1.5 w-20 overflow-hidden rounded-full bg-surface-100">
+                      <div
+                        className="h-full rounded-full bg-brand-500"
+                        style={{ width: `${p.priority}%` }}
+                      />
+                    </div>
+                    <span className="w-8 text-right text-xs font-semibold tabular-nums text-surface-700">
+                      {Math.round(p.priority)}
+                    </span>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }
