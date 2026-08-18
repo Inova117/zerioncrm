@@ -1,22 +1,26 @@
 // ============================================================================
-// SALES SCRIPT — Llamada en frío (Guion de venta completo, demo-first)
+// SALES SCRIPT — Prospección fría completa, demo-first
 // ----------------------------------------------------------------------------
 // Guion de prospección fría a negocios locales sin web, co-diseñado con el
-// fundador (ago 2026) y espejo del documento de entrenamiento
-// (~/ZerionStudio/ads-web-300/guion-venta-frio.pdf). Metodología:
-//   - Tono: curiosidad genuina, NO interrogatorio. Observación ("vi que
-//     tienen [RESEÑAS]… pero no tienen web") + pregunta suave ("¿podría
-//     preguntarle la razón?"). Voz unificada en "usted" (mercado ecuatoriano).
-//   - Pattern interruption: los DATOS reales del negocio ([RESEÑAS], [RATING])
-//     + la sorpresa de que un negocio así no tenga web — sin halagos de
+// fundador (ago 2026) y espejo del documento de entrenamiento. Metodología:
+//   - PRIMER TOQUE = MENSAJE frío de curiosidad (WhatsApp/DM), NO un guion de
+//     llamada. Un desconocido no te debe 30 segundos ni una respuesta: solo se
+//     da la observación (dato del negocio) + el problema + curiosidad + UNA
+//     pregunta suave. Nada de preguntas de encuesta ("¿qué servicios ofrecen?",
+//     "¿cuántos clientes recibe?") — eso es encuesta y mata el ánimo.
+//   - Las preguntas emocionales (razón + agitación) van SOLO DESPUÉS de que el
+//     dueño responde: con permiso. En el primer toque NUNCA.
+//   - Pattern interruption: los DATOS reales ([RESEÑAS], [RATING], [SOCIALES])
+//     + la sorpresa de que un negocio así no tenga web. Sin halagos de
 //     telemarketer ("me encantó su negocio" = cliché).
-//   - NEPQ-lite: la pregunta "¿por qué no tienen web?" saca la razón real (la
-//     objeción antes de que exista) + agitación con el costo.
+//   - NEPQ-lite: "¿por qué no tiene web?" saca la razón real (la objeción antes
+//     de que exista) + agitación con el costo.
 //   - Riesgo reverso: "no paga nada por verla; si no le gusta, la borro" —
 //     nunca decir "ya está hecha" si no lo está (demo-first honesto).
-//   - Calificación antes de producir: "¿si le encanta, se la quedaría?" — el
-//     sí al compromiso se pide antes del trabajo.
-//   - WhatsApp (LatAm): canal rey para la entrega y el seguimiento.
+//   - Calificación antes de producir: "¿si le encanta, se la quedaría?" — el sí
+//     al compromiso se pide antes del trabajo.
+//   - WhatsApp (LatAm): canal rey para el primer toque, la entrega y el
+//     seguimiento. La llamada se agenda desde el mensaje.
 //
 // Voz unificada en "usted" (mercado ecuatoriano — como habla el fundador).
 // Los montos [PRECIO] / [MENSUAL] se resuelven SIEMPRE desde MIS PRECIOS
@@ -47,26 +51,49 @@ export interface ScriptSection {
 
 export const SALES_SCRIPT_FRIO: ScriptSection[] = [
   {
-    id: 'apertura',
+    id: 'mensaje',
     step: '1',
-    title: 'Apertura — la sorpresa',
-    emoji: '🎯',
-    action: 'El cumplido son los DATOS, no el halago. Dilo como curiosidad genuina, no como plantilla. Después de la pregunta: CALLA.',
+    title: 'Primer toque — el mensaje frío',
+    emoji: '📨',
+    action: 'Se envía por WhatsApp/DM ANTES de la llamada. Cópialo tal cual. NO preguntes datos ("¿qué servicios ofrece?", "¿cuántos clientes recibe?") ni digas "le hago la web" — solo la observación + el problema + curiosidad + UNA pregunta suave. Un solo mensaje.',
     lines: [
-      '"Hola, ¿con quién tengo el gusto? … Le hablo de ZerionStudio."',
-      '"Mire, algo me llamó la atención: vi a [EMPRESA] en Google — [RESEÑAS], [RATING] — pero ustedes no tienen página web."',
-      '"Me dio curiosidad: ¿podría preguntarle la razón?"',
+      '"Hola [SALUDO] 👋 Disculpe la molestia, soy [NOMBRE]. Vi a [EMPRESA] en Google: [RESEÑAS], [RATING], hasta [SOCIALES] — pero sin página web."',
+      '"Y cuando alguien busca «[rubro] cerca de mí» en [CIUDAD], se encuentra a la competencia."',
+      '"Me dio curiosidad la razón. ¿Podría preguntársela?"',
+    ],
+  },
+  {
+    id: 'permiso',
+    step: '2',
+    title: 'Si responde — ahora sí tienes permiso',
+    emoji: '🔓',
+    action: 'El dueño respondió → AHORA puedes conversar. NO vendas todavía: reconoce su razón, ofrece el adelanto gratis y AGENDA la llamada. Las preguntas emocionales van en la llamada, no aquí.',
+    lines: [
+      'Dio la razón (no tengo tiempo / es caro / mi sobrino / no lo necesito…) → reconoce: "Le entiendo, es normal."',
+      '→ "Justo por eso le escribí: no le voy a pedir que confíe en mi palabra. Le hago un adelanto de cómo se vería su página, gratis — con su nombre y sus fotos de Google — y usted lo ve con sus propios ojos. Si le gusta, seguimos; si no, lo borro y no pasó nada."',
+      '→ "¿Le parece si hablamos 5 minutos por teléfono esta tarde? Le muestro el adelanto y me cuenta qué le conviene." — AGENDA la llamada.',
+    ],
+  },
+  {
+    id: 'apertura',
+    step: '3',
+    title: 'La llamada — apertura (con permiso)',
+    emoji: '🎯',
+    action: 'Ya en llamada, el dueño respondió antes. Re-confirma y agradece. Aquí SÍ puedes preguntar — con permiso.',
+    lines: [
+      '"Gracias por tomar la llamada, [SALUDO]. Vi que respondió mi mensaje — le adelantaba que le haría un boceto de su página."',
+      '"Antes de mostrárselo, ¿me cuenta cómo le llegan hoy los clientes? ¿Recomendación, o también los buscan en Google?"',
     ],
   },
   {
     id: 'razon',
-    step: '2',
+    step: '4',
     title: 'La razón real (escucha y clasifica)',
     emoji: '🧭',
     action: 'NO interrumpa — su respuesta es la objeción antes de que exista. Clasifíquela y guarde sus palabras textuales.',
     lines: [
       '"No tengo tiempo" → no es prioridad → agite con el costo de no tenerla',
-      '"Es muy caro" → miedo al precio → agite + gratis de ver (paso 4)',
+      '"Es muy caro" → miedo al precio → agite + gratis de ver (paso 6)',
       '"Mi sobrino me la iba a hacer" → quemado con promesas → valide + prueba gratis',
       '"No lo necesito" → no ve el problema → agite con los clientes que pierde',
       '"No sé de eso" → miedo a lo desconocido → "Yo hago todo — usted solo mira"',
@@ -74,7 +101,7 @@ export const SALES_SCRIPT_FRIO: ScriptSection[] = [
   },
   {
     id: 'agitacion',
-    step: '3',
+    step: '5',
     title: 'Agitación — el costo de no tenerla',
     emoji: '⏳',
     action: 'UNA pregunta. Después: SILENCIO. Que él ponga el número — el que habla primero, pierde.',
@@ -86,10 +113,10 @@ export const SALES_SCRIPT_FRIO: ScriptSection[] = [
   },
   {
     id: 'propuesta',
-    step: '4',
+    step: '6',
     title: 'La oferta — irresistible, corta',
     emoji: '💎',
-    action: 'La oferta que creamos: mecanismo + entrega/precio + garantía. Tres frases, sin anclas ni listas — el precio se dice aquí, natural.',
+    action: 'Mecanismo + entrega/precio + garantía. Tres frases, sin anclas ni listas — el precio se dice aquí, natural.',
     lines: [
       '"Mire, le propongo algo: su página web completa, con WhatsApp, Google Maps y una IA que responde a sus clientes 24/7."',
       '"Lista en 7 días, dominio y alojamiento incluidos, por [PRECIO] — un solo pago, todo incluido."',
@@ -98,19 +125,19 @@ export const SALES_SCRIPT_FRIO: ScriptSection[] = [
   },
   {
     id: 'calificacion',
-    step: '5',
+    step: '7',
     title: 'La calificación (LA pregunta de eficiencia)',
     emoji: '🔒',
-    action: 'El precio ya está dicho — la pregunta ahora es solo de compromiso. Si dice no: no desarrolla nada — objeción real (paso 6).',
+    action: 'El precio ya está dicho — la pregunta ahora es solo de compromiso. Si dice no: no desarrolla nada — objeción real (paso 8).',
     lines: [
       '"Y para ser honestos: si le muestro la página terminada y le encanta, ¿se la quedaría?"',
       '→ SÍ: "¡Listo! La desarrollo esta semana y le escribo por WhatsApp con el link. ¿Este número tiene WhatsApp?"',
-      '→ NO / dudas: objeción real (paso 6). Si se resuelve, vuelva al paso 4.',
+      '→ NO / dudas: objeción real (paso 8). Si se resuelve, vuelva al paso 6.',
     ],
   },
   {
     id: 'objeciones',
-    step: '6',
+    step: '8',
     title: 'Objeciones (reflejos, no decisiones)',
     emoji: '🛡️',
     action: 'Acordar → aislar → responder → re-pedir. Máx. 2 vueltas — después cierre con elegancia.',
@@ -125,7 +152,7 @@ export const SALES_SCRIPT_FRIO: ScriptSection[] = [
   },
   {
     id: 'recepcion',
-    step: '7',
+    step: '9',
     title: 'Recepcionista / empleado (gatekeeper)',
     emoji: '🚪',
     action: 'Su razón debe ser transmisible — el gatekeeper la repite. La palabra "ayudar" abre puertas. Nunca engañar.',
@@ -136,7 +163,7 @@ export const SALES_SCRIPT_FRIO: ScriptSection[] = [
   },
   {
     id: 'entrega',
-    step: '8',
+    step: '10',
     title: 'WhatsApp con la página (Toque 2)',
     emoji: '📲',
     action: 'Se envía el día de la entrega. Link + curiosidad dirigida + riesgo cero.',
@@ -148,7 +175,7 @@ export const SALES_SCRIPT_FRIO: ScriptSection[] = [
   },
   {
     id: 'cierre',
-    step: '9',
+    step: '11',
     title: 'Follow-up + cierre (Toque 3, 24-48h)',
     emoji: '💵',
     action: 'Precio natural, sin drama: ya la vio, ya le gustó — es solo un dato. Si dice no: la página pasa al portafolio (máquina de demos).',
@@ -161,12 +188,12 @@ export const SALES_SCRIPT_FRIO: ScriptSection[] = [
   },
   {
     id: 'seguimiento',
-    step: '10',
+    step: '12',
     title: 'Seguimiento (anti-ghosting)',
     emoji: '📆',
     action: 'Siempre con algo NUEVO. Nunca "¿ya lo pensó?". Cadencia: día 0, 2, 5, 9 — y STOP.',
     lines: [
-      'Día 0: el mensaje de entrega del paso 8.',
+      'Día 0: el mensaje de entrega del paso 10.',
       'Día 2: "¿Alcanzó a verla? Si quiere cambios, me escribe — se ajusta sin costo."',
       'Día 5: caso corto: "Un negocio de [rubro] en [CIUDAD] pasó de no aparecer a recibir X mensajes a la semana."',
       'Día 9: cierre suave: "Si no es buen momento, sin problema. La dejo guardada unos días — cuando quiera la retomamos. Aquí estoy." — STOP.',
@@ -174,7 +201,7 @@ export const SALES_SCRIPT_FRIO: ScriptSection[] = [
   },
   {
     id: 'referidos',
-    step: '11',
+    step: '13',
     title: 'Referidos (post-venta, dinero en efectivo)',
     emoji: '🎁',
     action: 'Solo después del pago, con la emoción arriba. 3 compras = devolución en efectivo. Nunca hosting gratis (ya viene incluido).',
@@ -191,4 +218,4 @@ export const QUICK_OBJECTIONS = SALES_SCRIPT_FRIO.find((s) => s.id === 'objecion
 
 /** Frase resumen del sistema (prospección fría + demo-first honesto). */
 export const FRIO_PITCH_LINE =
-  'No le venda una página: muéstrele la suya. El adelanto es gratis y la web terminada se ve antes de pagar — el riesgo siempre es cero.';
+  'No le venda una página: muéstrele la suya. El primer toque es un mensaje de curiosidad, no un guion — y el adelanto se ve antes de pagar. El riesgo siempre es cero.';
