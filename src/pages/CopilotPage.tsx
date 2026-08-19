@@ -43,6 +43,9 @@ export function CopilotPage() {
   const [lead, setLead] = useState<Lead | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [hasSettings, setHasSettings] = useState(() => hasCopilotSettings());
+  // Variante de apertura A/B de la llamada (la prueba A/B). Se elige por lead
+  // o lote con el toggle del panel y se registra en `outcome.apertura`.
+  const [apertura, setApertura] = useState<'A' | 'B'>('A');
 
   // Wrap
   const [summary, setSummary] = useState<CallSummary | null>(null);
@@ -156,6 +159,8 @@ export function CopilotPage() {
     setSaved(false);
     setSummary(null);
     setPastCalls([]);
+    // Variante de apertura A/B: arranca por defecto en 'A' por cada lead.
+    setApertura('A');
     listCopilotCalls(l.id).then(setPastCalls).catch(() => {});
     callStartRef.current = Date.now();
     // Encuesta de la llamada NUEVA: la anterior no debe filtrar al outcome.
@@ -232,7 +237,7 @@ export function CopilotPage() {
   // los indicadores del embudo salen de la ENCUESTA del vendedor.
   const buildOutcome = useCallback(
     (temperature: string, cash: number): CallOutcome => ({
-      apertura: 'A',
+      apertura,
       durationMin: callStartRef.current
         ? Math.max(1, Math.round((Date.now() - callStartRef.current) / 60000))
         : 0,
@@ -248,7 +253,7 @@ export function CopilotPage() {
       // Encuesta post-llamada: si se respondió, queda en el outcome medible.
       survey: survey.resultado ? survey : null,
     }),
-    [survey]
+    [survey, apertura]
   );
 
   async function saveToLead() {
@@ -412,7 +417,14 @@ export function CopilotPage() {
 
             {/* El guion — la pantalla principal de la llamada */}
             <div className="min-h-0 flex-1">
-              <SalesScriptPanel key={lead.id} lead={lead} script={lead.script} large />
+              <SalesScriptPanel
+                key={lead.id}
+                lead={lead}
+                script={lead.script}
+                apertura={apertura}
+                onAperturaChange={setApertura}
+                large
+              />
             </div>
 
             <button

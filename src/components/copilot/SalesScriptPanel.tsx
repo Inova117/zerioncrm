@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { BookOpen, ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { SALES_SCRIPT_FRIO, FRIO_PITCH_LINE } from '../../data/salesScriptFrio';
+import { salesScriptFrio, FRIO_PITCH_LINE } from '../../data/salesScriptFrio';
 import { SALES_SCRIPT_AGENT, AGENT_PITCH_LINE } from '../../data/salesScriptAgente';
 import { fillLeadVars, type ScriptLeadVars } from '../../lib/scriptUtils';
 import { fillPrecios } from '../../lib/copilotSettings';
@@ -21,6 +21,11 @@ interface SalesScriptPanelProps {
   /** Guion específico de ESTE prospecto (lead.script). Si existe, tiene
    *  prioridad sobre el guion por servicio. */
   script?: string;
+  /** Variante de apertura A/B de la llamada (la prueba A/B). Determina el paso
+   *  1 del guion web. Se registra en `outcome.apertura` para comparar. */
+  apertura?: 'A' | 'B';
+  /** Cambia la variante A/B desde el panel (toggle). */
+  onAperturaChange?: (v: 'A' | 'B') => void;
   /** Modo grande: tipografía y controles grandes, llena la altura disponible —
    *  para leer DURANTE la llamada. */
   large?: boolean;
@@ -60,7 +65,7 @@ function ScriptStep({
   );
 }
 
-export function SalesScriptPanel({ lead, script, large = false }: SalesScriptPanelProps) {
+export function SalesScriptPanel({ lead, script, apertura = 'A', onAperturaChange, large = false }: SalesScriptPanelProps) {
   const hasCustom = Boolean(script?.trim());
   // Por defecto: guion propio si existe; si no, la línea de oferta del lead
   // decide el guion (web vs AI agent) — regla de prospección (leadOfferLine).
@@ -73,7 +78,7 @@ export function SalesScriptPanel({ lead, script, large = false }: SalesScriptPan
   const fill = (t: string) => fillPrecios(fillLeadVars(t, lead));
 
   const service: 'web' | 'aaas' = mode === 'aaas' ? 'aaas' : 'web';
-  const sections = service === 'aaas' ? SALES_SCRIPT_AGENT : SALES_SCRIPT_FRIO;
+  const sections = service === 'aaas' ? SALES_SCRIPT_AGENT : salesScriptFrio(apertura);
   const pitchLine = service === 'aaas' ? AGENT_PITCH_LINE : FRIO_PITCH_LINE;
 
   const headerTitle =
@@ -141,6 +146,29 @@ export function SalesScriptPanel({ lead, script, large = false }: SalesScriptPan
                   </button>
                 ))}
               </div>
+
+              {/* Toggle A/B de la apertura — SOLO para el guion web. La variante
+                  se registra en outcome.apertura para el split del dashboard. */}
+              {service === 'web' && (
+                <div className="flex items-center gap-1.5">
+                  <span className={cn('shrink-0 font-semibold text-surface-400', large ? 'text-xs' : 'text-[10px]')}>
+                    Apertura
+                  </span>
+                  {(['A', 'B'] as const).map((v) => (
+                    <button
+                      key={v}
+                      onClick={() => onAperturaChange?.(v)}
+                      title={`Variante ${v} de la apertura — el resto del guion es el mismo`}
+                      className={cn(
+                        'rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors',
+                        apertura === v ? 'bg-brand-600 text-white' : 'bg-surface-100 text-surface-500 hover:bg-surface-200'
+                      )}
+                    >
+                      Apertura {v}
+                    </button>
+                  ))}
+                </div>
+              )}
 
               {/* Guion por servicio — todo en scroll */}
               <div className={cn('space-y-2', large ? 'min-h-0 flex-1 overflow-y-auto pr-1' : 'max-h-80 overflow-y-auto pr-1')}>
