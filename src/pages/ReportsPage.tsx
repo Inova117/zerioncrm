@@ -1,5 +1,6 @@
-import { useMemo } from 'react';
-import { DollarSign, Repeat, Trophy, Receipt, Layers } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { DollarSign, Repeat, Trophy, Receipt, Layers, BellRing, ClipboardList, ArrowRight, Loader2 } from 'lucide-react';
 import { AppLayout } from '../components/layout/AppLayout';
 import { StatCard } from '../components/dashboard/StatCard';
 import { PageLoader, EmptyState } from '../components/ui/misc';
@@ -7,9 +8,14 @@ import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { totals, byService, winRate, avgTicket, pipelineByStage } from '../services/metricsService';
 import { stageConfig } from '../lib/constants';
-import { fmtMoney, cn } from '../lib/utils';
+import { fmtMoney, fmtDateTime, cn } from '../lib/utils';
+import { followUpBucket, touchInfo } from '../lib/followUp';
 import { useNichePerformance } from '../hooks/useNichePerformance';
 import type { NichePerformance } from '../lib/feedback';
+import { dailyActivityService } from '../services/dailyActivityService';
+import type { DailyActivity } from '../types';
+import { dayKey, weekDays, activityTotals } from '../lib/dailyActivityUtils';
+import type { Lead } from '../types';
 
 /** Horizontal labelled bars (reused for revenue-by-service and pipeline-by-stage). */
 function Bars({
@@ -172,6 +178,12 @@ export function ReportsPage() {
             </div>
           </div>
 
+          {/* Seguimiento: salud de la cola de toques (conectado con Hoy) */}
+          <FollowUpPanel leads={scoped} />
+
+          {/* Actividad diaria del equipo (conectado con Actividad) */}
+          <TeamActivityPanel />
+
           {/* Feedback loop: rendimiento por nicho (qué convierte de verdad) */}
           <NichePerformancePanel />
         </div>
@@ -244,6 +256,216 @@ function NichePerformancePanel() {
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+/** Salud de la cola de seguimiento: cuántos toques caen en cada cubo y cuáles
+ *  están atrasados (conexión automática con la vista Hoy). */
+function FollowUpPanel({ leads }: { leads: Lead[] }) {
+  const stats = useMemo(() => {
+    let overdue = 0;
+    let today = 0;
+    let upcoming = 0;
+    let withNext = 0;
+    const weekFromNow = Date.now() + 7 * 86_400_000;
+    for (const l of leads) {
+      const b = followUpBucket(l.nextActionAt);
+      if (b === 'overdue') overdue += 1;
+      else if (b === 'today') today += 1;
+      else if (
+        b === 'upcoming' &&
+        l.nextActionAt &&
+        new Date(l.nextActionAt).getTime() <= weekFromNow
+      ) {
+        upcoming += 1;
+      }
+      if (l.nextActionAt) withNext += 1;
+    }
+    const open = leads.filter(
+      (l) => !['cliente', 'perdido'].includes(l.temperature)
+    ).length;
+    return { overdue, today, upcoming, withNext, total: open };
+  }, [leads]);
+
+  const topOverdue = useMemo(
+    () =>
+      leads
+        .filter((l) => followUpBucket(l.nextActionAt) === 'overdue')
+        .sort((a, b) => (a.nextActionAt ?? '').localeCompare(b.nextActionAt ?? ''))
+        .slice(0, 5),
+    [leads]
+  );
+
+  if (stats.total === 0) return null;
+
+  const coverage = stats.total > 0 ? Math.round((stats.withNext / stats.total) * 100) : 0;
+  const chip = (label: string, value: number, tone: 'red' | 'amber' | 'gray' | 'green') => (
+    <div className="flex flex-col rounded-xl border border-surface-200 bg-white px-3 py-2">
+      <span
+        className={cn(
+          'text-xl font-bold tabular-nums',
+          tone === 'red' ? 'text-red-600' : tone === 'amber' ? 'text-amber-600' : tone === 'green' ? 'text-emerald-600' : 'text-surface-700'
+        )}
+      >
+        {value}
+      </span>
+      <span className="text-[11px] text-surface-400">{label}</span>
+    </div>
+  );
+
+  return (
+    <div className="card p-5">
+      <div className="mb-4 flex items-center gap-2">
+        <BellRing className="h-4 w-4 text-brand-600" />
+        <div className="flex-1">
+          <h2 className="text-sm font-semibold text-surface-800">Seguimiento — salud de la cola</h2>
+          <p className="text-xs text-surface-400">
+            Los toques con fecha vencida o de hoy son lo que ves en la vista Hoy.
+          </p>
+        </div>
+        <Link to="/hoy" className="btn-secondary px-3 py-1.5 text-xs">
+          Abrir Hoy <ArrowRight className="ml-1 inline h-3 w-3" />
+        </Link>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {chip('Atrasados', stats.overdue, 'red')}
+        {chip('Para hoy', stats.today, 'amber')}
+        {chip('Próximos 7 días', stats.upcoming, 'gray')}
+        {chip(`Con próxima acción (${coverage}%)`, stats.withNext, 'green')}
+      </div>
+
+      {topOverdue.length > 0 && (
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full min-w-[520px] text-sm">
+            <thead>
+              <tr className="border-b border-surface-200 text-left text-[11px] uppercase tracking-wide text-surface-400">
+                <th className="px-2 py-2 font-medium">Prospecto</th>
+                <th className="px-2 py-2 text-center font-medium">Toque</th>
+                <th className="px-2 py-2 text-right font-medium">Vencido desde</th>
+                <th className="px-2 py-2" />
+              </tr>
+            </thead>
+            <tbody>
+              {topOverdue.map((l) => {
+                const t = touchInfo(l);
+                return (
+                  <tr key={l.id} className="border-b border-surface-100 last:border-0">
+                    <td className="px-2 py-2.5 font-medium text-surface-800">{l.company}</td>
+                    <td className="px-2 py-2.5 text-center text-surface-600">
+                      {t ? `${t.touch}/${t.total > 0 ? t.total : '∞'}` : '—'}
+                    </td>
+                    <td className="px-2 py-2.5 text-right text-red-600">
+                      {fmtDateTime(l.nextActionAt)}
+                    </td>
+                    <td className="px-2 py-2.5 text-right">
+                      <Link
+                        to={`/leads?lead=${l.id}`}
+                        className="text-xs font-medium text-brand-600 hover:underline"
+                      >
+                        Ver prospecto →
+                      </Link>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Actividad diaria del equipo en la semana actual (conexión con Actividad):
+ *  lo que cada vendedor registró, sin depender del tab Actividad. */
+function TeamActivityPanel() {
+  const { isAdmin } = useAuth();
+  const { users } = useData();
+  const [rows, setRows] = useState<DailyActivity[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const activeEmployees = useMemo(
+    () => users.filter((u) => u.role === 'employee' && u.active),
+    [users]
+  );
+  const week = useMemo(() => weekDays(new Date()), []);
+  const weekFrom = dayKey(week[0]!);
+  const weekTo = dayKey(week[4]!);
+
+  useEffect(() => {
+    if (!isAdmin || activeEmployees.length === 0) {
+      setRows([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    dailyActivityService
+      .listRange(
+        activeEmployees.map((u) => u.id),
+        weekFrom,
+        weekTo
+      )
+      .then(setRows)
+      .catch(() => setRows([]))
+      .finally(() => setLoading(false));
+  }, [isAdmin, activeEmployees, weekFrom, weekTo]);
+
+  if (!isAdmin || activeEmployees.length === 0) return null;
+
+  return (
+    <div className="card p-5">
+      <div className="mb-4 flex items-center gap-2">
+        <ClipboardList className="h-4 w-4 text-brand-600" />
+        <div>
+          <h2 className="text-sm font-semibold text-surface-800">Actividad del equipo — esta semana</h2>
+          <p className="text-xs text-surface-400">
+            Lo que cada vendedor registró en su check-in diario (tab Actividad).
+          </p>
+        </div>
+      </div>
+      {loading ? (
+        <div className="flex h-24 items-center justify-center text-surface-400">
+          <Loader2 className="h-5 w-5 animate-spin" />
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[560px] text-sm">
+            <thead>
+              <tr className="border-b border-surface-200 text-left text-[11px] uppercase tracking-wide text-surface-400">
+                <th className="pb-2 pr-2 font-medium">Vendedor</th>
+                <th className="pb-2 pr-2 text-center font-medium">Llamadas</th>
+                <th className="pb-2 pr-2 text-center font-medium">Contactos</th>
+                <th className="pb-2 pr-2 text-center font-medium">Demos</th>
+                <th className="pb-2 pr-2 text-center font-medium">Cierres</th>
+                <th className="pb-2 pr-2 text-center font-medium">Demo→cierre</th>
+                <th className="pb-2 text-center font-medium">Registro</th>
+              </tr>
+            </thead>
+            <tbody>
+              {activeEmployees.map((u) => {
+                const t = activityTotals(rows.filter((r) => r.userId === u.id));
+                return (
+                  <tr key={u.id} className="border-t border-surface-100">
+                    <td className="py-2 pr-2 font-medium text-surface-800">
+                      <Link to={`/actividad?u=${u.id}`} className="hover:text-brand-600 hover:underline">
+                        {u.name}
+                      </Link>
+                    </td>
+                    <td className="py-2 pr-2 text-center text-surface-700">{t.calls}</td>
+                    <td className="py-2 pr-2 text-center text-surface-700">{t.contacts}</td>
+                    <td className="py-2 pr-2 text-center text-surface-700">{t.demos}</td>
+                    <td className="py-2 pr-2 text-center font-semibold text-emerald-700">{t.closes}</td>
+                    <td className="py-2 pr-2 text-center text-surface-500">{t.closeRate}%</td>
+                    <td className="py-2 pr-2 text-center text-surface-500">{t.daysLogged}/5</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

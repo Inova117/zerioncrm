@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, ClipboardList, Loader2, Save, TrendingUp } from 'lucide-react';
-import { useSearchParams } from 'react-router-dom';
+import { ChevronLeft, ChevronRight, ClipboardList, Loader2, Save, TrendingUp, Users } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { AppLayout } from '../components/layout/AppLayout';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
@@ -57,6 +57,32 @@ export function ActivityPage() {
       .catch(() => setError('No se pudo cargar la actividad — reintenta.'))
       .finally(() => setLoading(false));
   }, [userId, fromKey, toKey]);
+
+  // Vista de admin: los reportes de los empleados DEBAJO de mi actividad, en la
+  // misma semana seleccionada (solo lectura — cada empleado registra lo suyo).
+  const activeEmployees = useMemo(
+    () => (isAdmin ? users.filter((u) => u.role === 'employee' && u.active) : []),
+    [users, isAdmin]
+  );
+  const [teamRows, setTeamRows] = useState<DailyActivity[]>([]);
+  const [teamLoading, setTeamLoading] = useState(false);
+  useEffect(() => {
+    if (!isAdmin || isSupervisor || activeEmployees.length === 0) {
+      setTeamRows([]);
+      setTeamLoading(false);
+      return;
+    }
+    setTeamLoading(true);
+    dailyActivityService
+      .listRange(
+        activeEmployees.map((u) => u.id),
+        fromKey,
+        toKey
+      )
+      .then(setTeamRows)
+      .catch(() => setTeamRows([]))
+      .finally(() => setTeamLoading(false));
+  }, [isAdmin, isSupervisor, activeEmployees, fromKey, toKey]);
 
   function selectDay(d: Date) {
     if (dayKey(d) > todayKey) return; // el futuro no se registra
@@ -267,6 +293,96 @@ export function ActivityPage() {
           </div>
         </div>
       </div>
+
+      {/* Reportes del equipo DEBAJO de mi actividad (admin) — misma semana,
+          solo lectura. Cada empleado registra su propio diario. */}
+      {isAdmin && !isSupervisor && activeEmployees.length > 0 && (
+        <div className="mt-8 space-y-4">
+          <div className="flex items-center gap-2">
+            <Users className="h-4 w-4 text-brand-600" />
+            <h2 className="text-sm font-semibold text-surface-800">
+              Reportes del equipo — semana del {weekLabel(days)}
+            </h2>
+          </div>
+
+          {teamLoading ? (
+            <div className="flex h-24 items-center justify-center text-surface-400">
+              <Loader2 className="h-5 w-5 animate-spin" />
+            </div>
+          ) : (
+            activeEmployees.map((u) => {
+              const empRows = teamRows.filter((r) => r.userId === u.id);
+              const t = activityTotals(empRows);
+              const anyLogged = empRows.some(
+                (r) => r.calls + r.contacts + r.demos + r.closes > 0 || r.notes.trim()
+              );
+              return (
+                <div key={u.id} className="card p-4">
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-semibold text-surface-800">{u.name}</p>
+                      {!anyLogged && (
+                        <span className="badge bg-red-50 text-red-600">Sin registro esta semana</span>
+                      )}
+                    </div>
+                    <Link
+                      to={`/actividad?u=${u.id}`}
+                      className="text-xs font-medium text-brand-600 hover:underline"
+                    >
+                      Ver su diario completo →
+                    </Link>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[420px] text-sm">
+                      <thead>
+                        <tr className="text-left text-[11px] uppercase tracking-wide text-surface-400">
+                          <th className="pb-2 pr-2">Día</th>
+                          <th className="pb-2 pr-2 text-center">Llamadas</th>
+                          <th className="pb-2 pr-2 text-center">Contactos</th>
+                          <th className="pb-2 pr-2 text-center">Demos</th>
+                          <th className="pb-2 text-center">Cierres</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {days.map((d) => {
+                          const k = dayKey(d);
+                          const r = rowForDay(empRows, k);
+                          const logged = r && (r.calls + r.contacts + r.demos + r.closes > 0 || r.notes.trim());
+                          return (
+                            <tr key={k} className="border-t border-surface-100" title={r?.notes ? `📝 ${r.notes}` : undefined}>
+                              <td className="py-1.5 pr-2 font-medium text-surface-700">
+                                {DOW[(d.getDay() + 6) % 7]} {d.getDate()}
+                                {logged && <span className="ml-1 text-emerald-500">●</span>}
+                              </td>
+                              <td className="py-1.5 pr-2 text-center text-surface-700">{r ? r.calls : '—'}</td>
+                              <td className="py-1.5 pr-2 text-center text-surface-700">{r ? r.contacts : '—'}</td>
+                              <td className="py-1.5 pr-2 text-center text-surface-700">{r ? r.demos : '—'}</td>
+                              <td className="py-1.5 text-center font-semibold text-emerald-700">{r ? r.closes : '—'}</td>
+                            </tr>
+                          );
+                        })}
+                        <tr className="border-t-2 border-surface-200 font-semibold text-surface-800">
+                          <td className="py-1.5 pr-2">Total</td>
+                          <td className="py-1.5 pr-2 text-center">{t.calls}</td>
+                          <td className="py-1.5 pr-2 text-center">{t.contacts}</td>
+                          <td className="py-1.5 pr-2 text-center">{t.demos}</td>
+                          <td className="py-1.5 text-center text-emerald-700">{t.closes}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="mt-2.5 flex flex-wrap gap-2 text-xs text-surface-500">
+                    <span className="rounded-full bg-surface-100 px-2.5 py-1">
+                      {t.closeRate}% demos → cierre
+                    </span>
+                    <span className="rounded-full bg-surface-100 px-2.5 py-1">{t.daysLogged}/5 días</span>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
     </AppLayout>
   );
 }

@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Plus, Search, KanbanSquare, LayoutList, Columns3, Flame, Clock, Upload, Download, Bot, Users, Send } from 'lucide-react';
 import { AppLayout } from '../components/layout/AppLayout';
 import { KanbanBoard } from '../components/leads/KanbanBoard';
@@ -47,6 +48,21 @@ export function LeadsPage() {
   const [importOpen, setImportOpen] = useState(false);
   const [editing, setEditing] = useState<Lead | null>(null);
   const [detail, setDetail] = useState<Lead | null>(null);
+  const [params] = useSearchParams();
+
+  // Deep-link desde otras vistas (p.ej. la cola de Hoy): /leads?lead=<id>
+  // abre directo el detalle del prospecto. Solo se auto-abre UNA vez por id
+  // (si el usuario cierra el modal, no se reabre con cada re-render).
+  const autoOpened = useRef<string | null>(null);
+  const leadParam = params.get('lead');
+  useEffect(() => {
+    if (!leadParam || autoOpened.current === leadParam) return;
+    const l = leads.find((x) => x.id === leadParam);
+    if (l) {
+      setDetail(l);
+      autoOpened.current = leadParam;
+    }
+  }, [leadParam, leads]);
 
   const employees = useMemo(() => users.filter((u) => u.role === 'employee'), [users]);
   const activeEmployees = useMemo(() => employees.filter((u) => u.active), [employees]);

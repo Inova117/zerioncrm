@@ -13,7 +13,10 @@ import {
   LogOut,
   X,
 } from 'lucide-react';
+import { useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useData } from '../../context/DataContext';
+import { followUpBucket } from '../../lib/followUp';
 import { isRoadmapOwner } from '../../lib/roadmapGate';
 import { Avatar } from '../ui/Avatar';
 import { roleLabel } from '../../lib/constants';
@@ -48,6 +51,20 @@ const NAV: NavItem[] = [
 
 export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { user, isAdmin, signOut } = useAuth();
+  const { leads } = useData();
+
+  // Alerta de follow-up: cuántos seguimientos tiene pendientes el usuario HOY
+  // (atrasados + de hoy). Se pinta como badge en el item "Hoy" del menú.
+  const followUpCount = useMemo(() => {
+    let overdue = 0;
+    let today = 0;
+    for (const l of leads) {
+      const b = followUpBucket(l.nextActionAt);
+      if (b === 'overdue') overdue += 1;
+      else if (b === 'today') today += 1;
+    }
+    return { overdue, today, total: overdue + today };
+  }, [leads]);
 
   return (
     <>
@@ -101,6 +118,24 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
             >
               <Icon className="h-[18px] w-[18px]" />
               {label}
+              {/* Alerta de follow-up: pendientes que tocan hoy */}
+              {to === '/hoy' && followUpCount.total > 0 && (
+                <span
+                  className={cn(
+                    'ml-auto rounded-full px-2 py-0.5 text-[11px] font-bold tabular-nums',
+                    followUpCount.overdue > 0
+                      ? 'bg-red-500 text-white'
+                      : 'bg-amber-400 text-white'
+                  )}
+                  title={
+                    followUpCount.overdue > 0
+                      ? `${followUpCount.overdue} atrasado${followUpCount.overdue === 1 ? '' : 's'} · ${followUpCount.today} para hoy`
+                      : `${followUpCount.today} seguimiento${followUpCount.today === 1 ? '' : 's'} para hoy`
+                  }
+                >
+                  {followUpCount.total}
+                </span>
+              )}
             </NavLink>
           ))}
         </nav>

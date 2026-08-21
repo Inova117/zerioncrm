@@ -129,12 +129,21 @@ function FollowUpCard({
         >
           <Clock3 className="h-3.5 w-3.5" /> Mañana
         </button>
-        <Link
-          to={`/copilot?lead=${lead.id}`}
-          className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-brand-600 hover:underline"
-        >
-          <Sparkles className="h-3.5 w-3.5" /> Copilot
-        </Link>
+        <span className="ml-auto flex flex-wrap items-center gap-3">
+          <Link
+            to={`/leads?lead=${lead.id}`}
+            className="inline-flex items-center gap-1 text-xs font-medium text-surface-500 hover:text-brand-600 hover:underline"
+            title="Abrir el prospecto en el tab Prospectos"
+          >
+            Ver prospecto
+          </Link>
+          <Link
+            to={`/copilot?lead=${lead.id}`}
+            className="inline-flex items-center gap-1 text-xs font-medium text-brand-600 hover:underline"
+          >
+            <Sparkles className="h-3.5 w-3.5" /> Copilot
+          </Link>
+        </span>
       </div>
     </div>
   );
