@@ -22,7 +22,7 @@ import type { User } from '../types';
 
 export function TeamPage() {
   const { user } = useAuth();
-  const { loading, users, leads, tasks, createUser, setUserActive, setUserPassword, removeUser } =
+  const { loading, users, allLeads, tasks, createUser, setUserActive, setUserPassword, removeUser } =
     useData();
 
   const [formOpen, setFormOpen] = useState(false);
@@ -32,7 +32,10 @@ export function TeamPage() {
   const [resetMsg, setResetMsg] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
-  const stats = useMemo(() => employeeStats(users, leads, tasks), [users, leads, tasks]);
+  // Supervisión: las stats y el perfil del staff se calculan sobre TODOS los
+  // leads (allLeads), NO sobre los del admin logueado — ver la separación de
+  // libros de negocio en DataContext.
+  const stats = useMemo(() => employeeStats(users, allLeads, tasks), [users, allLeads, tasks]);
   const statsById = useMemo(() => new Map(stats.map((s) => [s.user.id, s])), [stats]);
   const admins = users.filter((u) => u.role === 'admin');
   const employees = users.filter((u) => u.role === 'employee');
@@ -205,13 +208,14 @@ export function TeamPage() {
         onSubmit={createUser}
       />
 
-      {/* Employee profile — their tasks & leads */}
+      {/* Employee profile — their tasks, leads & check-ins (allLeads: el admin
+          ve TODO el trabajo del empleado, no solo sus propios leads) */}
       <EmployeeProfileModal
         user={profileFor}
         open={Boolean(profileFor)}
         onClose={() => setProfileFor(null)}
         tasks={tasks}
-        leads={leads}
+        leads={allLeads}
       />
 
       {/* Reset password */}

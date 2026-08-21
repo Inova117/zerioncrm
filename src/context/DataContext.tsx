@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { Comment, Contact, Lead, Task, Temperature, User } from '../types';
 import { leadsService } from '../services/leadsService';
@@ -98,6 +98,35 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     reload().finally(() => setLoading(false));
   }, [user, reload]);
+
+  // Refresco automático: cada 60s (solo con la pestaña visible) y al volver a
+  // la pestaña. Así el admin ve al día lo que hace el equipo sin recargar.
+  // Guard de concurrencia: si un reload ya está en vuelo, no se dispara otro.
+  const reloadingRef = useRef(false);
+  const reloadOnce = useCallback(async () => {
+    if (reloadingRef.current) return;
+    reloadingRef.current = true;
+    try {
+      await reload();
+    } finally {
+      reloadingRef.current = false;
+    }
+  }, [reload]);
+
+  useEffect(() => {
+    if (!user) return;
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void reloadOnce();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') void reloadOnce();
+    }, 60_000);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      clearInterval(interval);
+    };
+  }, [user, reloadOnce]);
 
   const authorId = user?.id ?? '';
 
