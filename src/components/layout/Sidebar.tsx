@@ -10,6 +10,7 @@ import {
   PhoneCall,
   Users,
   Map,
+  Crosshair,
   LogOut,
   X,
 } from 'lucide-react';
@@ -46,6 +47,8 @@ const NAV: NavItem[] = [
   // Guía Diaria V1: módulo personal del fundador. ownerOnly = solo Martín
   // (admin id 117mgd…); ni empleados ni otros admins lo ven.
   { to: '/roadmap', label: 'Roadmap', icon: Map, ownerOnly: true },
+  // Minero de Prospectos: sistema personal de outreach del fundador (solo él).
+  { to: '/prospectos', label: 'Minero', icon: Crosshair, ownerOnly: true },
   { to: '/equipo', label: 'Equipo', icon: Users, adminOnly: true },
 ];
 

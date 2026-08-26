@@ -480,3 +480,68 @@ export interface DailyActivity {
   createdAt: string;
   updatedAt: string;
 }
+
+// ---------------------------------------------------------------------------
+// Minero de Prospectos — módulo PERSONAL del fundador (solo Martín).
+// Es SU lista de empresas que está cazando (el delivery de lead gen), separada
+// del pipeline de los empleados (leads). RLS y gate owner-only.
+// ---------------------------------------------------------------------------
+export type ProspectoSegment =
+  | 'colegio'
+  | 'preuniversitario'
+  | 'academia'
+  | 'instituto'
+  | 'capacitacion'
+  | 'otro';
+
+/** Calidad del prospecto derivada del score (0-100). */
+export type ProspectoTemperatura = 'prioritario' | 'caliente' | 'tibio' | 'frio';
+
+/** Canales por los que se puede contactar a este prospecto. La "ruta" que
+ *  sugiere el sistema prioriza LinkedIn → email → WhatsApp → teléfono → web. */
+export interface ProspectoContacto {
+  linkedin?: string;
+  email?: string;
+  /** Dígitos con o sin +593 (se normaliza al abrir wa.me). */
+  whatsapp?: string;
+  /** Teléfono tal como se muestra (puede ser la misma línea fija). */
+  telefono?: string;
+  web?: string;
+}
+
+/** Análisis técnico de la web del prospecto (señales de hueco digital). */
+export interface ProspectoTechnical {
+  accessible: boolean;
+  https: boolean;
+  hasMetaDescription: boolean;
+  hasViewport: boolean;
+  stack: string[];
+  title?: string;
+}
+
+export interface Prospecto {
+  id: string;
+  /** Dueño (el fundador). El sistema es personal: RLS owner_id = auth.uid(). */
+  ownerId: string;
+  company: string;
+  segment: ProspectoSegment;
+  city: string;
+  /** País por defecto Ecuador; expandible a Colombia/México (Apify multi-país). */
+  pais?: string;
+  /** Proxy de facturación: "9 empleados · 4 sedes" etc. */
+  size?: string;
+  website?: string;
+  contact?: ProspectoContacto;
+  /** 0-100 — rúbrica del modelo (puede pagar 40% + nos necesita 35% + llegamos 25%). */
+  score: number;
+  temperatura: ProspectoTemperatura;
+  /** Juicio humano (capa Hormozi): false = no-objetivo aunque el score sea alto. */
+  objetivo: boolean;
+  /** Por qué es oportunidad / hueco detectado. */
+  gap?: string;
+  notas?: string;
+  technical?: ProspectoTechnical | null;
+  source: 'seed' | 'manual' | 'apify';
+  createdAt: string;
+  updatedAt: string;
+}

@@ -15,6 +15,9 @@ const ago = (days: number, hours = 0) =>
   new Date(now - days * DAY - hours * 3_600_000).toISOString();
 const ahead = (days: number) => new Date(now + days * DAY).toISOString();
 
+// Minero de Prospectos del fundador (módulo personal, owner-only).
+export { seedProspectos } from './prospectosDefaults';
+
 // ---- Users -----------------------------------------------------------------
 export const ADMIN_ID = 'usr-admin';
 const U_LUCIA = 'usr-lucia';

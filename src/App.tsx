@@ -16,6 +16,7 @@ import { ActivityPage } from './pages/ActivityPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { TeamPage } from './pages/TeamPage';
 import { RoadmapPage } from './pages/RoadmapPage';
+import { ProspectosPage } from './pages/ProspectosPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 
 /** Wraps the authenticated pages with the data provider (needs a logged-in user). */
@@ -54,6 +55,8 @@ export default function App() {
           <Route path="/equipo" element={<Private adminOnly><TeamPage /></Private>} />
           {/* Roadmap Zerion: módulo personal del fundador (ownerOnly = solo admin 117mgd…) */}
           <Route path="/roadmap" element={<Private ownerOnly><RoadmapPage /></Private>} />
+          {/* Minero de Prospectos: sistema personal de outreach del fundador (solo él) */}
+          <Route path="/prospectos" element={<Private ownerOnly><ProspectosPage /></Private>} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </BrowserRouter>
