@@ -663,6 +663,8 @@ drop policy if exists "prospectos own" on public.prospectos;
 create policy "prospectos own" on public.prospectos for all
   using (owner_id = auth.uid())
   with check (owner_id = auth.uid());
+grant all on table public.prospectos to authenticated;
+grant all on table public.prospectos to service_role;
 
 -- ============================================================================
 -- VERIFICACIÓN — corre esto después para confirmar que todo quedó bien:

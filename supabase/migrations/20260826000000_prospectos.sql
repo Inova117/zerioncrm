@@ -31,3 +31,9 @@ drop policy if exists "prospectos own" on public.prospectos;
 create policy "prospectos own" on public.prospectos for all
   using (owner_id = auth.uid())
   with check (owner_id = auth.uid());
+
+-- GRANT (CRÍTICO): PostgREST devuelve "42501 permission denied" sin esto. La app
+-- corre con rol `authenticated` (RLS filtra las filas); service_role por
+-- consistencia con el resto del schema (uso futuro en edge functions).
+grant all on table public.prospectos to authenticated;
+grant all on table public.prospectos to service_role;
