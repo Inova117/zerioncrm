@@ -26,7 +26,8 @@ import {
 import { NIVEL_FACTURACION, facturaScore, huecoScore, nivelFacturacion, senalesDetalle } from '../lib/facturacion';
 import { cn, colorFromString } from '../lib/utils';
 import { Modal } from '../components/ui/Modal';
-import { EmptyState, PageLoader, SectionTitle } from '../components/ui/misc';
+import { EmptyState, PageLoader } from '../components/ui/misc';
+import { AppLayout } from '../components/layout/AppLayout';
 
 const inputCls =
   'rounded-lg border border-surface-200 bg-white px-3 py-2 text-sm text-surface-800 outline-none transition focus:border-brand-400 focus:ring-2 focus:ring-brand-100';
@@ -156,22 +157,20 @@ export function ProspectosPage() {
     setSelected((s) => (s && s.id === updated.id ? updated : s));
   };
 
-  if (loading) return <PageLoader label="Cargando tu minero…" />;
-
   return (
-    <div className="space-y-5">
-      <SectionTitle
-        hint="Tu lista personal de empresas objetivo · separada del pipeline del equipo · solo vos la ves"
-        right={
-          <div className="flex items-center gap-2">
-            <button className="btn-primary flex items-center gap-2" onClick={() => setShowAdd(true)}>
-              <Plus className="h-4 w-4" /> Nuevo prospecto
-            </button>
-          </div>
-        }
-      >
-        Minero de Prospectos
-      </SectionTitle>
+    <AppLayout
+      title="Minero de Prospectos"
+      subtitle="Tu lista personal de empresas objetivo · separada del pipeline del equipo · solo vos la ves"
+      actions={
+        <button className="btn-primary flex items-center gap-2" onClick={() => setShowAdd(true)}>
+          <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Nuevo prospecto</span>
+        </button>
+      }
+    >
+      {loading ? (
+        <PageLoader label="Cargando tu minero…" />
+      ) : (
+      <div className="space-y-5">
 
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
@@ -488,7 +487,9 @@ export function ProspectosPage() {
 
       {/* Agregar */}
       <AddProspectoModal open={showAdd} onClose={() => setShowAdd(false)} onSave={onSave} ownerCityDefault="" />
-    </div>
+      </div>
+      )}
+    </AppLayout>
   );
 }
 
