@@ -8,6 +8,7 @@ import {
   Crosshair,
   Globe,
   Building2,
+  AlertCircle,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import type { Prospecto, ProspectoSegment, ProspectoTemperatura } from '../types';
@@ -28,6 +29,7 @@ import { EmptyState, PageLoader, SectionTitle } from '../components/ui/misc';
 
 const inputCls =
   'rounded-lg border border-surface-200 bg-white px-3 py-2 text-sm text-surface-800 outline-none transition focus:border-brand-400 focus:ring-2 focus:ring-brand-100';
+const selectCls = cn(inputCls, 'min-w-[10rem]');
 
 function ScoreBar({ score }: { score: number }) {
   const color = score >= 70 ? '#f59e0b' : score >= 50 ? '#3b82f6' : '#64748b';
@@ -47,6 +49,7 @@ export function ProspectosPage() {
 
   const [prospectos, setProspectos] = useState<Prospecto[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const [q, setQ] = useState('');
   const [segment, setSegment] = useState<ProspectoSegment | 'all'>('all');
@@ -60,9 +63,12 @@ export function ProspectosPage() {
 
   const reload = async () => {
     setLoading(true);
+    setError(null);
     try {
       const rows = await prospectosService.listFor(ownerId);
       setProspectos(rows);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudieron cargar los prospectos.');
     } finally {
       setLoading(false);
     }
@@ -154,25 +160,25 @@ export function ProspectosPage() {
             onChange={(e) => setQ(e.target.value)}
           />
         </div>
-        <select className={inputCls} value={segment} onChange={(e) => setSegment(e.target.value as ProspectoSegment | 'all')}>
+        <select className={selectCls} value={segment} onChange={(e) => setSegment(e.target.value as ProspectoSegment | 'all')}>
           <option value="all">Todos los nichos</option>
           {SEGMENTS.map((s) => (
             <option key={s.key} value={s.key}>{s.label}</option>
           ))}
         </select>
-        <select className={inputCls} value={city} onChange={(e) => setCity(e.target.value)}>
+        <select className={selectCls} value={city} onChange={(e) => setCity(e.target.value)}>
           <option value="all">Todas las ciudades</option>
           {cities.map((c) => (
             <option key={c} value={c}>{c}</option>
           ))}
         </select>
-        <select className={inputCls} value={temp} onChange={(e) => setTemp(e.target.value as ProspectoTemperatura | 'all')}>
+        <select className={selectCls} value={temp} onChange={(e) => setTemp(e.target.value as ProspectoTemperatura | 'all')}>
           <option value="all">Temperatura</option>
           {(['prioritario', 'caliente', 'tibio', 'frio'] as ProspectoTemperatura[]).map((t) => (
             <option key={t} value={t}>{TEMP_CONFIG[t].label}</option>
           ))}
         </select>
-        <select className={inputCls} value={objetivo} onChange={(e) => setObjetivo(e.target.value as 'all' | 'si' | 'no')}>
+        <select className={selectCls} value={objetivo} onChange={(e) => setObjetivo(e.target.value as 'all' | 'si' | 'no')}>
           <option value="all">Objetivo (todos)</option>
           <option value="si">Sí es objetivo</option>
           <option value="no">No es objetivo</option>
@@ -258,13 +264,55 @@ export function ProspectosPage() {
             </tbody>
           </table>
         </div>
-        {filtered.length === 0 && (
+        {error ? (
+          <EmptyState
+            icon={<AlertCircle className="h-8 w-8" />}
+            title="No se pudieron cargar los prospectos"
+            description="Revisá que la tabla «prospectos» esté creada en Supabase (migración aplicada) o que el backend responda."
+            action={
+              <div className="flex flex-col items-center gap-2">
+                <button className="btn-primary rounded-lg px-4 py-2 text-sm" onClick={() => reload()}>
+                  Reintentar
+                </button>
+                <p className="max-w-md break-words text-xs leading-relaxed text-surface-400">{error}</p>
+              </div>
+            }
+          />
+        ) : prospectos.length === 0 ? (
+          <EmptyState
+            icon={<Crosshair className="h-8 w-8" />}
+            title="Aún no tenés prospectos"
+            description="Tu minero está vacío. Agregá tu primera empresa para empezar a cazarla."
+            action={
+              <button
+                className="btn-primary flex items-center gap-2 rounded-lg px-4 py-2 text-sm"
+                onClick={() => setShowAdd(true)}
+              >
+                <Plus className="h-4 w-4" /> Nuevo prospecto
+              </button>
+            }
+          />
+        ) : filtered.length === 0 ? (
           <EmptyState
             icon={<Crosshair className="h-8 w-8" />}
             title="No hay prospectos que encajen"
-            description="Ajustá la búsqueda o los filtros, o agregá un prospecto nuevo."
+            description="Ninguno coincide con la búsqueda o los filtros actuales."
+            action={
+              <button
+                className="btn-ghost rounded-lg px-3 py-2 text-sm"
+                onClick={() => {
+                  setQ('');
+                  setSegment('all');
+                  setCity('all');
+                  setTemp('all');
+                  setObjetivo('all');
+                }}
+              >
+                Limpiar filtros
+              </button>
+            }
           />
-        )}
+        ) : null}
       </div>
 
       {/* Detalle */}
