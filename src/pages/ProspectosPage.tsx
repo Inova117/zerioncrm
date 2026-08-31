@@ -9,10 +9,12 @@ import {
   Globe,
   Building2,
   AlertCircle,
+  Loader2,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import type { Prospecto, ProspectoSegment, ProspectoTemperatura, NivelFacturacion } from '../types';
-import { prospectosService, type ProspectoInput } from '../services/prospectosService';
+import type { Prospecto, ProspectoSegment, ProspectoTemperatura, NivelFacturacion, Discovery } from '../types';
+import { prospectosService, discoveryToProspectoInput, type ProspectoInput } from '../services/prospectosService';
+import { findLeads, analyzeSites, listDiscoveries } from '../services/leadFinderService';
 import {
   TEMP_CONFIG,
   SEGMENTS,
@@ -32,6 +34,17 @@ import { AppLayout } from '../components/layout/AppLayout';
 const inputCls =
   'rounded-lg border border-surface-200 bg-white px-3 py-2 text-sm text-surface-800 outline-none transition focus:border-brand-400 focus:ring-2 focus:ring-brand-100';
 const selectCls = cn(inputCls, 'min-w-[10rem]');
+
+/** Nicho → término de búsqueda en Google Maps. Solo elegís nicho y ciudad; el
+ *  sistema scrapea y autocompleta empresa, contacto, reseñas, hueco y score. */
+const NICHO_QUERY: Record<ProspectoSegment, string> = {
+  colegio: 'colegio privado',
+  preuniversitario: 'preuniversitario',
+  academia: 'academia',
+  instituto: 'instituto técnico',
+  capacitacion: 'centro de capacitación',
+  otro: 'negocio',
+};
 
 function ScoreBar({ score }: { score: number }) {
   const color = score >= 70 ? '#f59e0b' : score >= 50 ? '#3b82f6' : '#64748b';
@@ -90,6 +103,13 @@ export function ProspectosPage() {
   const [temp, setTemp] = useState<ProspectoTemperatura | 'all'>('all');
   const [objetivo, setObjetivo] = useState<'all' | 'si' | 'no'>('all');
   const [establecido, setEstablecido] = useState<NivelFacturacion | 'all'>('all');
+
+  // Búsqueda automática (elegís nicho + ciudad → Apify autocompleta todo)
+  const [nicho, setNicho] = useState<ProspectoSegment>('colegio');
+  const [ciudadBusqueda, setCiudadBusqueda] = useState('Quito');
+  const [cantidad, setCantidad] = useState(25);
+  const [buscando, setBuscando] = useState(false);
+  const [busquedaMsg, setBusquedaMsg] = useState<string | null>(null);
 
   const [selected, setSelected] = useState<Prospecto | null>(null);
   const [showAdd, setShowAdd] = useState(false);
@@ -157,13 +177,66 @@ export function ProspectosPage() {
     setSelected((s) => (s && s.id === updated.id ? updated : s));
   };
 
+  /** Busca en Google Maps (Apify) un nicho + ciudad, analiza las webs y guarda
+   *  todo como prospectos (autollenado). Solo entran los que no están ya. */
+  async function runSearch(e: React.FormEvent) {
+    e.preventDefault();
+    if (!ciudadBusqueda.trim() || buscando) return;
+    setBuscando(true);
+    setError(null);
+    setBusquedaMsg('Buscando en Google Maps… puede tardar 1–2 min.');
+    try {
+      const res = await findLeads({
+        businessType: NICHO_QUERY[nicho],
+        location: ciudadBusqueda.trim(),
+        limit: cantidad,
+        deep: true,
+        assignedTo: ownerId,
+      });
+      setBusquedaMsg('Analizando las webs encontradas…');
+      const webIds = res.discoveries
+        .filter((d) => String(d.website ?? '').trim())
+        .slice(0, 15)
+        .map((d) => d.id);
+      if (webIds.length) await analyzeSites(webIds);
+
+      // analyze-site persiste el technical en lead_discoveries → lo re-leemos.
+      let fresh: Discovery[] = [];
+      try {
+        fresh = await listDiscoveries();
+      } catch {
+        /* usa el snapshot sin technical */
+      }
+      const byPlace = new Map(fresh.map((d) => [d.placeId, d]));
+
+      const existingKeys = new Set(prospectos.map((p) => p.company.trim().toLowerCase()));
+      let added = 0;
+      for (const d of res.discoveries) {
+        const key = d.company.trim().toLowerCase();
+        if (existingKeys.has(key)) continue;
+        const withTech = byPlace.get(d.placeId) ?? d;
+        await prospectosService.save(ownerId, discoveryToProspectoInput(withTech, nicho, ciudadBusqueda.trim()));
+        existingKeys.add(key);
+        added += 1;
+      }
+      await reload();
+      const dupes = res.discoveries.length - added;
+      setBusquedaMsg(`${added} prospectos nuevos · ${dupes} repetidos.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo completar la búsqueda.');
+      setBusquedaMsg(null);
+    } finally {
+      setBuscando(false);
+    }
+  }
+
   return (
     <AppLayout
       title="Minero de Prospectos"
-      subtitle="Tu lista personal de empresas objetivo · separada del pipeline del equipo · solo vos la ves"
+      subtitle="Buscá negocios establecidos por nicho y ciudad — el sistema los encuentra, analiza y te dice si pueden pagarte."
       actions={
-        <button className="btn-primary flex items-center gap-2" onClick={() => setShowAdd(true)}>
-          <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Nuevo prospecto</span>
+        <button className="btn-secondary flex items-center gap-2" onClick={() => setShowAdd(true)} title="Agregar uno a mano (fuera de Google)">
+          <Plus className="h-4 w-4" /> <span className="hidden sm:inline">A mano</span>
         </button>
       }
     >
@@ -171,6 +244,38 @@ export function ProspectosPage() {
         <PageLoader label="Cargando tu minero…" />
       ) : (
       <div className="space-y-5">
+      {/* Buscador automático */}
+      <form onSubmit={runSearch} className="rounded-xl border border-surface-200 bg-white p-4">
+        <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto_auto] md:items-end">
+          <Field label="Nicho">
+            <select className={cn(selectCls, 'w-full')} value={nicho} onChange={(e) => setNicho(e.target.value as ProspectoSegment)}>
+              {SEGMENTS.map((s) => (<option key={s.key} value={s.key}>{s.label}</option>))}
+            </select>
+          </Field>
+          <Field label="Ciudad">
+            <input className={inputCls} placeholder="Quito, Guayaquil, Bogotá, CDMX…" value={ciudadBusqueda} onChange={(e) => setCiudadBusqueda(e.target.value)} />
+          </Field>
+          <Field label="Cantidad">
+            <select className={selectCls} value={cantidad} onChange={(e) => setCantidad(Number(e.target.value))}>
+              {[10, 25, 50].map((n) => (<option key={n} value={n}>{n}</option>))}
+            </select>
+          </Field>
+          <button type="submit" className="btn-primary h-[42px] whitespace-nowrap" disabled={buscando}>
+            {buscando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+            {buscando ? 'Buscando…' : 'Buscar'}
+          </button>
+        </div>
+        {busquedaMsg && (
+          <p className="mt-2 flex items-center gap-1.5 text-xs text-surface-500">
+            <Loader2 className="h-3 w-3 animate-spin" /> {busquedaMsg}
+          </p>
+        )}
+        {error && (
+          <p className="mt-2 flex items-center gap-1.5 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
+            <AlertCircle className="h-4 w-4 shrink-0" /> {error}
+          </p>
+        )}
+      </form>
 
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">

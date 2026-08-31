@@ -8,6 +8,7 @@ import {
   nSenales,
   huecoScore,
   senalesDetalle,
+  scoreProspecto,
 } from './facturacion';
 import type { ProspectoSenales, ProspectoTechnical } from '../types';
 
@@ -80,5 +81,23 @@ describe('huecoScore', () => {
   });
   it('web bloqueada + sin SEO + sin responsive → 85', () => {
     expect(huecoScore(tech({ accessible: false, hasMetaDescription: false, hasViewport: false }))).toBe(85);
+  });
+});
+
+describe('scoreProspecto', () => {
+  it('desconocido por ambos lados cae a neutro (~50) sin contacto', () => {
+    const s = scoreProspecto(undefined, null, false);
+    // 0.4*40 + 0.35*40 + 0.25*30 = 16 + 14 + 7.5 = 37.5 → 38
+    expect(s).toBe(38);
+  });
+  it('con reseñas (factura alta) + hueco + contacto sube', () => {
+    const s = scoreProspecto(
+      { resenas: 300 },
+      { accessible: false, https: true, hasMetaDescription: false, hasViewport: false, stack: [] },
+      true
+    );
+    // factura = ptsResenas(300)=80, hueco = 85, reach = 80
+    // 0.4*80 + 0.35*85 + 0.25*80 = 32 + 29.75 + 20 = 81.75 → 82
+    expect(s).toBe(82);
   });
 });

@@ -135,6 +135,20 @@ export function huecoScore(technical: ProspectoTechnical | null | undefined): nu
   return Math.min(100, s);
 }
 
+/** Score global del prospecto (0-100) = facturación (40%) + hueco (35%) + alcance (25%).
+ *  Para autocompletar un prospecto desde el scraper sin pedir nada a mano. Los ejes
+ *  desconocidos caen a 40 (neutro) para no castigar ni inflar por falta de datos. */
+export function scoreProspecto(
+  senales: ProspectoSenales | undefined | null,
+  technical: ProspectoTechnical | null | undefined,
+  hasContact: boolean
+): number {
+  const factura = facturaScore(senales) ?? 40;
+  const hueco = huecoScore(technical) ?? 40;
+  const reach = hasContact ? 80 : 30;
+  return Math.round(0.4 * factura + 0.35 * hueco + 0.25 * reach);
+}
+
 /** Las señales informadas, con su lectura humana (para el detalle del prospecto). */
 export function senalesDetalle(s: ProspectoSenales | undefined | null): string[] {
   if (!s) return [];

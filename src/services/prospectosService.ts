@@ -3,11 +3,12 @@
 // Cada prospecto pertenece a un dueño (owner_id = auth.uid()) → RLS owner-only.
 // Es el "delivery" del lead gen: la lista de empresas que Martín está cazando.
 // ============================================================================
-import type { Prospecto, ProspectoContacto, ProspectoSegment, ProspectoSenales, ProspectoTechnical } from '../types';
+import type { Prospecto, ProspectoContacto, ProspectoSegment, ProspectoSenales, ProspectoTechnical, Discovery } from '../types';
 import { delay, table } from './db';
 import { uid, nowISO } from '../lib/utils';
 import { supabase } from '../lib/supabaseClient';
 import { computeTemperatura } from '../lib/prospectoUtils';
+import { scoreProspecto } from '../lib/facturacion';
 
 export interface ProspectoInput {
   id?: string;
@@ -214,3 +215,69 @@ const mockProspectos: ProspectosService = {
 export const prospectosService: ProspectosService = supabase
   ? SUPABASE_PROSPECTOS
   : mockProspectos;
+
+// ============================================================================
+// Mapper: un Discovery del Lead Finder → input de Prospecto (autollenado).
+// El scraper ya trae empresa, contacto y reseñas (Maps); acá se traducen a las
+// señales del Minero (resenas ← reviewCount) y se calcula el score global.
+// ============================================================================
+export function discoveryToProspectoInput(
+  d: Discovery,
+  segment: ProspectoSegment,
+  city: string
+): ProspectoInput {
+  const t = d.enrichment?.technical;
+  const rating = d.enrichment?.rating;
+  const reviewCount = d.enrichment?.reviewCount;
+  const linkedin = d.enrichment?.socials?.find((s) => /linkedin/i.test(s));
+
+  const technical: ProspectoTechnical | null = t
+    ? {
+        accessible: t.accessible,
+        https: t.https,
+        hasMetaDescription: t.hasMetaDescription,
+        hasViewport: t.hasViewport,
+        stack: t.stackHints ?? [],
+        title: t.title,
+      }
+    : null;
+
+  const senales: ProspectoSenales = {
+    ...(typeof reviewCount === 'number' && reviewCount > 0 ? { resenas: reviewCount } : {}),
+  };
+
+  const sizeParts = [
+    typeof rating === 'number' ? `⭐ ${rating}` : null,
+    typeof reviewCount === 'number' && reviewCount > 0 ? `${reviewCount} reseñas` : null,
+  ].filter(Boolean) as string[];
+
+  const gaps: string[] = [];
+  if (!String(d.website ?? '').trim()) gaps.push('sin sitio web');
+  if (t) {
+    if (t.accessible === false) gaps.push('web bloqueada');
+    if (t.hasMetaDescription === false) gaps.push('sin SEO (meta)');
+    if (t.hasViewport === false) gaps.push('sin responsive');
+  }
+
+  const hasContact = Boolean(String(d.phone ?? '').trim() || String(d.email ?? '').trim());
+
+  return {
+    company: d.company,
+    segment,
+    city,
+    size: sizeParts.join(' · ') || undefined,
+    website: d.website || undefined,
+    contact: {
+      linkedin: linkedin || undefined,
+      email: d.email || undefined,
+      whatsapp: d.phone || undefined,
+      telefono: d.phone || undefined,
+      web: d.website || undefined,
+    },
+    senales: Object.keys(senales).length ? senales : undefined,
+    technical,
+    score: scoreProspecto(senales, technical, hasContact),
+    gap: gaps.join(' · ') || undefined,
+    source: 'apify',
+  };
+}

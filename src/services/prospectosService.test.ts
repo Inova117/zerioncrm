@@ -6,7 +6,8 @@
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { bestRoute, filterProspectos } from '../lib/prospectoUtils';
 import { isRoadmapOwner } from '../lib/roadmapGate';
-import type { User } from '../types';
+import { discoveryToProspectoInput } from './prospectosService';
+import type { User, Discovery } from '../types';
 
 // Este test cubre la capa MOCK (la que corre en dev local). El repo tiene un
 // `.env` con las vars de Supabase, así que sin este mock el servicio resolvería
@@ -128,5 +129,69 @@ describe('gate ownerOnly de la tab', () => {
     expect(isRoadmapOwner(mk({ email: 'lucia@zerionstudio.com', role: 'employee' }))).toBe(false);
     // otro admin cualquiera NO ve el módulo personal
     expect(isRoadmapOwner(mk({ email: 'otro@empresa.com', name: 'Otro' }))).toBe(false);
+  });
+});
+
+describe('discoveryToProspectoInput (autollenado desde el scraper)', () => {
+  const disc = (over: Partial<Discovery> = {}): Discovery => ({
+    id: 'disc-1',
+    placeId: 'place-1',
+    company: 'Colegio Nueva Era',
+    contactName: '',
+    role: '',
+    email: 'hola@colegionuevaera.com',
+    phone: '0987654321',
+    website: 'https://colegionuevaera.com',
+    industry: 'colegio privado',
+    channel: 'test',
+    reason: '',
+    service: 'otro',
+    assignedTo: 'usr-admin',
+    discoveredBy: 'usr-admin',
+    createdAt: '2026-08-26T00:00:00.000Z',
+    enrichment: {
+      rating: 4.7,
+      reviewCount: 320,
+      city: 'Quito',
+      socials: ['https://linkedin.com/company/colegionuevaera'],
+      technical: {
+        analyzedAt: '2026-08-26T00:00:00.000Z',
+        accessible: true,
+        https: true,
+        httpOk: true,
+        certExpired: false,
+        httpStatus: 200,
+        loadTimeMs: 500,
+        title: 'Colegio Nueva Era',
+        hasMetaDescription: false,
+        hasH1: true,
+        hasViewport: true,
+        openGraph: false,
+        socials: [],
+        stackHints: ['wordpress'],
+      },
+    },
+    ...over,
+  });
+
+  it('autocompleta señales (reseñas), técnico, contacto y score', () => {
+    const input = discoveryToProspectoInput(disc(), 'colegio', 'Quito');
+    expect(input.company).toBe('Colegio Nueva Era');
+    expect(input.segment).toBe('colegio');
+    expect(input.senales?.resenas).toBe(320);
+    expect(input.contact?.whatsapp).toBe('0987654321');
+    expect(input.contact?.linkedin).toContain('linkedin.com');
+    expect(input.technical?.hasMetaDescription).toBe(false);
+    expect(input.technical?.stack).toEqual(['wordpress']);
+    expect(input.gap).toContain('sin SEO (meta)');
+    expect(input.source).toBe('apify');
+    expect(input.score).toBeGreaterThan(0);
+  });
+
+  it('sin web ni reseñas no rompe (senales undefined, gap sin sitio web)', () => {
+    const input = discoveryToProspectoInput(disc({ website: '', enrichment: undefined }), 'academia', 'Quito');
+    expect(input.senales).toBeUndefined();
+    expect(input.gap).toContain('sin sitio web');
+    expect(input.technical).toBeNull();
   });
 });
