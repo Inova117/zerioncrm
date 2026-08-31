@@ -658,6 +658,7 @@ create table if not exists public.prospectos (
   updated_at  timestamptz not null default now()
 );
 create index if not exists prospectos_owner_idx on public.prospectos(owner_id, score desc);
+alter table public.prospectos add column if not exists senales jsonb;
 alter table public.prospectos enable row level security;
 drop policy if exists "prospectos own" on public.prospectos;
 create policy "prospectos own" on public.prospectos for all

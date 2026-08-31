@@ -519,6 +519,25 @@ export interface ProspectoTechnical {
   title?: string;
 }
 
+/** Señales OBSERVABLES de facturación (proxy). La facturación real no es pública:
+ *  se infiere de variables que se pueden scrapear/verificar. Calibración inicial,
+ *  se ajusta con datos reales de cierre. */
+export interface ProspectoSenales {
+  /** Nº de empleados (LinkedIn / web "equipo"). */
+  empleados?: number;
+  /** Nº de sedes/sucursales. */
+  sucursales?: number;
+  /** Volumen de clientes/alumnos/pacientes (educación: nº estudiantes). */
+  clientes?: number;
+  /** Nº de reseñas de Google (volumen de negocio). */
+  resenas?: number;
+  /** Años de operación ("41 años"). */
+  antiguedad?: number;
+}
+
+/** Veredicto de facturación → ¿puede pagar el ticket ($500/mes + $300-400 pauta)? */
+export type NivelFacturacion = 'sostiene' | 'probable' | 'no' | 'sin-datos';
+
 export interface Prospecto {
   id: string;
   /** Dueño (el fundador). El sistema es personal: RLS owner_id = auth.uid(). */
@@ -530,6 +549,8 @@ export interface Prospecto {
   pais?: string;
   /** Proxy de facturación: "9 empleados · 4 sedes" etc. */
   size?: string;
+  /** Señales estructuradas de facturación (proxy) — alimentan el filtro Establecido. */
+  senales?: ProspectoSenales;
   website?: string;
   contact?: ProspectoContacto;
   /** 0-100 — rúbrica del modelo (puede pagar 40% + nos necesita 35% + llegamos 25%). */

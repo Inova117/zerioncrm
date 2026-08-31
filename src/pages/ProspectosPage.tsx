@@ -11,7 +11,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import type { Prospecto, ProspectoSegment, ProspectoTemperatura } from '../types';
+import type { Prospecto, ProspectoSegment, ProspectoTemperatura, NivelFacturacion } from '../types';
 import { prospectosService, type ProspectoInput } from '../services/prospectosService';
 import {
   TEMP_CONFIG,
@@ -23,6 +23,7 @@ import {
   uniqueCities,
   mensajeFrio,
 } from '../lib/prospectoUtils';
+import { NIVEL_FACTURACION, facturaScore, huecoScore, nivelFacturacion, senalesDetalle } from '../lib/facturacion';
 import { cn, colorFromString } from '../lib/utils';
 import { Modal } from '../components/ui/Modal';
 import { EmptyState, PageLoader, SectionTitle } from '../components/ui/misc';
@@ -43,6 +44,37 @@ function ScoreBar({ score }: { score: number }) {
   );
 }
 
+function FacturacionChip({ senales }: { senales?: Prospecto['senales'] }) {
+  const nivel = nivelFacturacion(senales);
+  const conf = NIVEL_FACTURACION[nivel];
+  const sc = facturaScore(senales);
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[11px] font-semibold"
+      style={{ background: 'var(--surface-100)', color: 'var(--surface-700)' }}
+      title={conf.desc}
+    >
+      <span className={cn('inline-block h-1.5 w-1.5 rounded-full', conf.dot)} />
+      {conf.label}
+      {sc !== null && <span className="tabular-nums text-surface-400">{sc}</span>}
+    </span>
+  );
+}
+
+function MiniBar({ label, value }: { label: string; value: number | null }) {
+  const v = value ?? 0;
+  const color = value === null ? '#d1d5db' : v >= 70 ? '#10b981' : v >= 40 ? '#f59e0b' : '#64748b';
+  return (
+    <div className="flex items-center gap-2">
+      <span className="w-12 text-xs text-surface-500">{label}</span>
+      <div className="h-1.5 w-24 overflow-hidden rounded bg-surface-200">
+        <div className="h-full rounded" style={{ width: `${v}%`, background: color }} />
+      </div>
+      <span className="text-xs font-semibold tabular-nums text-surface-600">{value ?? '—'}</span>
+    </div>
+  );
+}
+
 export function ProspectosPage() {
   const { user } = useAuth();
   const ownerId = user?.id ?? '';
@@ -56,6 +88,7 @@ export function ProspectosPage() {
   const [city, setCity] = useState('all');
   const [temp, setTemp] = useState<ProspectoTemperatura | 'all'>('all');
   const [objetivo, setObjetivo] = useState<'all' | 'si' | 'no'>('all');
+  const [establecido, setEstablecido] = useState<NivelFacturacion | 'all'>('all');
 
   const [selected, setSelected] = useState<Prospecto | null>(null);
   const [showAdd, setShowAdd] = useState(false);
@@ -87,8 +120,9 @@ export function ProspectosPage() {
         city: city === 'all' ? undefined : city,
         temperatura: temp,
         objetivo: objetivo === 'all' ? undefined : objetivo === 'si',
+        establecido,
       }),
-    [prospectos, q, segment, city, temp, objetivo]
+    [prospectos, q, segment, city, temp, objetivo, establecido]
   );
 
   const cities = useMemo(() => uniqueCities(prospectos), [prospectos]);
@@ -183,6 +217,13 @@ export function ProspectosPage() {
           <option value="si">Sí es objetivo</option>
           <option value="no">No es objetivo</option>
         </select>
+        <select className={selectCls} value={establecido} onChange={(e) => setEstablecido(e.target.value as NivelFacturacion | 'all')}>
+          <option value="all">Facturación: todos</option>
+          <option value="sostiene">Sostiene el ticket</option>
+          <option value="probable">Probable</option>
+          <option value="no">No</option>
+          <option value="sin-datos">Sin datos</option>
+        </select>
       </div>
 
       {/* Tabla */}
@@ -195,6 +236,7 @@ export function ProspectosPage() {
                 <th className="px-4 py-3 font-medium">Nicho</th>
                 <th className="px-4 py-3 font-medium">Ciudad</th>
                 <th className="px-4 py-3 font-medium">Tamaño (proxy)</th>
+                <th className="px-4 py-3 font-medium">Factura</th>
                 <th className="px-4 py-3 font-medium">Score</th>
                 <th className="px-4 py-3 font-medium">Ruta</th>
                 <th className="px-4 py-3 font-medium">Estado</th>
@@ -225,6 +267,9 @@ export function ProspectosPage() {
                     <td className="px-4 py-3 text-surface-600">{segmentLabel(p.segment)}</td>
                     <td className="px-4 py-3 text-surface-600">{p.city}</td>
                     <td className="px-4 py-3 text-surface-500">{p.size ?? '—'}</td>
+                    <td className="px-4 py-3">
+                      <FacturacionChip senales={p.senales} />
+                    </td>
                     <td className="px-4 py-3"><ScoreBar score={p.score} /></td>
                     <td className="px-4 py-3">
                       {route ? (
@@ -341,6 +386,37 @@ export function ProspectosPage() {
                 {selected.gap}
               </div>
             )}
+
+            <div className="rounded-lg border border-surface-200 p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wide text-surface-400">
+                  Facturación (proxy)
+                </span>
+                {' '}
+                {(() => {
+                  const n = nivelFacturacion(selected.senales);
+                  const c = NIVEL_FACTURACION[n];
+                  return <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-semibold', c.chip)}>{c.label}</span>;
+                })()}
+              </div>
+              <div className="space-y-2 text-sm">
+                <div>
+                  <span className="text-surface-500">Señales: </span>
+                  {senalesDetalle(selected.senales).length > 0 ? (
+                    <span className="text-surface-700">{senalesDetalle(selected.senales).join(' · ')}</span>
+                  ) : (
+                    <span className="text-surface-400">sin datos — verificá empleados, sedes, reseñas o años</span>
+                  )}
+                </div>
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+                  <MiniBar label="Factura" value={facturaScore(selected.senales)} />
+                  <MiniBar label="Hueco" value={huecoScore(selected.technical)} />
+                </div>
+                <p className="text-xs leading-relaxed text-surface-400">
+                  Factura = ¿puede pagar $500/mes + pauta? · Hueco = ¿te necesita? Un buen lead está alto en ambas.
+                </p>
+              </div>
+            </div>
 
             {selected.technical && (
               <div className="grid grid-cols-2 gap-2 text-sm">
@@ -477,6 +553,11 @@ function AddProspectoModal({
   const [whatsapp, setWhatsapp] = useState('');
   const [telefono, setTelefono] = useState('');
   const [size, setSize] = useState('');
+  const [empl, setEmpl] = useState('');
+  const [suc, setSuc] = useState('');
+  const [cli, setCli] = useState('');
+  const [res, setRes] = useState('');
+  const [ant, setAnt] = useState('');
   const [score, setScore] = useState('60');
   const [gap, setGap] = useState('');
   const [saving, setSaving] = useState(false);
@@ -484,7 +565,7 @@ function AddProspectoModal({
   const reset = () => {
     setCompany(''); setSegment('colegio'); setCity(ownerCityDefault || 'Quito'); setPais('Ecuador');
     setWebsite(''); setLinkedin(''); setEmail(''); setWhatsapp(''); setTelefono('');
-    setSize(''); setScore('60'); setGap('');
+    setSize(''); setEmpl(''); setSuc(''); setCli(''); setRes(''); setAnt(''); setScore('60'); setGap('');
   };
 
   useEffect(() => {
@@ -512,6 +593,15 @@ function AddProspectoModal({
           web: website.trim() || undefined,
         },
         size: size.trim() || undefined,
+        senales: [empl, suc, cli, res, ant].some((v) => v.trim())
+          ? {
+              empleados: empl.trim() ? Number(empl) || undefined : undefined,
+              sucursales: suc.trim() ? Number(suc) || undefined : undefined,
+              clientes: cli.trim() ? Number(cli) || undefined : undefined,
+              resenas: res.trim() ? Number(res) || undefined : undefined,
+              antiguedad: ant.trim() ? Number(ant) || undefined : undefined,
+            }
+          : undefined,
         score: Number(score) || 0,
         gap: gap.trim() || undefined,
         source: 'manual',
@@ -543,6 +633,15 @@ function AddProspectoModal({
         </Field>
         <Field label="Tamaño (proxy facturación)">
           <input className={inputCls} value={size} onChange={(e) => setSize(e.target.value)} placeholder="9 empleados · 4 sedes" />
+        </Field>
+        <Field label="Señales de facturación (opcional — deciden si «sostiene el ticket»)" className="sm:col-span-2">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+            <input className={inputCls} type="number" min="0" placeholder="Empleados" value={empl} onChange={(e) => setEmpl(e.target.value)} />
+            <input className={inputCls} type="number" min="0" placeholder="Sedes" value={suc} onChange={(e) => setSuc(e.target.value)} />
+            <input className={inputCls} type="number" min="0" placeholder="Clientes" value={cli} onChange={(e) => setCli(e.target.value)} />
+            <input className={inputCls} type="number" min="0" placeholder="Reseñas" value={res} onChange={(e) => setRes(e.target.value)} />
+            <input className={inputCls} type="number" min="0" placeholder="Años" value={ant} onChange={(e) => setAnt(e.target.value)} />
+          </div>
         </Field>
         <Field label="Sitio web" className="sm:col-span-2">
           <input className={inputCls} value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://…" />

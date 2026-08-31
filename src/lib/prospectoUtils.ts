@@ -1,5 +1,6 @@
-import type { Prospecto, ProspectoTemperatura, ProspectoSegment } from '../types';
+import type { Prospecto, ProspectoTemperatura, ProspectoSegment, NivelFacturacion } from '../types';
 import { mailLink, telLink, waLink, webLink } from './utils';
+import { nivelFacturacion } from './facturacion';
 
 // ============================================================================
 // Minero de Prospectos — lógica pura (sin React, testeable).
@@ -71,6 +72,8 @@ export interface ProspectoFilters {
   temperatura?: ProspectoTemperatura | 'all';
   /** undefined = todos; true = solo objetivo; false = solo no-objetivo. */
   objetivo?: boolean;
+  /** Filtro por facturación proxy (¿puede pagar el ticket?). */
+  establecido?: NivelFacturacion | 'all';
 }
 
 /** Búsqueda + filtros combinados sobre la lista (puro). */
@@ -81,6 +84,7 @@ export function filterProspectos(list: Prospecto[], f: ProspectoFilters): Prospe
     if (f.city && p.city.toLowerCase() !== f.city.toLowerCase()) return false;
     if (f.temperatura && f.temperatura !== 'all' && p.temperatura !== f.temperatura) return false;
     if (typeof f.objetivo === 'boolean' && p.objetivo !== f.objetivo) return false;
+    if (f.establecido && f.establecido !== 'all' && nivelFacturacion(p.senales) !== f.establecido) return false;
     if (q) {
       const hay = [p.company, p.city, p.segment, p.size, p.gap, p.website]
         .filter(Boolean)

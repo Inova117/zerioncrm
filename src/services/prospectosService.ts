@@ -3,7 +3,7 @@
 // Cada prospecto pertenece a un dueño (owner_id = auth.uid()) → RLS owner-only.
 // Es el "delivery" del lead gen: la lista de empresas que Martín está cazando.
 // ============================================================================
-import type { Prospecto, ProspectoContacto, ProspectoSegment, ProspectoTechnical } from '../types';
+import type { Prospecto, ProspectoContacto, ProspectoSegment, ProspectoSenales, ProspectoTechnical } from '../types';
 import { delay, table } from './db';
 import { uid, nowISO } from '../lib/utils';
 import { supabase } from '../lib/supabaseClient';
@@ -16,6 +16,7 @@ export interface ProspectoInput {
   city: string;
   pais?: string;
   size?: string;
+  senales?: ProspectoSenales;
   website?: string;
   contact?: ProspectoContacto;
   /** 0-100; si viene, se recalcula la temperatura automáticamente. */
@@ -45,6 +46,7 @@ type ProspectoRow = {
   city: string;
   pais: string | null;
   size: string | null;
+  senales: ProspectoSenales | null;
   website: string | null;
   contact: ProspectoContacto | null;
   score: number;
@@ -67,6 +69,7 @@ function rowToProspecto(r: ProspectoRow): Prospecto {
     city: r.city,
     pais: r.pais ?? undefined,
     size: r.size ?? undefined,
+    senales: r.senales ?? undefined,
     website: r.website ?? undefined,
     contact: r.contact ?? undefined,
     score: r.score,
@@ -105,6 +108,7 @@ const SUPABASE_PROSPECTOS: ProspectosService = {
       city: input.city,
       pais: input.pais ?? null,
       size: input.size ?? null,
+      senales: input.senales ?? null,
       website: input.website ?? null,
       contact: input.contact ?? null,
       score,
@@ -168,6 +172,7 @@ const mockProspectos: ProspectosService = {
       city: input.city,
       pais: input.pais ?? 'Ecuador',
       size: input.size ?? undefined,
+      senales: input.senales ?? undefined,
       website: input.website ?? undefined,
       contact: input.contact ?? undefined,
       score,
