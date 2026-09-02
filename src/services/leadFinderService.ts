@@ -327,9 +327,36 @@ async function mockAnalyzeSites(discoveryIds: string[]): Promise<AnalyzeSitesRes
   return { analyzed: discoveryIds.length, failed: 0 };
 }
 
-// ===========================================================================
+// ============================================================================
+// Enriquecimiento LinkedIn (edge function enrich-linkedin). Devuelve empleados
+// y año de fundación por URL de empresa → alimenta señales del Minero.
+// ============================================================================
+export interface LinkedInEnrichment {
+  inputUrl: string | null;
+  success: boolean;
+  name: string | null;
+  employeeCount: number | null;
+  size: string | null;
+  founded: number | null;
+  headquarters: string | null;
+  industry: string | null;
+}
+
+async function supabaseEnrichLinkedIn(urls: string[]): Promise<LinkedInEnrichment[]> {
+  const { data, error } = await supabase!.functions.invoke('enrich-linkedin', { body: { urls } });
+  if (error) throw new Error(error.message);
+  return ((data as { results?: LinkedInEnrichment[] })?.results ?? []) as LinkedInEnrichment[];
+}
+
+async function mockEnrichLinkedIn(_urls: string[]): Promise<LinkedInEnrichment[]> {
+  await sleep(300);
+  return []; // mock: sin LinkedIn (el enriquecimiento real solo corre en prod)
+}
+
+// ============================================================================
 export const findLeads = supabase ? supabaseFindLeads : mockFindLeads;
 export const listDiscoveries = supabase ? supabaseListDiscoveries : mockListDiscoveries;
 export const deleteDiscovery = supabase ? supabaseDeleteDiscovery : mockDeleteDiscovery;
 export const analyzeSites = supabase ? supabaseAnalyzeSites : mockAnalyzeSites;
 export const listSearches = supabase ? supabaseListSearches : mockListSearches;
+export const enrichLinkedIn = supabase ? supabaseEnrichLinkedIn : mockEnrichLinkedIn;

@@ -14,7 +14,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import type { Prospecto, ProspectoSegment, ProspectoTemperatura, NivelFacturacion, Discovery } from '../types';
 import { prospectosService, discoveryToProspectoInput, type ProspectoInput } from '../services/prospectosService';
-import { findLeads, analyzeSites, listDiscoveries } from '../services/leadFinderService';
+import { findLeads, analyzeSites, listDiscoveries, enrichLinkedIn } from '../services/leadFinderService';
 import {
   TEMP_CONFIG,
   SEGMENTS,
@@ -209,13 +209,39 @@ export function ProspectosPage() {
       }
       const byPlace = new Map(fresh.map((d) => [d.placeId, d]));
 
+      // Enriquecimiento LinkedIn (empleados + antigüedad) para las que tienen URL.
+      const thisYear = new Date().getFullYear();
+      const linkedinUrls = [...new Set(
+        res.discoveries
+          .map((d) => d.enrichment?.socials?.find((s) => /linkedin/i.test(s)))
+          .filter(Boolean) as string[]
+      )];
+      const liByUrl = new Map<string, { empleados?: number; antiguedad?: number }>();
+      if (linkedinUrls.length) {
+        setBusquedaMsg('Enriqueciendo con LinkedIn (empleados, antigüedad)…');
+        try {
+          const enriched = await enrichLinkedIn(linkedinUrls);
+          for (const e of enriched) {
+            if (!e.inputUrl) continue;
+            liByUrl.set(e.inputUrl, {
+              ...(e.employeeCount ? { empleados: e.employeeCount } : {}),
+              ...(e.founded ? { antiguedad: Math.max(0, thisYear - e.founded) } : {}),
+            });
+          }
+        } catch {
+          /* LinkedIn es opcional: si falla, seguimos con las reseñas de Maps */
+        }
+      }
+
       const existingKeys = new Set(prospectos.map((p) => p.company.trim().toLowerCase()));
       let added = 0;
       for (const d of res.discoveries) {
         const key = d.company.trim().toLowerCase();
         if (existingKeys.has(key)) continue;
         const withTech = byPlace.get(d.placeId) ?? d;
-        await prospectosService.save(ownerId, discoveryToProspectoInput(withTech, nicho, ciudadBusqueda.trim()));
+        const liUrl = d.enrichment?.socials?.find((s) => /linkedin/i.test(s));
+        const li = liUrl ? liByUrl.get(liUrl) : undefined;
+        await prospectosService.save(ownerId, discoveryToProspectoInput(withTech, nicho, ciudadBusqueda.trim(), li));
         existingKeys.add(key);
         added += 1;
       }

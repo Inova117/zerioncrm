@@ -194,4 +194,11 @@ describe('discoveryToProspectoInput (autollenado desde el scraper)', () => {
     expect(input.gap).toContain('sin sitio web');
     expect(input.technical).toBeNull();
   });
+
+  it('fusiona empleados y antigüedad de LinkedIn con las reseñas de Maps', () => {
+    const input = discoveryToProspectoInput(disc(), 'colegio', 'Quito', { empleados: 45, antiguedad: 30 });
+    expect(input.senales?.empleados).toBe(45);
+    expect(input.senales?.antiguedad).toBe(30);
+    expect(input.senales?.resenas).toBe(320); // sigue conservando las de Maps
+  });
 });

@@ -224,12 +224,13 @@ export const prospectosService: ProspectosService = supabase
 export function discoveryToProspectoInput(
   d: Discovery,
   segment: ProspectoSegment,
-  city: string
+  city: string,
+  linkedin?: { empleados?: number; antiguedad?: number }
 ): ProspectoInput {
   const t = d.enrichment?.technical;
   const rating = d.enrichment?.rating;
   const reviewCount = d.enrichment?.reviewCount;
-  const linkedin = d.enrichment?.socials?.find((s) => /linkedin/i.test(s));
+  const linkedinUrl = d.enrichment?.socials?.find((s) => /linkedin/i.test(s));
 
   const technical: ProspectoTechnical | null = t
     ? {
@@ -244,6 +245,8 @@ export function discoveryToProspectoInput(
 
   const senales: ProspectoSenales = {
     ...(typeof reviewCount === 'number' && reviewCount > 0 ? { resenas: reviewCount } : {}),
+    ...(linkedin?.empleados ? { empleados: linkedin.empleados } : {}),
+    ...(linkedin?.antiguedad ? { antiguedad: linkedin.antiguedad } : {}),
   };
 
   const sizeParts = [
@@ -268,7 +271,7 @@ export function discoveryToProspectoInput(
     size: sizeParts.join(' · ') || undefined,
     website: d.website || undefined,
     contact: {
-      linkedin: linkedin || undefined,
+      linkedin: linkedinUrl || undefined,
       email: d.email || undefined,
       whatsapp: d.phone || undefined,
       telefono: d.phone || undefined,
