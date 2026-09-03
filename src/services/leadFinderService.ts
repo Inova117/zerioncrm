@@ -65,8 +65,8 @@ export function discoveryToInput(d: Discovery): NewLeadInput {
 // ===========================================================================
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-async function invoke(body: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const { data, error } = await supabase!.functions.invoke('find-leads', { body });
+async function invoke(fnName: string, body: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const { data, error } = await supabase!.functions.invoke(fnName, { body });
   if (error) {
     let message = error.message;
     const ctx = (error as { context?: { json?: () => Promise<{ error?: string }> } }).context;
@@ -84,7 +84,7 @@ async function invoke(body: Record<string, unknown>): Promise<Record<string, unk
 }
 
 async function supabaseFindLeads(params: FindLeadsParams): Promise<FindLeadsResult> {
-  const started = await invoke({
+  const started = await invoke('find-leads', {
     action: 'start',
     businessType: params.businessType,
     location: params.location,
@@ -100,7 +100,7 @@ async function supabaseFindLeads(params: FindLeadsParams): Promise<FindLeadsResu
   let wait = 2500;
   while (Date.now() < deadline) {
     await sleep(wait);
-    const res = await invoke({ action: 'poll', searchId });
+    const res = await invoke('find-leads', { action: 'poll', searchId });
     if (res.status === 'done') {
       return {
         found: Number(res.found ?? 0),
@@ -284,7 +284,7 @@ export interface AnalyzeSitesResult {
 }
 
 async function supabaseAnalyzeSites(discoveryIds: string[]): Promise<AnalyzeSitesResult> {
-  const res = await invoke({ action: 'analyze', discoveryIds });
+  const res = await invoke('analyze-site', { action: 'analyze', discoveryIds });
   return { analyzed: Number(res.analyzed ?? 0), failed: Number(res.failed ?? 0) };
 }
 
