@@ -298,7 +298,10 @@ Deno.serve(async (req) => {
   if (!isAdmin) q = q.eq('assigned_to', caller.id);
   const { data: rows, error: selErr } = q;
   if (selErr) return json({ error: selErr.message }, 500);
-  if (!rows?.length) return json({ error: 'No se encontraron discoveries para analizar' }, 404);
+  // Carrera del re-run: el cliente puede mandar IDs que el snapshot del front ya
+  // no ve (upsert ignoreDuplicates compitió con un poll atrasado). En vez de 404,
+  // seguimos con las filas que SÍ matchean; el resto cuenta como failed.
+  if (!rows?.length) return json({ analyzed: 0, failed: ids.length, items: [] });
 
   const targets = rows.filter((r) => String(r.website ?? '').trim());
   const items: Array<{ id: string; technical: Record<string, unknown>; score: number; agentScore: number; offer: string }> = [];

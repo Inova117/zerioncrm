@@ -194,13 +194,9 @@ export function ProspectosPage() {
         assignedTo: ownerId,
       });
       setBusquedaMsg('Analizando las webs encontradas…');
-      const webIds = res.discoveries
-        .filter((d) => String(d.website ?? '').trim())
-        .slice(0, 15)
-        .map((d) => d.id);
-      if (webIds.length) await analyzeSites(webIds);
-
-      // analyze-site persiste el technical en lead_discoveries → lo re-leemos.
+      // Releemos las filas reales ANTES de analizar: en un re-run el snapshot
+      // `res.discoveries` puede traer IDs que el upsert ignoreDuplicates ya no
+      // refleja. Con los place_id frescos sacamos los `id` verdaderos de tabla.
       let fresh: Discovery[] = [];
       try {
         fresh = await listDiscoveries();
@@ -208,6 +204,16 @@ export function ProspectosPage() {
         /* usa el snapshot sin technical */
       }
       const byPlace = new Map(fresh.map((d) => [d.placeId, d]));
+
+      const webIds = res.discoveries
+        .map((d) => byPlace.get(d.placeId))
+        .filter((d): d is Discovery => Boolean(d))
+        .filter((d) => String(d.website ?? '').trim())
+        .slice(0, 15)
+        .map((d) => d.id);
+      if (webIds.length) await analyzeSites(webIds);
+
+      // analyze-site persiste el technical en lead_discoveries → lo re-leemos.
 
       // Enriquecimiento LinkedIn (empleados + antigüedad) para las que tienen URL.
       const thisYear = new Date().getFullYear();
