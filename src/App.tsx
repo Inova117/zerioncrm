@@ -17,6 +17,7 @@ import { ReportsPage } from './pages/ReportsPage';
 import { TeamPage } from './pages/TeamPage';
 import { RoadmapPage } from './pages/RoadmapPage';
 import { ProspectosPage } from './pages/ProspectosPage';
+import { MonidPage } from './pages/MonidPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 
 /** Wraps the authenticated pages with the data provider (needs a logged-in user). */
@@ -57,6 +58,8 @@ export default function App() {
           <Route path="/roadmap" element={<Private ownerOnly><RoadmapPage /></Private>} />
           {/* Minero de Prospectos: sistema personal de outreach del fundador (solo él) */}
           <Route path="/prospectos" element={<Private ownerOnly><ProspectosPage /></Private>} />
+          {/* Monid V2: pasarela pay-per-use que mata Apify/Clay/Apollo/Hunter/PDL/ContactOut */}
+          <Route path="/monid" element={<Private ownerOnly><MonidPage /></Private>} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </BrowserRouter>

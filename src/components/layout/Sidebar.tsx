@@ -11,6 +11,7 @@ import {
   Users,
   Map,
   Crosshair,
+  Zap,
   LogOut,
   X,
 } from 'lucide-react';
@@ -49,6 +50,8 @@ const NAV: NavItem[] = [
   { to: '/roadmap', label: 'Roadmap', icon: Map, ownerOnly: true },
   // Minero de Prospectos: sistema personal de outreach del fundador (solo él).
   { to: '/prospectos', label: 'Minero', icon: Crosshair, ownerOnly: true },
+  // Monid V2: pasarela pay-per-use (mata Apify/Clay/Apollo/Hunter/PDL/ContactOut).
+  { to: '/monid', label: 'Monid', icon: Zap, ownerOnly: true },
   { to: '/equipo', label: 'Equipo', icon: Users, adminOnly: true },
 ];
 
