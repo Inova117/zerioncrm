@@ -472,20 +472,27 @@ interface Intent {
   objetivo: string;
 }
 
-async function parseIntent(text: string): Promise<Intent> {
-  if (!OPENROUTER_API_KEY) {
-    // Fallback determinístico sin LLM: heurística simple por palabras clave.
-    // Regex case-insensitive para "en <ciudad>" (acepta minúsculas y países).
-    const cityMatch = text.match(/\ben\s+([a-záéíóúñ][a-záéíóúñ]*(?:\s+de\s+[a-záéíóúñ]+)?(?:\s+[a-záéíóúñ]+)?)/i);
-    const city = cityMatch?.[1] ?? '';
-    const objetivo = /sostien|establecid|factur|plata|grande/i.test(text) ? 'sostiene'
-      : /probable|quiz|tal vez|medio/i.test(text) ? 'probable'
+/** Heurística determinística (paridad con src/lib/monidMapping.ts). SIEMPRE
+ *  disponible — es el piso mínimo cuando el LLM no está o falla. */
+function fallbackIntent(text: string): Intent {
+  const cityMatch = text.match(
+    /\ben\s+([a-záéíóúñA-ZÁÉÍÓÚÑ][a-záéíóúñA-ZÁÉÍÓÚÑ]*(?:\s+[a-záéíóúñA-ZÁÉÍÓÚÑ]+)*?)(?=\s+que\b|\s+sostien|\s+probable\b|\s+todos\b|\s+y\b|$)/i,
+  );
+  const city = cityMatch?.[1] ?? '';
+  const objetivo: Intent['objetivo'] = /sostien|sosten|sosteng|establecid|factur|plata|grande/i.test(text)
+    ? 'sostiene'
+    : /probable|quiz|tal vez|medio/i.test(text)
+      ? 'probable'
       : 'todos';
-    let niche = text;
-    if (cityMatch) niche = text.slice(0, cityMatch.index).trim();
-    niche = niche.replace(/^(dame|busca|quiero|necesito|encontr)\w*\s+/i, '').trim();
-    return { niche: niche || 'negocio', city, objetivo };
-  }
+  let niche = text;
+  if (cityMatch) niche = text.slice(0, cityMatch.index).trim();
+  niche = niche.replace(/^(dame|busca|quiero|necesito|encontr|empresas?)\w*\s+de\s+/i, '').replace(/^(dame|busca|quiero|necesito|encontr)\w*\s+/i, '').trim();
+  return { niche: niche || 'negocio', city, objetivo };
+}
+
+async function parseIntent(text: string): Promise<Intent> {
+  // Sin LLM → heurística pura.
+  if (!OPENROUTER_API_KEY) return fallbackIntent(text);
   try {
     const resp = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
       method: 'POST',
@@ -496,11 +503,10 @@ async function parseIntent(text: string): Promise<Intent> {
         max_tokens: 120,
         temperature: 0.2,
         reasoning: { enabled: false },
-        response_format: { type: 'json_object' },
         messages: [
           {
             role: 'system',
-            content: 'Extrae de la frase del usuario 3 campos para una búsqueda de prospección B2B. Devuelve SOLO JSON: {"niche": "<tipo de negocio, ej. dentistas>", "city": "<ciudad o vacío>", "objetivo": "<sostiene|probable|todos>"}. objetivo es "sostiene" si pide negocios grandes/establecidos/que facturan, "probable" si quiere candidatos medianos, "todos" si no filtra por tamaño. niche en español, sin artículos ni verbos.',
+            content: 'Extrae de la frase 3 campos para prospección B2B y responde SOLO el JSON: {"niche":"tipo de negocio","city":"ciudad","objetivo":"sostiene|probable|todos"}. city es la ciudad o vacía; objetivo "sostiene" si pide grandes/establecidos, "probable" si medianos, "todos" si no filtra. niche en español sin artículos ni verbos.',
           },
           { role: 'user', content: text },
         ],
@@ -510,14 +516,14 @@ async function parseIntent(text: string): Promise<Intent> {
     const data = await resp.json() as { choices?: Array<{ message?: { content?: string } }> };
     const raw = data.choices?.[0]?.message?.content ?? '{}';
     const parsed = JSON.parse(raw) as Partial<Intent>;
-    return {
-      niche: String(parsed.niche ?? 'negocio').trim() || 'negocio',
-      city: String(parsed.city ?? '').trim(),
-      objetivo: ['sostiene', 'probable', 'todos'].includes(String(parsed.objetivo)) ? String(parsed.objetivo) : 'todos',
-    };
+    const city = String(parsed.city ?? '').trim();
+    const objetivo = ['sostiene', 'probable', 'todos'].includes(String(parsed.objetivo)) ? String(parsed.objetivo) as Intent['objetivo'] : 'todos';
+    const niche = String(parsed.niche ?? '').trim() || fallbackIntent(text).niche;
+    // Si el LLM no detectó ciudad, reforzar con la heurística (jamás seguir sin ciudad).
+    return { niche, city: city || fallbackIntent(text).city, objetivo };
   } catch {
-    // Si el LLM falla, caer a heurística básica.
-    return { niche: text.replace(/^(dame|busca|quiero|necesito)\w*\s+/i, '').trim() || 'negocio', city: '', objetivo: 'todos' };
+    // Cualquier fallo del LLM → heurística (mismo resultado que el módulo puro).
+    return fallbackIntent(text);
   }
 }
 
