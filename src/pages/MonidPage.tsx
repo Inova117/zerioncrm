@@ -27,46 +27,12 @@ const inputCls =
   'rounded-lg border border-surface-200 bg-white px-3 py-2 text-sm text-surface-800 outline-none transition focus:border-brand-400 focus:ring-2 focus:ring-brand-100';
 
 // ---------------------------------------------------------------------------
-// Tipos de resultado (shapes confirmados en pruebas reales contra Monid)
+// Tipos de resultado (del módulo puro monidMapping — fuente única de verdad)
 // ---------------------------------------------------------------------------
-interface ClayPerson {
-  name?: string;
-  first_name?: string;
-  last_name?: string;
-  location?: { name?: string; city?: string; state_or_province?: string };
-  matched_experiences?: Array<{ company?: string; title?: string }>;
-}
-interface ApolloPerson {
-  first_name?: string;
-  last_name_obfuscated?: string;
-  title?: string;
-  organization?: { name?: string };
-  has_email?: boolean;
-  has_direct_phone?: string;
-}
-interface HunterEmail {
-  email?: string;
-  type?: string;
-  confidence?: number;
-  position?: string;
-}
-interface ContactPerson {
-  full_name?: string;
-  title?: string;
-  seniority?: string;
-  job_function?: string;
-  contact_availability?: { work_email?: boolean; personal_email?: boolean; phone?: boolean };
-}
-interface FirmSignals {
-  empleados?: number;
-  founded?: number;
-  antiguedad?: number;
-  size?: string;
-  industry?: string;
-  totalFunding?: number;
-  fundingStage?: string;
-  linkedinUrl?: string;
-}
+import {
+  mapContactOutProfiles, mapApolloPeople, mapClayPeople,
+  type ContactPerson, type HunterEmail, type ClayPerson, type ApolloPerson, type FirmSignals,
+} from '../lib/monidMapping';
 
 // ---------------------------------------------------------------------------
 // Componentes de tarjeta
@@ -245,8 +211,7 @@ export function MonidPage() {
     try {
       const r = await monidReveal(company);
       // Reemplaza los decisionMakers de ESE lead con la versión revelada.
-      const raw = (r.people as { profiles?: Record<string, unknown> } | undefined)?.profiles;
-      const people = (Array.isArray(raw) ? raw : Object.values(raw ?? {})) as unknown as Record<string, unknown>[];
+      const people = mapContactOutProfiles((r.people as { profiles?: unknown } | undefined)?.profiles);
       setOrch((prev) => prev && {
         ...prev,
         leads: prev.leads.map((l) => (l.company === company ? { ...l, decisionMakers: people, revealed: true } : l)),
@@ -282,12 +247,11 @@ export function MonidPage() {
     try {
       const titles = personTitles.split(',').map((s) => s.trim()).filter(Boolean);
       const r = await monidPeople({ query: clayQuery.trim() || undefined, personTitles: titles.length ? titles : undefined });
-      // Clay → { data: [...] }; Apollo → { people: [...] }
-      const clay = r.clay as { data?: ClayPerson[] } | undefined;
-      const apollo = r.apollo as { people?: ApolloPerson[] } | undefined;
-      setClayPeople(clay?.data ?? []);
-      setApolloPeople(apollo?.people ?? []);
-      if (!clay?.data?.length && !apollo?.people?.length) {
+      const clay = mapClayPeople(r.clay);
+      const apollo = mapApolloPeople(r.apollo);
+      setClayPeople(clay);
+      setApolloPeople(apollo);
+      if (!clay.length && !apollo.length) {
         setError('Sin resultados de Clay ni Apollo. Probá otro título o query.');
       }
     } catch (err) {
@@ -337,10 +301,7 @@ export function MonidPage() {
     setError(null);
     try {
       const r = await monidDecisionMakers(dmCompany.trim());
-      // ContactOut devuelve `profiles` como DICCIONARIO indexado por URL de
-      // LinkedIn (no un array) — aplanar a lista.
-      const raw = (r.people as { profiles?: Record<string, unknown> } | undefined)?.profiles;
-      const people = (Array.isArray(raw) ? raw : Object.values(raw ?? {})) as unknown as ContactPerson[];
+      const people = mapContactOutProfiles((r.people as { profiles?: unknown } | undefined)?.profiles);
       setDmPeople(people);
       if (!people.length) setError(`Sin decision-makers para ${dmCompany.trim()}.`);
     } catch (err) {

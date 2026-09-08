@@ -151,6 +151,8 @@ export async function monidReveal(company: string): Promise<Record<string, unkno
 // ORQUESTACIÓN — un solo disparo que decide la cadena de tools.
 // ---------------------------------------------------------------------------
 
+import type { ContactPerson, HunterEmail } from '../lib/monidMapping';
+
 export interface OrchestrateLead {
   company: string | null;
   website: string | null;
@@ -164,10 +166,10 @@ export interface OrchestrateLead {
   industry: string | null;
   totalFunding: number | null;
   email: string | null;
-  emails: Array<{ email?: string }>;
+  emails: Array<Omit<HunterEmail, 'first_name' | 'last_name'>>;
   nivel: 'sostiene' | 'probable' | 'no' | 'sin-datos';
   score: number | null;
-  decisionMakers?: Array<Record<string, unknown>>;
+  decisionMakers?: ContactPerson[];
   revealed?: boolean;
 }
 
