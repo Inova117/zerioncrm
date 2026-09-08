@@ -142,6 +142,11 @@ export async function monidDecisionMakers(company: string): Promise<Record<strin
   return invoke('decision-makers', { company });
 }
 
+/** Revela emails/phones de los decision-makers de una empresa (reveal=true, ~$0.07/email). */
+export async function monidReveal(company: string): Promise<Record<string, unknown>> {
+  return invoke('reveal', { company });
+}
+
 // ---------------------------------------------------------------------------
 // ORQUESTACIÓN — un solo disparo que decide la cadena de tools.
 // ---------------------------------------------------------------------------
@@ -163,6 +168,7 @@ export interface OrchestrateLead {
   nivel: 'sostiene' | 'probable' | 'no' | 'sin-datos';
   score: number | null;
   decisionMakers?: Array<Record<string, unknown>>;
+  revealed?: boolean;
 }
 
 export interface OrchestrateResult {

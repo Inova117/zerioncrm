@@ -29,7 +29,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const VERSION = '2026-09-05.2';
+const VERSION = '2026-09-07.1-orchestrate';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -475,12 +475,12 @@ interface Intent {
 async function parseIntent(text: string): Promise<Intent> {
   if (!OPENROUTER_API_KEY) {
     // Fallback determinístico sin LLM: heurística simple por palabras clave.
-    const cityMatch = text.match(/\ben\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]*(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]*)?)/i);
+    // Regex case-insensitive para "en <ciudad>" (acepta minúsculas y países).
+    const cityMatch = text.match(/\ben\s+([a-záéíóúñ][a-záéíóúñ]*(?:\s+de\s+[a-záéíóúñ]+)?(?:\s+[a-záéíóúñ]+)?)/i);
     const city = cityMatch?.[1] ?? '';
     const objetivo = /sostien|establecid|factur|plata|grande/i.test(text) ? 'sostiene'
       : /probable|quiz|tal vez|medio/i.test(text) ? 'probable'
       : 'todos';
-    // niche = el texto antes de "en <ciudad>", sin verbos de relleno.
     let niche = text;
     if (cityMatch) niche = text.slice(0, cityMatch.index).trim();
     niche = niche.replace(/^(dame|busca|quiero|necesito|encontr)\w*\s+/i, '').trim();
@@ -521,8 +521,10 @@ async function parseIntent(text: string): Promise<Intent> {
   }
 }
 
-/** Replica la lógica de src/lib/facturacion.ts (paridad). Score 0-100 o null. */
-function scoreFacturacion(s: { empleados?: number; antiguedad?: number; founded?: number }): number | null {
+/** Replica la lógica de src/lib/facturacion.ts (paridad) + reseñas (señal de
+ *  Maps, decisión sep 2026: los negocios locales NO están en PDL, así que las
+ *  reseñas de Google son proxy válido de facturación). Score 0-100 o null. */
+function scoreFacturacion(s: { empleados?: number; antiguedad?: number; founded?: number; resenas?: number }): number | null {
   const parts: number[] = [];
   if (typeof s.empleados === 'number') {
     const n = s.empleados;
@@ -531,6 +533,11 @@ function scoreFacturacion(s: { empleados?: number; antiguedad?: number; founded?
   const antig = s.antiguedad ?? (s.founded != null ? new Date().getFullYear() - s.founded : undefined);
   if (typeof antig === 'number') {
     parts.push(antig >= 21 ? 80 : antig >= 11 ? 60 : antig >= 3 ? 40 : 15);
+  }
+  // reseñas de Google Maps (ptsResenas de facturacion.ts): proxy de volumen de negocio.
+  if (typeof s.resenas === 'number') {
+    const n = s.resenas;
+    parts.push(n >= 500 ? 95 : n >= 200 ? 80 : n >= 50 ? 65 : n >= 10 ? 40 : 15);
   }
   if (parts.length === 0) return null;
   return Math.round(parts.reduce((a, b) => a + b, 0) / parts.length);
@@ -543,6 +550,25 @@ function nivelOf(score: number | null): 'sostiene' | 'probable' | 'no' | 'sin-da
   return 'no';
 }
 
+interface LeadRow {
+  company: string | null;
+  website: string | null;
+  phone: string | null;
+  rating: number | null;
+  reviewCount: number | null;
+  empleados: unknown;
+  founded: unknown;
+  antiguedad: unknown;
+  size: unknown;
+  industry: unknown;
+  totalFunding: unknown;
+  email: unknown;
+  emails: Record<string, unknown>[];
+  nivel: 'sostiene' | 'probable' | 'no' | 'sin-datos';
+  score: number | null;
+  decisionMakers?: Record<string, unknown>[];
+}
+
 /** Corrida completa: intención → lista lista para outreach. */
 async function orchestrate(text: string, opts: { maxLeads?: number }) {
   const intent = await parseIntent(text);
@@ -553,27 +579,14 @@ async function orchestrate(text: string, opts: { maxLeads?: number }) {
   // 1) Maps
   const maps = await searchMaps(intent.niche, intent.city, Math.min(opts.maxLeads ?? 20, 50));
 
-  // 2) Por cada lugar con web: firma (PDL) + emails (Hunter). Secuencial para no
-  //    reventar balance; limitado a maxLeads.
-  const leads: Array<{
-    company: string | null;
-    website: string | null;
-    phone: string | null;
-    rating: number | null;
-    reviewCount: number | null;
-    empleados: unknown;
-    founded: unknown;
-    antiguedad: unknown;
-    size: unknown;
-    industry: unknown;
-    totalFunding: unknown;
-    email: unknown;
-    emails: Record<string, unknown>[];
-    nivel: 'sostiene' | 'probable' | 'no' | 'sin-datos';
-    score: number | null;
-    decisionMakers?: Record<string, unknown>[];
-  }> = [];
-  for (const place of maps.places.slice(0, opts.maxLeads ?? 20)) {
+  // 2) Por cada lugar con web: firma (PDL) + emails (Hunter), con concurrencia
+  //    acotada (pool de 3) y cap duro de leads para no reventar balance ni el
+  //    timeout de la edge function.
+  const ORCH_CONCURRENCY = 3;
+  const ORCH_MAX_LEADS = Math.min(opts.maxLeads ?? 20, 20); // cap duro de seguridad
+  const targets = maps.places.slice(0, ORCH_MAX_LEADS);
+
+  const enrichOne = async (place: (typeof maps.places)[number]): Promise<LeadRow> => {
     const domain = place.website ? domainOnly(place.website) : null;
     let senales: Record<string, unknown> = {};
     let emails: Record<string, unknown>[] = [];
@@ -589,10 +602,10 @@ async function orchestrate(text: string, opts: { maxLeads?: number }) {
       } catch { /* emails fallan → sigue */ }
     }
 
-    const score = scoreFacturacion(senales as { empleados?: number; antiguedad?: number; founded?: number });
+    const score = scoreFacturacion({ ...(senales as { empleados?: number; antiguedad?: number; founded?: number }), resenas: place.reviewCount ?? undefined });
     const nivel = nivelOf(score);
 
-    leads.push({
+    return {
       company: place.company,
       website: place.website,
       phone: place.phone,
@@ -608,8 +621,19 @@ async function orchestrate(text: string, opts: { maxLeads?: number }) {
       emails,
       nivel,
       score,
-    });
+    };
+  };
+
+  // Pool manual de concurrencia acotada (sin dependencias externas).
+  const leads: LeadRow[] = [];
+  let idx = 0;
+  async function worker() {
+    while (idx < targets.length) {
+      const t = targets[idx++];
+      try { leads.push(await enrichOne(t)); } catch { /* un lead que falla no tumba la corrida */ }
+    }
   }
+  await Promise.all(Array.from({ length: Math.min(ORCH_CONCURRENCY, targets.length) }, worker));
 
   // 3) Decision-makers solo para los que "sostienen" (ahorra balance).
   const sostienen = leads.filter((l) => l.nivel === 'sostiene');
@@ -617,7 +641,10 @@ async function orchestrate(text: string, opts: { maxLeads?: number }) {
     const ref = l.website ?? l.company;
     try {
       const r = await decisionMakers(String(ref), false); // sin reveal → más barato (solo perfiles)
-      const people = (r.people as { profiles?: Record<string, unknown>[] })?.profiles ?? [];
+      // ContactOut devuelve `profiles` como DICCIONARIO indexado por URL de
+      // LinkedIn (¡no un array!) — aplanar a lista.
+      const raw = (r.people as { profiles?: Record<string, unknown> })?.profiles ?? {};
+      const people = Array.isArray(raw) ? raw : Object.values(raw);
       l.decisionMakers = people.slice(0, 5);
     } catch { l.decisionMakers = []; }
   }
@@ -715,6 +742,15 @@ Deno.serve(async (req) => {
       return json({ ...result, provider: 'monid' });
     }
 
+    if (action === 'reveal') {
+      // Revela emails/phones de los decision-makers de UNA empresa (reveal=true).
+      // Cobra ~$0.07 por email encontrado — se usa bajo demanda, no en la corrida.
+      const company = String(body.company ?? '').trim();
+      if (!company) return json({ error: 'Proporciona company (nombre o dominio)' }, 400);
+      const result = await decisionMakers(company, true);
+      return json({ ...result, provider: 'monid' });
+    }
+
     if (action === 'balance') {
       requireKey();
       return json(await monidGet('/v1/wallet/balance'));
@@ -724,6 +760,15 @@ Deno.serve(async (req) => {
       const text = String(body.text ?? body.prompt ?? '').trim();
       if (!text) return json({ error: 'Dime qué querés buscar (ej. "dame dentistas en Quito que sostengan el ticket")' }, 400);
       const maxLeads = Math.min(Math.max(Number(body.maxLeads) || 20, 1), 50);
+      // Guard de balance: una orquestación completa (Maps + PDL×N + Hunter×N +
+      // ContactOut) puede costar $3-5. Avisar temprano si el saldo no alcanza.
+      try {
+        const bal = await monidGet('/v1/wallet/balance') as { balance?: { value?: number } };
+        const valor = bal?.balance?.value ?? 0;
+        if (valor < 1) {
+          return json({ error: `Saldo Monid insuficiente (${bal?.balance?.value ?? 0}). Recarga en app.monid.ai antes de correr una prospección completa.` }, 402);
+        }
+      } catch { /* si balance falla, seguir y dejar que Monid rechace si no hay saldo */ }
       const result = await orchestrate(text, { maxLeads });
       if ('error' in result) return json(result, 422);
       return json({ ...result, provider: 'monid' });

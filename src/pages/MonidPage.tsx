@@ -19,7 +19,7 @@ import {
 import { AppLayout } from '../components/layout/AppLayout';
 import { cn } from '../lib/utils';
 import {
-  monidSearch, monidPeople, monidFirm, monidDecisionMakers, monidBalance, monidEnrich, monidOrchestrate,
+  monidSearch, monidPeople, monidFirm, monidDecisionMakers, monidBalance, monidEnrich, monidOrchestrate, monidReveal,
   type MonidPlace, type OrchestrateResult,
 } from '../v2/monid';
 
@@ -217,6 +217,7 @@ export function MonidPage() {
   const [prompt, setPrompt] = useState('');
   const [orch, setOrch] = useState<OrchestrateResult | null>(null);
   const [orching, setOrching] = useState(false);
+  const [revealingFor, setRevealingFor] = useState<string | null>(null);
 
   useEffect(() => {
     monidBalance().then((b) => setBalance(b.balance)).catch(() => undefined);
@@ -234,6 +235,26 @@ export function MonidPage() {
       setError(err instanceof Error ? err.message : 'Fallo la prospección completa.');
     } finally {
       setOrching(false);
+    }
+  }
+
+  async function revealDm(company: string) {
+    if (revealingFor) return;
+    setRevealingFor(company);
+    setError(null);
+    try {
+      const r = await monidReveal(company);
+      // Reemplaza los decisionMakers de ESE lead con la versión revelada.
+      const raw = (r.people as { profiles?: Record<string, unknown> } | undefined)?.profiles;
+      const people = (Array.isArray(raw) ? raw : Object.values(raw ?? {})) as unknown as Record<string, unknown>[];
+      setOrch((prev) => prev && {
+        ...prev,
+        leads: prev.leads.map((l) => (l.company === company ? { ...l, decisionMakers: people, revealed: true } : l)),
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Fallo la revelación de emails.');
+    } finally {
+      setRevealingFor(null);
     }
   }
 
@@ -316,7 +337,10 @@ export function MonidPage() {
     setError(null);
     try {
       const r = await monidDecisionMakers(dmCompany.trim());
-      const people = (r.people as { profiles?: ContactPerson[] } | undefined)?.profiles ?? [];
+      // ContactOut devuelve `profiles` como DICCIONARIO indexado por URL de
+      // LinkedIn (no un array) — aplanar a lista.
+      const raw = (r.people as { profiles?: Record<string, unknown> } | undefined)?.profiles;
+      const people = (Array.isArray(raw) ? raw : Object.values(raw ?? {})) as unknown as ContactPerson[];
       setDmPeople(people);
       if (!people.length) setError(`Sin decision-makers para ${dmCompany.trim()}.`);
     } catch (err) {
@@ -417,12 +441,28 @@ export function MonidPage() {
                         </p>
                       )}
                       {l.decisionMakers && l.decisionMakers.length > 0 && (
-                        <div className="mt-1.5 flex flex-wrap gap-1">
-                          {l.decisionMakers.slice(0, 3).map((dm, j) => (
-                            <Pill key={j} tone="green">
-                              {(dm as { full_name?: string }).full_name?.split(' ').slice(0, 2).join(' ') ?? 'Contacto'}
-                            </Pill>
-                          ))}
+                        <div className="mt-1.5">
+                          <div className="flex flex-wrap gap-1">
+                            {l.decisionMakers.slice(0, 3).map((dm, j) => (
+                              <Pill key={j} tone="green">
+                                {(dm as { full_name?: string }).full_name?.split(' ').slice(0, 2).join(' ') ?? 'Contacto'}
+                              </Pill>
+                            ))}
+                          </div>
+                          {(revealingFor === l.company) ? (
+                            <span className="mt-1.5 inline-flex items-center gap-1 text-xs text-surface-400">
+                              <Loader2 className="h-3 w-3 animate-spin" /> Revelando emails…
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => revealDm(l.company ?? '')}
+                              disabled={revealingFor !== null}
+                              className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-brand-600 hover:text-brand-700 disabled:opacity-50"
+                            >
+                              <Mail className="h-3 w-3" /> Revelar emails (~$0.07/c/u)
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>
