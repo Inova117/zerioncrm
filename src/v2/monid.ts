@@ -141,3 +141,43 @@ export async function monidFirm(website: string): Promise<{ senales?: MonidSigna
 export async function monidDecisionMakers(company: string): Promise<Record<string, unknown>> {
   return invoke('decision-makers', { company });
 }
+
+// ---------------------------------------------------------------------------
+// ORQUESTACIÓN — un solo disparo que decide la cadena de tools.
+// ---------------------------------------------------------------------------
+
+export interface OrchestrateLead {
+  company: string | null;
+  website: string | null;
+  phone: string | null;
+  rating: number | null;
+  reviewCount: number | null;
+  empleados: number | null;
+  founded: number | null;
+  antiguedad: number | null;
+  size: string | null;
+  industry: string | null;
+  totalFunding: number | null;
+  email: string | null;
+  emails: Array<{ email?: string }>;
+  nivel: 'sostiene' | 'probable' | 'no' | 'sin-datos';
+  score: number | null;
+  decisionMakers?: Array<Record<string, unknown>>;
+}
+
+export interface OrchestrateResult {
+  intent: { niche: string; city: string; objetivo: string };
+  total: number;
+  matched: number;
+  leads: OrchestrateLead[];
+}
+
+/** "dame dentistas en Quito que sostengan el ticket" → pipeline completo. */
+export async function monidOrchestrate(
+  text: string,
+  opts: { maxLeads?: number } = {},
+): Promise<OrchestrateResult> {
+  const res = await invoke('orchestrate', { text, maxLeads: opts.maxLeads });
+  if ((res as { error?: string })?.error) throw new Error((res as { error: string }).error);
+  return res as unknown as OrchestrateResult;
+}

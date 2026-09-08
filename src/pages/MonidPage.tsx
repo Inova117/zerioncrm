@@ -14,13 +14,13 @@ import { useEffect, useState } from 'react';
 import {
   Search, Users, Globe, Mail, Building2, Contact, Wallet,
   Loader2, AlertCircle, ExternalLink, ChevronDown, Zap,
-  Briefcase, Phone, BadgeCheck, MapPin, TrendingUp, Hash, CalendarDays,
+  Briefcase, Phone, BadgeCheck, MapPin, TrendingUp, Hash, CalendarDays, Sparkles,
 } from 'lucide-react';
 import { AppLayout } from '../components/layout/AppLayout';
 import { cn } from '../lib/utils';
 import {
-  monidSearch, monidPeople, monidFirm, monidDecisionMakers, monidBalance, monidEnrich,
-  type MonidPlace,
+  monidSearch, monidPeople, monidFirm, monidDecisionMakers, monidBalance, monidEnrich, monidOrchestrate,
+  type MonidPlace, type OrchestrateResult,
 } from '../v2/monid';
 
 const inputCls =
@@ -213,9 +213,29 @@ export function MonidPage() {
   const [dmPeople, setDmPeople] = useState<ContactPerson[]>([]);
   const [dming, setDming] = useState(false);
 
+  // Orquestación — un solo disparo
+  const [prompt, setPrompt] = useState('');
+  const [orch, setOrch] = useState<OrchestrateResult | null>(null);
+  const [orching, setOrching] = useState(false);
+
   useEffect(() => {
     monidBalance().then((b) => setBalance(b.balance)).catch(() => undefined);
   }, []);
+
+  async function runOrchestrate(e: React.FormEvent) {
+    e.preventDefault();
+    if (!prompt.trim() || orching) return;
+    setOrching(true);
+    setError(null);
+    setOrch(null);
+    try {
+      setOrch(await monidOrchestrate(prompt.trim(), { maxLeads: 20 }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Fallo la prospección completa.');
+    } finally {
+      setOrching(false);
+    }
+  }
 
   async function runSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -334,6 +354,85 @@ export function MonidPage() {
       )}
 
       <div className="space-y-3">
+        {/* 0. Orquestación — un solo disparo */}
+        <section className="card overflow-hidden border-2 border-brand-200">
+          <div className="p-4">
+            <div className="mb-2 flex items-center gap-2.5">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 text-white">
+                <Sparkles className="h-4 w-4" />
+              </span>
+              <div>
+                <p className="text-sm font-semibold text-surface-900">Prospección completa</p>
+                <p className="text-xs text-surface-400">Decís qué querés y el sistema decide qué tools usar — Maps, firma, emails, score y decision-makers en una corrida.</p>
+              </div>
+            </div>
+            <form onSubmit={runOrchestrate} className="flex flex-wrap items-end gap-2">
+              <label className="flex-1 min-w-[260px]">
+                <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-surface-400">Qué querés encontrar</span>
+                <input
+                  className={inputCls}
+                  placeholder='Dame dentistas en Quito que sostengan el ticket de $500/mes'
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                />
+              </label>
+              <button type="submit" className="btn-primary" disabled={orching}>
+                {orching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                {orching ? 'Minando…' : 'Encontrar'}
+              </button>
+            </form>
+            {orching && (
+              <p className="mt-2 flex items-center gap-1.5 text-xs text-surface-400">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Buscando, enriqueciendo firmas, sacando emails y decision-makers… puede tardar 1–3 min.
+              </p>
+            )}
+          </div>
+
+          {orch && (
+            <div className="border-t border-surface-100 p-4">
+              <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
+                <Pill tone="brand">{orch.intent.niche} · {orch.intent.city}</Pill>
+                <Pill tone="gray">{orch.intent.objetivo}</Pill>
+                <span className="text-surface-500">{orch.matched} de {orch.total} cumplen el objetivo</span>
+              </div>
+              {orch.leads.length === 0 ? (
+                <p className="text-sm text-surface-500">Ningún negocio alcanzó ese nivel. Aflojá el filtro o probá otra ciudad.</p>
+              ) : (
+                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                  {orch.leads.map((l, i) => (
+                    <div key={i} className="rounded-lg border border-surface-100 p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-sm font-semibold text-surface-900">{l.company}</p>
+                        <NivelBadge nivel={l.nivel} />
+                      </div>
+                      <p className="mt-0.5 text-xs text-surface-500">
+                        {l.empleados != null ? `${l.empleados} empleados` : ''}
+                        {l.founded != null ? ` · fundada ${l.founded}` : ''}
+                        {l.industry ? ` · ${l.industry}` : ''}
+                      </p>
+                      {l.email && (
+                        <p className="mt-1 flex items-center gap-1 text-xs text-brand-600">
+                          <Mail className="h-3 w-3" /> {l.email}
+                        </p>
+                      )}
+                      {l.decisionMakers && l.decisionMakers.length > 0 && (
+                        <div className="mt-1.5 flex flex-wrap gap-1">
+                          {l.decisionMakers.slice(0, 3).map((dm, j) => (
+                            <Pill key={j} tone="green">
+                              {(dm as { full_name?: string }).full_name?.split(' ').slice(0, 2).join(' ') ?? 'Contacto'}
+                            </Pill>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+
         {/* 1. Apify → Google Maps */}
         <Section icon={Search} title="Buscador local (Google Maps)" killed="Apify mensualidad → pay-per-use">
           <form onSubmit={runSearch} className="flex flex-wrap items-end gap-2">
@@ -521,4 +620,11 @@ function Stat({ icon: Icon, label, value }: { icon: typeof Users; label: string;
       <p className="mt-0.5 text-sm font-semibold text-surface-900">{value}</p>
     </div>
   );
+}
+
+function NivelBadge({ nivel }: { nivel: string }) {
+  if (nivel === 'sostiene') return <Pill tone="green">Sostiene el ticket</Pill>;
+  if (nivel === 'probable') return <Pill tone="amber">Probable</Pill>;
+  if (nivel === 'no') return <Pill tone="gray">No</Pill>;
+  return <Pill tone="gray">Sin datos</Pill>;
 }

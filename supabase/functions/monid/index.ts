@@ -454,6 +454,188 @@ function companySlugFrom(domain?: string, linkedinUrl?: string): string | null {
   return null;
 }
 
+// ============================================================================
+// ORCHESTRATE — un solo disparo que decide la cadena de tools.
+// "dame dentistas en Quito que sostengan el ticket" →
+//   parse (LLM) → Maps → emails → firma → score → decision-makers.
+// ============================================================================
+
+const OR_MODEL = Deno.env.get('ORCHESTRATE_MODEL') ?? 'deepseek/deepseek-v4-flash-0731';
+const OPENROUTER_API_KEY = Deno.env.get('OPENROUTER_API_KEY') ?? '';
+const OPENROUTER_BASE_URL = (Deno.env.get('OPENROUTER_BASE_URL') ?? 'https://openrouter.ai/api/v1').replace(/\/+$/, '');
+
+/** Parseo de intención → { niche, city, objetivo }. LLM SOLO hace esto. */
+interface Intent {
+  niche: string;
+  city: string;
+  /** 'sostiene' | 'probable' | 'todos' — a qué nivel de facturación apuntar. */
+  objetivo: string;
+}
+
+async function parseIntent(text: string): Promise<Intent> {
+  if (!OPENROUTER_API_KEY) {
+    // Fallback determinístico sin LLM: heurística simple por palabras clave.
+    const cityMatch = text.match(/\ben\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]*(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]*)?)/i);
+    const city = cityMatch?.[1] ?? '';
+    const objetivo = /sostien|establecid|factur|plata|grande/i.test(text) ? 'sostiene'
+      : /probable|quiz|tal vez|medio/i.test(text) ? 'probable'
+      : 'todos';
+    // niche = el texto antes de "en <ciudad>", sin verbos de relleno.
+    let niche = text;
+    if (cityMatch) niche = text.slice(0, cityMatch.index).trim();
+    niche = niche.replace(/^(dame|busca|quiero|necesito|encontr)\w*\s+/i, '').trim();
+    return { niche: niche || 'negocio', city, objetivo };
+  }
+  try {
+    const resp = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${OPENROUTER_API_KEY}`, 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(20_000),
+      body: JSON.stringify({
+        model: OR_MODEL,
+        max_tokens: 120,
+        temperature: 0.2,
+        reasoning: { enabled: false },
+        response_format: { type: 'json_object' },
+        messages: [
+          {
+            role: 'system',
+            content: 'Extrae de la frase del usuario 3 campos para una búsqueda de prospección B2B. Devuelve SOLO JSON: {"niche": "<tipo de negocio, ej. dentistas>", "city": "<ciudad o vacío>", "objetivo": "<sostiene|probable|todos>"}. objetivo es "sostiene" si pide negocios grandes/establecidos/que facturan, "probable" si quiere candidatos medianos, "todos" si no filtra por tamaño. niche en español, sin artículos ni verbos.',
+          },
+          { role: 'user', content: text },
+        ],
+      }),
+    });
+    if (!resp.ok) throw new Error(`OpenRouter HTTP ${resp.status}`);
+    const data = await resp.json() as { choices?: Array<{ message?: { content?: string } }> };
+    const raw = data.choices?.[0]?.message?.content ?? '{}';
+    const parsed = JSON.parse(raw) as Partial<Intent>;
+    return {
+      niche: String(parsed.niche ?? 'negocio').trim() || 'negocio',
+      city: String(parsed.city ?? '').trim(),
+      objetivo: ['sostiene', 'probable', 'todos'].includes(String(parsed.objetivo)) ? String(parsed.objetivo) : 'todos',
+    };
+  } catch {
+    // Si el LLM falla, caer a heurística básica.
+    return { niche: text.replace(/^(dame|busca|quiero|necesito)\w*\s+/i, '').trim() || 'negocio', city: '', objetivo: 'todos' };
+  }
+}
+
+/** Replica la lógica de src/lib/facturacion.ts (paridad). Score 0-100 o null. */
+function scoreFacturacion(s: { empleados?: number; antiguedad?: number; founded?: number }): number | null {
+  const parts: number[] = [];
+  if (typeof s.empleados === 'number') {
+    const n = s.empleados;
+    parts.push(n >= 20 ? 100 : n >= 10 ? 80 : n >= 5 ? 60 : n >= 3 ? 40 : n >= 1 ? 20 : 0);
+  }
+  const antig = s.antiguedad ?? (s.founded != null ? new Date().getFullYear() - s.founded : undefined);
+  if (typeof antig === 'number') {
+    parts.push(antig >= 21 ? 80 : antig >= 11 ? 60 : antig >= 3 ? 40 : 15);
+  }
+  if (parts.length === 0) return null;
+  return Math.round(parts.reduce((a, b) => a + b, 0) / parts.length);
+}
+
+function nivelOf(score: number | null): 'sostiene' | 'probable' | 'no' | 'sin-datos' {
+  if (score === null) return 'sin-datos';
+  if (score >= 70) return 'sostiene';
+  if (score >= 40) return 'probable';
+  return 'no';
+}
+
+/** Corrida completa: intención → lista lista para outreach. */
+async function orchestrate(text: string, opts: { maxLeads?: number }) {
+  const intent = await parseIntent(text);
+  if (!intent.city) {
+    return { error: 'No detecté una ciudad. Probá: "dame dentistas en Quito que sostengan el ticket".', intent };
+  }
+
+  // 1) Maps
+  const maps = await searchMaps(intent.niche, intent.city, Math.min(opts.maxLeads ?? 20, 50));
+
+  // 2) Por cada lugar con web: firma (PDL) + emails (Hunter). Secuencial para no
+  //    reventar balance; limitado a maxLeads.
+  const leads: Array<{
+    company: string | null;
+    website: string | null;
+    phone: string | null;
+    rating: number | null;
+    reviewCount: number | null;
+    empleados: unknown;
+    founded: unknown;
+    antiguedad: unknown;
+    size: unknown;
+    industry: unknown;
+    totalFunding: unknown;
+    email: unknown;
+    emails: Record<string, unknown>[];
+    nivel: 'sostiene' | 'probable' | 'no' | 'sin-datos';
+    score: number | null;
+    decisionMakers?: Record<string, unknown>[];
+  }> = [];
+  for (const place of maps.places.slice(0, opts.maxLeads ?? 20)) {
+    const domain = place.website ? domainOnly(place.website) : null;
+    let senales: Record<string, unknown> = {};
+    let emails: Record<string, unknown>[] = [];
+
+    if (domain) {
+      try {
+        const firm = await enrichFirm(domain);
+        senales = (firm.senales as Record<string, unknown>) ?? {};
+      } catch { /* firma falla → sigue sin señal */ }
+      try {
+        const enr = await enrichCompany({ domain });
+        emails = (enr.emails as Record<string, unknown>[]) ?? [];
+      } catch { /* emails fallan → sigue */ }
+    }
+
+    const score = scoreFacturacion(senales as { empleados?: number; antiguedad?: number; founded?: number });
+    const nivel = nivelOf(score);
+
+    leads.push({
+      company: place.company,
+      website: place.website,
+      phone: place.phone,
+      rating: place.rating,
+      reviewCount: place.reviewCount,
+      empleados: senales.empleados ?? null,
+      founded: senales.founded ?? null,
+      antiguedad: senales.antiguedad ?? null,
+      size: senales.size ?? null,
+      industry: senales.industry ?? null,
+      totalFunding: senales.totalFunding ?? null,
+      email: emails[0]?.email ?? senales.email ?? null,
+      emails,
+      nivel,
+      score,
+    });
+  }
+
+  // 3) Decision-makers solo para los que "sostienen" (ahorra balance).
+  const sostienen = leads.filter((l) => l.nivel === 'sostiene');
+  for (const l of sostienen) {
+    const ref = l.website ?? l.company;
+    try {
+      const r = await decisionMakers(String(ref), false); // sin reveal → más barato (solo perfiles)
+      const people = (r.people as { profiles?: Record<string, unknown>[] })?.profiles ?? [];
+      l.decisionMakers = people.slice(0, 5);
+    } catch { l.decisionMakers = []; }
+  }
+
+  // 4) Filtrar por objetivo.
+  const filtered = intent.objetivo === 'todos'
+    ? leads
+    : leads.filter((l) => l.nivel === intent.objetivo || (intent.objetivo === 'probable' && l.nivel === 'sostiene'));
+
+  return { intent, total: leads.length, matched: filtered.length, leads: filtered };
+}
+
+function domainOnly(url: string): string | null {
+  try {
+    return new URL(/^https?:\/\//i.test(url) ? url : `https://${url}`).hostname.replace(/^www\./, '');
+  } catch { return null; }
+}
+
 // ---------------------------------------------------------------------------
 // handler
 // ---------------------------------------------------------------------------
@@ -536,6 +718,15 @@ Deno.serve(async (req) => {
     if (action === 'balance') {
       requireKey();
       return json(await monidGet('/v1/wallet/balance'));
+    }
+
+    if (action === 'orchestrate') {
+      const text = String(body.text ?? body.prompt ?? '').trim();
+      if (!text) return json({ error: 'Dime qué querés buscar (ej. "dame dentistas en Quito que sostengan el ticket")' }, 400);
+      const maxLeads = Math.min(Math.max(Number(body.maxLeads) || 20, 1), 50);
+      const result = await orchestrate(text, { maxLeads });
+      if ('error' in result) return json(result, 422);
+      return json({ ...result, provider: 'monid' });
     }
 
     return json({ error: `Acción desconocida: ${action}` }, 400);
