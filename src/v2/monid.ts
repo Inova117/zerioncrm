@@ -174,7 +174,7 @@ export interface OrchestrateLead {
 }
 
 export interface OrchestrateResult {
-  intent: { niche: string; city: string; objetivo: string };
+  intent: { niche: string; city: string; objetivo: string; tipo?: 'local' | 'b2b' };
   total: number;
   matched: number;
   leads: OrchestrateLead[];

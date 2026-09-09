@@ -467,12 +467,36 @@ const OR_MODEL = Deno.env.get('ORCHESTRATE_MODEL') ?? 'deepseek/deepseek-v4-flas
 const OPENROUTER_API_KEY = Deno.env.get('OPENROUTER_API_KEY') ?? '';
 const OPENROUTER_BASE_URL = (Deno.env.get('OPENROUTER_BASE_URL') ?? 'https://openrouter.ai/api/v1').replace(/\/+$/, '');
 
-/** Parseo de intención → { niche, city, objetivo }. LLM SOLO hace esto. */
+/** Parseo de intención → { niche, city, objetivo, tipo }. LLM SOLO hace esto. */
 interface Intent {
   niche: string;
   city: string;
   /** 'sostiene' | 'probable' | 'todos' — a qué nivel de facturación apuntar. */
   objetivo: string;
+  /** 'local' (negocio físico B2C → Maps) | 'b2b' (empresa → Clay/Apollo). */
+  tipo: 'local' | 'b2b';
+}
+
+// Keywords que marcan una intención B2B (empresa/servicio profesional) vs un
+// negocio local B2C (dentista, taller, restaurante…).
+const B2B_KEYWORDS = /software|tecnolog|tech\b|saas|\bit\b|desarrollo|consultor|consulting|agencia|marketing|publicidad|advertising|branding|diseño|fintech|startup|digital|legal|abogad|contab|auditor|ingenier|arquitect|logíst|ecommerce|e-commerce|telecom|seguros|inmobiliar/i;
+
+/** Mapea el niche a buckets de industria válidos de Clay (companies). */
+function pickIndustryBuckets(niche: string): string[] {
+  const n = niche.toLowerCase();
+  const buckets: string[] = [];
+  if (/software|tecnolog|tech\b|saas|\bit\b|desarrollo|ingenier|programac|web|app\b|cloud/.test(n)) {
+    buckets.push('Software Development', 'IT Services and IT Consulting', 'Technology, Information and Internet');
+  }
+  if (/consultor|consulting|asesor|estrateg/.test(n)) buckets.push('Business Consulting and Services');
+  if (/marketing|publicidad|agencia|advertising|branding|diseño|creativ/.test(n)) {
+    buckets.push('Advertising Services', 'Marketing Services');
+  }
+  if (/fintech|financier|banco|inversi|contab|auditor|seguro/.test(n)) buckets.push('Financial Services');
+  if (/legal|abogad|bufete|firma legal/.test(n)) buckets.push('Legal Services');
+  if (/salud|med|clinic|hospital|dental|farma/.test(n)) buckets.push('Hospitals and Health Care');
+  if (buckets.length === 0) buckets.push('Software Development', 'IT Services and IT Consulting');
+  return [...new Set(buckets)];
 }
 
 /** Heurística determinística (paridad con src/lib/monidMapping.ts). SIEMPRE
@@ -490,7 +514,8 @@ function fallbackIntent(text: string): Intent {
   let niche = text;
   if (cityMatch) niche = text.slice(0, cityMatch.index).trim();
   niche = niche.replace(/^(dame|busca|quiero|necesito|encontr|empresas?)\w*\s+de\s+/i, '').replace(/^(dame|busca|quiero|necesito|encontr)\w*\s+/i, '').trim();
-  return { niche: niche || 'negocio', city, objetivo };
+  const tipo: Intent['tipo'] = B2B_KEYWORDS.test(text) ? 'b2b' : 'local';
+  return { niche: niche || 'negocio', city, objetivo, tipo };
 }
 
 async function parseIntent(text: string): Promise<Intent> {
@@ -509,7 +534,7 @@ async function parseIntent(text: string): Promise<Intent> {
         messages: [
           {
             role: 'system',
-            content: 'Extrae de la frase 3 campos para prospección B2B y responde SOLO el JSON: {"niche":"tipo de negocio","city":"ciudad","objetivo":"sostiene|probable|todos"}. city es la ciudad o vacía; objetivo "sostiene" si pide grandes/establecidos, "probable" si medianos, "todos" si no filtra. niche en español sin artículos ni verbos.',
+            content: 'Extrae de la frase 4 campos para prospección y responde SOLO el JSON: {"niche":"tipo de negocio","city":"ciudad","objetivo":"sostiene|probable|todos","tipo":"local|b2b"}. city es la ciudad o vacía. tipo es "b2b" si es una empresa/servicio profesional (software, consultoría, agencia, tecnología, fintech), "local" si es un negocio físico de barrio (dentista, taller, restaurante). objetivo "sostiene" si pide grandes/establecidos, "probable" si medianos, "todos" si no filtra. niche en español sin artículos ni verbos.',
           },
           { role: 'user', content: text },
         ],
@@ -522,8 +547,11 @@ async function parseIntent(text: string): Promise<Intent> {
     const city = String(parsed.city ?? '').trim();
     const objetivo = ['sostiene', 'probable', 'todos'].includes(String(parsed.objetivo)) ? String(parsed.objetivo) as Intent['objetivo'] : 'todos';
     const niche = String(parsed.niche ?? '').trim() || fallbackIntent(text).niche;
+    const tipo: Intent['tipo'] = (String(parsed.tipo) === 'b2b' || String(parsed.tipo) === 'local')
+      ? String(parsed.tipo) as Intent['tipo']
+      : fallbackIntent(text).tipo;
     // Si el LLM no detectó ciudad, reforzar con la heurística (jamás seguir sin ciudad).
-    return { niche, city: city || fallbackIntent(text).city, objetivo };
+    return { niche, city: city || fallbackIntent(text).city, objetivo, tipo };
   } catch {
     // Cualquier fallo del LLM → heurística (mismo resultado que el módulo puro).
     return fallbackIntent(text);
@@ -578,28 +606,112 @@ interface LeadRow {
   decisionMakers?: Record<string, unknown>[];
 }
 
+interface ClayCompany {
+  clay_company_id?: number;
+  name?: string;
+  domain?: string;
+  industry?: string;
+  size?: string;
+  type?: string;
+  location?: string;
+  country?: string;
+  linkedin_url?: string;
+  description?: string;
+}
+
+/** Descubre empresas B2B con Clay (`select from companies where industry in ...`).
+ *  Clay NO filtra bien por ciudad → filtramos por subcadena en location/country
+ *  del lado nuestro. Si la ciudad deja todo afuera (cobertura LatAm débil),
+ *  devolvemos el top global para no quedar en vacío. */
+async function searchCompaniesB2B(niche: string, city: string, limit: number) {
+  const buckets = pickIndustryBuckets(niche);
+  const inClause = buckets.map((b) => `"${b}"`).join(', ');
+  const query = `select from companies where industry in (${inClause})`;
+
+  const create = await monidRun({
+    provider: 'clay',
+    endpoint: '/search/query-mode',
+    input: { body: { query } },
+  });
+  const searchId = (create.output as { search_id?: string })?.search_id;
+  if (!searchId) return { companies: [], all: 0, matched: 0 };
+
+  const page = await monidRun({
+    provider: 'clay',
+    endpoint: '/search/query-mode/run',
+    input: { body: { search_id: searchId, limit: Math.min(limit * 3, 25) } },
+  });
+  const raw = ((page.output as { data?: ClayCompany[] })?.data ?? []).filter((c) => c.domain && c.name);
+
+  const cityLower = city.toLowerCase().trim();
+  const matched = cityLower
+    ? raw.filter((c) => {
+        const loc = `${c.location ?? ''} ${c.country ?? ''}`.toLowerCase();
+        return loc.includes(cityLower);
+      })
+    : raw;
+
+  // La ciudad es preferencia, no un filtro excluyente: si Clay no tiene cobertura
+  // de esa ciudad, devolvemos el top global en vez de nada (y el front lo muestra).
+  const companies = matched.length ? matched : raw;
+  return { companies: companies.slice(0, limit), all: raw.length, matched: matched.length };
+}
+
 /** Corrida completa: intención → lista lista para outreach. */
 async function orchestrate(text: string, opts: { maxLeads?: number }) {
   const intent = await parseIntent(text);
-  if (!intent.city) {
+  if (!intent.city && intent.tipo === 'local') {
     return { error: 'No detecté una ciudad. Probá: "dame dentistas en Quito que sostengan el ticket".', intent };
   }
 
-  // 1) Maps
-  const maps = await searchMaps(intent.niche, intent.city, Math.min(opts.maxLeads ?? 20, 50));
-
-  // 2) Por cada lugar con web: firma (PDL) + emails (Hunter), con concurrencia
-  //    acotada (pool de 3) y cap duro de leads para no reventar balance ni el
-  //    timeout de la edge function.
-  const ORCH_CONCURRENCY = 2;
-  // Cap DURO del orquestador: cada lead dispara PDL + Hunter (+ ContactOut si
-  // sostiene). Con 8 leads ya son ~16-24 llamadas Monid con polling — el techo
-  // para caber en el wall-clock de la tier gratis (546 si se excede). 20 rompía.
   const ORCH_MAX_LEADS = Math.min(opts.maxLeads ?? 8, 8);
-  const targets = maps.places.slice(0, ORCH_MAX_LEADS);
 
-  const enrichOne = async (place: (typeof maps.places)[number]): Promise<LeadRow> => {
-    const domain = place.website ? domainOnly(place.website) : null;
+  // 1) Descubrimiento según el tipo de intención.
+  //    local → Google Maps (negocios B2C). b2b → Clay companies (empresas).
+  let discovered: Array<{
+    name: string | null;
+    website: string | null;
+    domain: string | null;
+    rating: number | null;
+    reviewCount: number | null;
+    phone: string | null;
+    industry: string | null;
+    size: string | null;
+  }> = [];
+
+  if (intent.tipo === 'b2b') {
+    const r = await searchCompaniesB2B(intent.niche, intent.city, ORCH_MAX_LEADS);
+    discovered = r.companies.map((c) => ({
+      name: c.name ?? null,
+      website: c.domain ? `https://${c.domain}` : null,
+      domain: c.domain ?? null,
+      rating: null,
+      reviewCount: null,
+      phone: null,
+      industry: c.industry ?? null,
+      size: c.size ?? null,
+    }));
+  } else {
+    const maps = await searchMaps(intent.niche, intent.city, ORCH_MAX_LEADS);
+    discovered = maps.places.map((p) => ({
+      name: p.company,
+      website: p.website,
+      domain: p.website ? domainOnly(p.website) : null,
+      rating: p.rating,
+      reviewCount: p.reviewCount,
+      phone: p.phone,
+      industry: p.type ?? null,
+      size: null,
+    }));
+  }
+
+  // 2) Por cada lead con dominio: firma (PDL) + emails (Hunter), con concurrencia
+  //    acotada (pool de 2) para caber en el wall-clock de la tier gratis (546).
+  const ORCH_CONCURRENCY = 2;
+  const targets = discovered.slice(0, ORCH_MAX_LEADS);
+
+  const enrichOne = async (d: (typeof discovered)[number]): Promise<LeadRow> => {
+    const domain = d.domain;
     let senales: Record<string, unknown> = {};
     let emails: Record<string, unknown>[] = [];
 
@@ -614,20 +726,20 @@ async function orchestrate(text: string, opts: { maxLeads?: number }) {
       } catch { /* emails fallan → sigue */ }
     }
 
-    const score = scoreFacturacion({ ...(senales as { empleados?: number; antiguedad?: number; founded?: number }), resenas: place.reviewCount ?? undefined });
+    const score = scoreFacturacion({ ...(senales as { empleados?: number; antiguedad?: number; founded?: number }), resenas: d.reviewCount ?? undefined });
     const nivel = nivelOf(score);
 
     return {
-      company: place.company,
-      website: place.website,
-      phone: place.phone,
-      rating: place.rating,
-      reviewCount: place.reviewCount,
+      company: d.name,
+      website: d.website,
+      phone: d.phone,
+      rating: d.rating,
+      reviewCount: d.reviewCount,
       empleados: senales.empleados ?? null,
       founded: senales.founded ?? null,
       antiguedad: senales.antiguedad ?? null,
-      size: senales.size ?? null,
-      industry: senales.industry ?? null,
+      size: senales.size ?? d.size ?? null,
+      industry: senales.industry ?? d.industry ?? null,
       totalFunding: senales.totalFunding ?? null,
       email: emails[0]?.email ?? senales.email ?? null,
       emails,
@@ -654,8 +766,6 @@ async function orchestrate(text: string, opts: { maxLeads?: number }) {
     const ref = l.website ?? l.company;
     try {
       const r = await decisionMakers(String(ref), false); // sin reveal → más barato (solo perfiles)
-      // ContactOut devuelve `profiles` como DICCIONARIO indexado por URL de
-      // LinkedIn (¡no un array!) — aplanar a lista.
       const raw = (r.people as { profiles?: Record<string, unknown> })?.profiles ?? {};
       const people = Array.isArray(raw) ? raw : Object.values(raw);
       l.decisionMakers = people.slice(0, 3);

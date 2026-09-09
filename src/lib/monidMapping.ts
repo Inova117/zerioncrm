@@ -174,9 +174,12 @@ export interface Intent {
   niche: string;
   city: string;
   objetivo: 'sostiene' | 'probable' | 'todos';
+  tipo: 'local' | 'b2b';
 }
 
-/** Heurística sin LLM: extrae nicho/ciudad/objetivo de una frase natural. */
+const B2B_KEYWORDS = /software|tecnolog|tech\b|saas|\bit\b|desarrollo|consultor|consulting|agencia|marketing|publicidad|advertising|branding|diseño|fintech|startup|digital|legal|abogad|contab|auditor|ingenier|arquitect|logíst|ecommerce|e-commerce|telecom|seguros|inmobiliar/i;
+
+/** Heurística sin LLM: extrae nicho/ciudad/objetivo/tipo de una frase natural. */
 export function parseIntentFallback(text: string): Intent {
   // Captura "en <ciudad>" de forma lazy, cortando en cláusulas de filtro
   // ("que sostengan", "probable", "todos") o en el final. Acepta ciudades
@@ -193,5 +196,6 @@ export function parseIntentFallback(text: string): Intent {
   let niche = text;
   if (cityMatch) niche = text.slice(0, cityMatch.index).trim();
   niche = niche.replace(/^(dame|busca|quiero|necesito|encontr)\w*\s+/i, '').trim();
-  return { niche: niche || 'negocio', city, objetivo };
+  const tipo: Intent['tipo'] = B2B_KEYWORDS.test(text) ? 'b2b' : 'local';
+  return { niche: niche || 'negocio', city, objetivo, tipo };
 }

@@ -379,6 +379,11 @@ export function MonidPage() {
               <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
                 <Pill tone="brand">{orch.intent.niche} · {orch.intent.city}</Pill>
                 <Pill tone="gray">{orch.intent.objetivo}</Pill>
+                {orch.intent.tipo && (
+                  <Pill tone={orch.intent.tipo === 'b2b' ? 'green' : 'amber'}>
+                    {orch.intent.tipo === 'b2b' ? 'B2B (Clay/Apollo)' : 'Local (Maps)'}
+                  </Pill>
+                )}
                 <span className="text-surface-500">{orch.matched} de {orch.total} cumplen el objetivo</span>
               </div>
               {orch.leads.length === 0 ? (

@@ -169,4 +169,14 @@ describe('parseIntentFallback (sin LLM)', () => {
     expect(i.objetivo).toBe('todos');
     expect(i.city).toBe('Guayaquil');
   });
+
+  it('detecta tipo b2b para empresas de software', () => {
+    const i = parseIntentFallback('empresas de desarrollo de software en Quito');
+    expect(i.tipo).toBe('b2b');
+  });
+
+  it('detecta tipo local para negocios de barrio', () => {
+    const i = parseIntentFallback('dame dentistas en Quito');
+    expect(i.tipo).toBe('local');
+  });
 });
