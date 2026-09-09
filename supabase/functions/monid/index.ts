@@ -37,7 +37,10 @@ const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 const MONID_API_KEY = Deno.env.get('MONID_API_KEY') ?? '';
 
 const MONID = 'https://api.monid.ai';
-const RUN_TIMEOUT_MS = 60_000;
+// 30s de techo por run individual (no 60s): en orquestación, un run colgado se
+// multiplica por N leads y revienta el presupuesto de wall-clock (546) de la
+// tier gratuita de Supabase. Menos techo = menos CPU/wall-clock total por corrida.
+const RUN_TIMEOUT_MS = 30_000;
 const POLL_MS = 1500;
 
 const CORS = {
@@ -588,8 +591,11 @@ async function orchestrate(text: string, opts: { maxLeads?: number }) {
   // 2) Por cada lugar con web: firma (PDL) + emails (Hunter), con concurrencia
   //    acotada (pool de 3) y cap duro de leads para no reventar balance ni el
   //    timeout de la edge function.
-  const ORCH_CONCURRENCY = 3;
-  const ORCH_MAX_LEADS = Math.min(opts.maxLeads ?? 20, 20); // cap duro de seguridad
+  const ORCH_CONCURRENCY = 2;
+  // Cap DURO del orquestador: cada lead dispara PDL + Hunter (+ ContactOut si
+  // sostiene). Con 8 leads ya son ~16-24 llamadas Monid con polling — el techo
+  // para caber en el wall-clock de la tier gratis (546 si se excede). 20 rompía.
+  const ORCH_MAX_LEADS = Math.min(opts.maxLeads ?? 8, 8);
   const targets = maps.places.slice(0, ORCH_MAX_LEADS);
 
   const enrichOne = async (place: (typeof maps.places)[number]): Promise<LeadRow> => {
@@ -641,8 +647,9 @@ async function orchestrate(text: string, opts: { maxLeads?: number }) {
   }
   await Promise.all(Array.from({ length: Math.min(ORCH_CONCURRENCY, targets.length) }, worker));
 
-  // 3) Decision-makers solo para los que "sostienen" (ahorra balance).
-  const sostienen = leads.filter((l) => l.nivel === 'sostiene');
+  // 3) Decision-makers solo para los TOP 2 que "sostienen" (ahorra balance y
+  //    wall-clock — ContactOut es la llamada más cara y lenta del pipeline).
+  const sostienen = leads.filter((l) => l.nivel === 'sostiene').slice(0, 2);
   for (const l of sostienen) {
     const ref = l.website ?? l.company;
     try {
@@ -651,7 +658,7 @@ async function orchestrate(text: string, opts: { maxLeads?: number }) {
       // LinkedIn (¡no un array!) — aplanar a lista.
       const raw = (r.people as { profiles?: Record<string, unknown> })?.profiles ?? {};
       const people = Array.isArray(raw) ? raw : Object.values(raw);
-      l.decisionMakers = people.slice(0, 5);
+      l.decisionMakers = people.slice(0, 3);
     } catch { l.decisionMakers = []; }
   }
 
@@ -765,7 +772,7 @@ Deno.serve(async (req) => {
     if (action === 'orchestrate') {
       const text = String(body.text ?? body.prompt ?? '').trim();
       if (!text) return json({ error: 'Dime qué querés buscar (ej. "dame dentistas en Quito que sostengan el ticket")' }, 400);
-      const maxLeads = Math.min(Math.max(Number(body.maxLeads) || 20, 1), 50);
+      const maxLeads = Math.min(Math.max(Number(body.maxLeads) || 8, 1), 20);
       // Guard de balance: una orquestación completa (Maps + PDL×N + Hunter×N +
       // ContactOut) puede costar $3-5. Avisar temprano si el saldo no alcanza.
       try {
