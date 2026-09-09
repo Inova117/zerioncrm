@@ -81,7 +81,7 @@ function requireKey() {
   if (!MONID_API_KEY) throw new Error('MONID_API_KEY no configurada en la Edge Function');
 }
 
-async function monidPost(path: string, body: unknown): Promise<unknown> {
+async function monidPost(path: string, body: unknown, attempt = 1): Promise<unknown> {
   const resp = await fetch(`${MONID}${path}`, {
     method: 'POST',
     headers: {
@@ -92,6 +92,12 @@ async function monidPost(path: string, body: unknown): Promise<unknown> {
     body: JSON.stringify(body),
   });
   const data = await resp.json().catch(() => ({}));
+  // 429 = rate limit de Monid (el orquestador dispara ~20 runs en ráfaga).
+  // Reintentar con backoff exponencial (1s, 2s, 4s) en vez de morir → 502.
+  if (resp.status === 429 && attempt < 4) {
+    await new Promise((r) => setTimeout(r, 1000 * 2 ** (attempt - 1)));
+    return monidPost(path, body, attempt + 1);
+  }
   if (!resp.ok) {
     const msg = (data as { error?: { message?: string } })?.error?.message
       ?? (data as { message?: string })?.message
@@ -101,10 +107,14 @@ async function monidPost(path: string, body: unknown): Promise<unknown> {
   return data;
 }
 
-async function monidGet(path: string): Promise<unknown> {
+async function monidGet(path: string, attempt = 1): Promise<unknown> {
   const resp = await fetch(`${MONID}${path}`, {
     headers: { Authorization: `Bearer ${MONID_API_KEY}` },
   });
+  if (resp.status === 429 && attempt < 4) {
+    await new Promise((r) => setTimeout(r, 1000 * 2 ** (attempt - 1)));
+    return monidGet(path, attempt + 1);
+  }
   return resp.json();
 }
 
@@ -705,9 +715,9 @@ async function orchestrate(text: string, opts: { maxLeads?: number }) {
     }));
   }
 
-  // 2) Por cada lead con dominio: firma (PDL) + emails (Hunter), con concurrencia
-  //    acotada (pool de 2) para caber en el wall-clock de la tier gratis (546).
-  const ORCH_CONCURRENCY = 2;
+  // 2) Por cada lead con dominio: firma (PDL) + emails (Hunter), secuencial con
+  //    throttle (ver loop abajo) para caber en el wall-clock de la tier gratis
+  //    (546) y no disparar el rate limit (429) de Monid.
   const targets = discovered.slice(0, ORCH_MAX_LEADS);
 
   const enrichOne = async (d: (typeof discovered)[number]): Promise<LeadRow> => {
@@ -748,16 +758,14 @@ async function orchestrate(text: string, opts: { maxLeads?: number }) {
     };
   };
 
-  // Pool manual de concurrencia acotada (sin dependencias externas).
+  // Secuencial con throttle (NO paralelo): Monid rate-limits (429) cuando el
+  // orquestador dispara ~20 runs en ráfaga. Un lead a la vez + delay de 600ms
+  // entre leads mantiene la tasa por debajo del límite.
   const leads: LeadRow[] = [];
-  let idx = 0;
-  async function worker() {
-    while (idx < targets.length) {
-      const t = targets[idx++];
-      try { leads.push(await enrichOne(t)); } catch { /* un lead que falla no tumba la corrida */ }
-    }
+  for (const t of targets) {
+    try { leads.push(await enrichOne(t)); } catch { /* un lead que falla no tumba la corrida */ }
+    if (targets.length > 1) await new Promise((r) => setTimeout(r, 600));
   }
-  await Promise.all(Array.from({ length: Math.min(ORCH_CONCURRENCY, targets.length) }, worker));
 
   // 3) Decision-makers solo para los TOP 2 que "sostienen" (ahorra balance y
   //    wall-clock — ContactOut es la llamada más cara y lenta del pipeline).
