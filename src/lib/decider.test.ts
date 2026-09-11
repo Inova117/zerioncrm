@@ -12,8 +12,8 @@ const perf = (over: Partial<NichePerformance>): NichePerformance => ({
 });
 
 const cities: CityEntry[] = [
-  { key: 'quito', label: 'Quito', tier: 1, note: '', zones: [] },
-  { key: 'guayaquil', label: 'Guayaquil', tier: 1, note: '', zones: [] },
+  { key: 'quito', label: 'Quito', country: 'Ecuador', tier: 1, note: '', zones: [] },
+  { key: 'guayaquil', label: 'Guayaquil', country: 'Ecuador', tier: 1, note: '', zones: [] },
 ];
 
 const emptySat: Record<string, Saturation> = {};
