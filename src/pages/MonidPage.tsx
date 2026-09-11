@@ -183,6 +183,7 @@ export function MonidPage() {
   const [prompt, setPrompt] = useState('');
   const [orch, setOrch] = useState<OrchestrateResult | null>(null);
   const [orching, setOrching] = useState(false);
+  const [orchProgress, setOrchProgress] = useState<string | null>(null);
   const [revealingFor, setRevealingFor] = useState<string | null>(null);
 
   useEffect(() => {
@@ -195,12 +196,20 @@ export function MonidPage() {
     setOrching(true);
     setError(null);
     setOrch(null);
+    setOrchProgress('Descubriendo prospectos…');
     try {
-      setOrch(await monidOrchestrate(prompt.trim(), { maxLeads: 20 }));
+      const result = await monidOrchestrate(prompt.trim(), (p) => {
+        if (p.phase === 'discover') setOrchProgress(`Encontré ${p.total} prospectos, enriqueciendo…`);
+        else if (p.phase === 'enrich') setOrchProgress(`Enriqueciendo ${p.done}/${p.total}…`);
+        else setOrchProgress('Buscando contactos de decisión…');
+      }, { maxLeads: 8 });
+      setOrchProgress(null);
+      setOrch(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Fallo la prospección completa.');
     } finally {
       setOrching(false);
+      setOrchProgress(null);
     }
   }
 
@@ -369,7 +378,7 @@ export function MonidPage() {
             {orching && (
               <p className="mt-2 flex items-center gap-1.5 text-xs text-surface-400">
                 <Loader2 className="h-3 w-3 animate-spin" />
-                Buscando, enriqueciendo firmas, sacando emails y decision-makers… puede tardar 1–3 min.
+                {orchProgress ?? 'Procesando…'}
               </p>
             )}
           </div>

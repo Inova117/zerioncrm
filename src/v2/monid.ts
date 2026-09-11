@@ -180,12 +180,61 @@ export interface OrchestrateResult {
   leads: OrchestrateLead[];
 }
 
-/** "dame dentistas en Quito que sostengan el ticket" → pipeline completo. */
+export interface OrchestrateProgress {
+  phase: 'discover' | 'enrich' | 'finalize';
+  done: number;
+  total: number;
+}
+
+/** Estado del descubrimiento (FASE 1) antes de enriquecer. */
+export interface OrchestrateTarget {
+  name: string | null;
+  website: string | null;
+  domain: string | null;
+  rating: number | null;
+  reviewCount: number | null;
+  phone: string | null;
+  industry: string | null;
+  size: string | null;
+}
+
+const ENRICH_BATCH_SIZE = 3; // lote por llamada → cada request cabe en el límite serverless
+
+/**
+ * "dame dentistas en Quito que sostengan el ticket" → pipeline completo.
+ * Se ejecuta en 3 fases serverless (descubrir → enriquecer por lotes → finalizar)
+ * para que NINGUNA llamada exceda los límites de edge function (546/504).
+ */
 export async function monidOrchestrate(
   text: string,
+  onProgress?: (p: OrchestrateProgress) => void,
   opts: { maxLeads?: number } = {},
 ): Promise<OrchestrateResult> {
-  const res = await invoke('orchestrate', { text, maxLeads: opts.maxLeads });
-  if ((res as { error?: string })?.error) throw new Error((res as { error: string }).error);
-  return res as unknown as OrchestrateResult;
+  // FASE 1 — descubrimiento (Maps/Clay), rapidísimo.
+  const d = await invoke('orchestrate', { text, maxLeads: opts.maxLeads });
+  if ((d as { error?: string })?.error) throw new Error((d as { error: string }).error);
+  const intent = d.intent as OrchestrateResult['intent'];
+  const targets = (d.targets ?? []) as OrchestrateTarget[];
+  onProgress?.({ phase: 'discover', done: targets.length, total: targets.length });
+
+  // FASE 2 — enriquecer en lotes chicos (PDL + Hunter + score).
+  const leads: OrchestrateLead[] = [];
+  for (let i = 0; i < targets.length; i += ENRICH_BATCH_SIZE) {
+    const batch = targets.slice(i, i + ENRICH_BATCH_SIZE);
+    const r = await invoke('enrich-batch', { targets: batch });
+    if ((r as { error?: string })?.error) throw new Error((r as { error: string }).error);
+    leads.push(...((r.leads ?? []) as OrchestrateLead[]));
+    onProgress?.({ phase: 'enrich', done: Math.min(i + ENRICH_BATCH_SIZE, targets.length), total: targets.length });
+  }
+
+  // FASE 3 — decision-makers para los que sostienen + filtro por objetivo.
+  const f = await invoke('finalize', { leads, intent });
+  if ((f as { error?: string })?.error) throw new Error((f as { error: string }).error);
+  onProgress?.({ phase: 'finalize', done: targets.length, total: targets.length });
+  return {
+    intent,
+    total: (f as { total?: number }).total ?? leads.length,
+    matched: (f as { matched?: number }).matched ?? leads.length,
+    leads: (f.leads ?? []) as OrchestrateLead[],
+  };
 }

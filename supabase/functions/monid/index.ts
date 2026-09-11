@@ -667,125 +667,87 @@ async function searchCompaniesB2B(niche: string, city: string, limit: number) {
   return { companies: companies.slice(0, limit), all: raw.length, matched: matched.length };
 }
 
-/** Corrida completa: intención → lista lista para outreach. */
-async function orchestrate(text: string, opts: { maxLeads?: number }) {
-  const intent = await parseIntent(text);
-  if (!intent.city && intent.tipo === 'local') {
-    return { error: 'No detecté una ciudad. Probá: "dame dentistas en Quito que sostengan el ticket".', intent };
-  }
+/** Un lead descubierto, ANTES de enriquecer. */
+interface Target {
+  name: string | null;
+  website: string | null;
+  domain: string | null;
+  rating: number | null;
+  reviewCount: number | null;
+  phone: string | null;
+  industry: string | null;
+  size: string | null;
+}
 
-  const ORCH_MAX_LEADS = Math.min(opts.maxLeads ?? 8, 8);
-
-  // 1) Descubrimiento según el tipo de intención.
-  //    local → Google Maps (negocios B2C). b2b → Clay companies (empresas).
-  let discovered: Array<{
-    name: string | null;
-    website: string | null;
-    domain: string | null;
-    rating: number | null;
-    reviewCount: number | null;
-    phone: string | null;
-    industry: string | null;
-    size: string | null;
-  }> = [];
-
+/** FASE 1 — descubrimiento (rápido, ~10s): Maps para B2C, Clay para B2B.
+ *  Devuelve targets SIN enriquecer. Cabe holgado en el límite de edge function. */
+async function discoverTargets(intent: Intent, maxLeads: number): Promise<Target[]> {
   if (intent.tipo === 'b2b') {
-    const r = await searchCompaniesB2B(intent.niche, intent.city, ORCH_MAX_LEADS);
-    discovered = r.companies.map((c) => ({
+    const r = await searchCompaniesB2B(intent.niche, intent.city, maxLeads);
+    return r.companies.map((c) => ({
       name: c.name ?? null,
       website: c.domain ? `https://${c.domain}` : null,
       domain: c.domain ?? null,
-      rating: null,
-      reviewCount: null,
-      phone: null,
-      industry: c.industry ?? null,
-      size: c.size ?? null,
-    }));
-  } else {
-    const maps = await searchMaps(intent.niche, intent.city, ORCH_MAX_LEADS);
-    discovered = maps.places.map((p) => ({
-      name: p.company,
-      website: p.website,
-      domain: p.website ? domainOnly(p.website) : null,
-      rating: p.rating,
-      reviewCount: p.reviewCount,
-      phone: p.phone,
-      industry: p.type ?? null,
-      size: null,
+      rating: null, reviewCount: null, phone: null,
+      industry: c.industry ?? null, size: c.size ?? null,
     }));
   }
+  const maps = await searchMaps(intent.niche, intent.city, maxLeads);
+  return maps.places.map((p) => ({
+    name: p.company,
+    website: p.website,
+    domain: p.website ? domainOnly(p.website) : null,
+    rating: p.rating, reviewCount: p.reviewCount, phone: p.phone,
+    industry: p.type ?? null, size: null,
+  }));
+}
 
-  // 2) Por cada lead con dominio: firma (PDL) + emails (Hunter), secuencial con
-  //    throttle (ver loop abajo) para caber en el wall-clock de la tier gratis
-  //    (546) y no disparar el rate limit (429) de Monid.
-  const targets = discovered.slice(0, ORCH_MAX_LEADS);
-
-  const enrichOne = async (d: (typeof discovered)[number]): Promise<LeadRow> => {
-    const domain = d.domain;
-    let senales: Record<string, unknown> = {};
-    let emails: Record<string, unknown>[] = [];
-
-    if (domain) {
-      try {
-        const firm = await enrichFirm(domain);
-        senales = (firm.senales as Record<string, unknown>) ?? {};
-      } catch { /* firma falla → sigue sin señal */ }
-      try {
-        const enr = await enrichCompany({ domain });
-        emails = (enr.emails as Record<string, unknown>[]) ?? [];
-      } catch { /* emails fallan → sigue */ }
-    }
-
-    const score = scoreFacturacion({ ...(senales as { empleados?: number; antiguedad?: number; founded?: number }), resenas: d.reviewCount ?? undefined });
-    const nivel = nivelOf(score);
-
-    return {
-      company: d.name,
-      website: d.website,
-      phone: d.phone,
-      rating: d.rating,
-      reviewCount: d.reviewCount,
-      empleados: senales.empleados ?? null,
-      founded: senales.founded ?? null,
-      antiguedad: senales.antiguedad ?? null,
-      size: senales.size ?? d.size ?? null,
-      industry: senales.industry ?? d.industry ?? null,
-      totalFunding: senales.totalFunding ?? null,
-      email: emails[0]?.email ?? senales.email ?? null,
-      emails,
-      nivel,
-      score,
-    };
+/** FASE 2 — enriquecer UN target (PDL firma + Hunter emails + score). ~3-8s. */
+async function enrichTarget(d: Target): Promise<LeadRow> {
+  const domain = d.domain;
+  let senales: Record<string, unknown> = {};
+  let emails: Record<string, unknown>[] = [];
+  if (domain) {
+    try { const firm = await enrichFirm(domain); senales = (firm.senales as Record<string, unknown>) ?? {}; } catch { /* firma falla → sigue */ }
+    try { const enr = await enrichCompany({ domain }); emails = (enr.emails as Record<string, unknown>[]) ?? []; } catch { /* emails fallan → sigue */ }
+  }
+  const score = scoreFacturacion({ ...(senales as { empleados?: number; antiguedad?: number; founded?: number }), resenas: d.reviewCount ?? undefined });
+  const nivel = nivelOf(score);
+  return {
+    company: d.name, website: d.website, phone: d.phone, rating: d.rating, reviewCount: d.reviewCount,
+    empleados: senales.empleados ?? null, founded: senales.founded ?? null, antiguedad: senales.antiguedad ?? null,
+    size: senales.size ?? d.size ?? null, industry: senales.industry ?? d.industry ?? null,
+    totalFunding: senales.totalFunding ?? null,
+    email: emails[0]?.email ?? senales.email ?? null, emails, nivel, score,
   };
+}
 
-  // Secuencial con throttle (NO paralelo): Monid rate-limits (429) cuando el
-  // orquestador dispara ~20 runs en ráfaga. Un lead a la vez + delay de 600ms
-  // entre leads mantiene la tasa por debajo del límite.
+/** Enriquecer un LOTE chico (≤3) con throttle. Una llamada = un lote < 15s. */
+async function enrichBatch(targets: Target[]): Promise<LeadRow[]> {
   const leads: LeadRow[] = [];
   for (const t of targets) {
-    try { leads.push(await enrichOne(t)); } catch { /* un lead que falla no tumba la corrida */ }
-    if (targets.length > 1) await new Promise((r) => setTimeout(r, 600));
+    try { leads.push(await enrichTarget(t)); } catch { /* un lead que falla no tumba el lote */ }
+    if (targets.length > 1) await new Promise((r) => setTimeout(r, 400));
   }
+  return leads;
+}
 
-  // 3) Decision-makers solo para los TOP 2 que "sostienen" (ahorra balance y
-  //    wall-clock — ContactOut es la llamada más cara y lenta del pipeline).
+/** FASE 3 — decision-makers para los que sostienen + filtro por objetivo. Rápido. */
+async function finalizeOrch(leads: LeadRow[], intent: Intent) {
   const sostienen = leads.filter((l) => l.nivel === 'sostiene').slice(0, 2);
   for (const l of sostienen) {
     const ref = l.website ?? l.company;
     try {
-      const r = await decisionMakers(String(ref), false); // sin reveal → más barato (solo perfiles)
+      const r = await decisionMakers(String(ref), false); // sin reveal → más barato
       const raw = (r.people as { profiles?: Record<string, unknown> })?.profiles ?? {};
       const people = Array.isArray(raw) ? raw : Object.values(raw);
       l.decisionMakers = people.slice(0, 3);
     } catch { l.decisionMakers = []; }
   }
-
-  // 4) Filtrar por objetivo.
   const filtered = intent.objetivo === 'todos'
     ? leads
     : leads.filter((l) => l.nivel === intent.objetivo || (intent.objetivo === 'probable' && l.nivel === 'sostiene'));
-
-  return { intent, total: leads.length, matched: filtered.length, leads: filtered };
+  return { total: leads.length, matched: filtered.length, leads: filtered };
 }
 
 function domainOnly(url: string): string | null {
@@ -888,20 +850,33 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'orchestrate') {
+      // FASE 1 (rapidísimo): parsea intención + descubre targets (Maps/Clay).
+      // Devuelve los targets SIN enriquecer; el front los enriquece en lotes.
       const text = String(body.text ?? body.prompt ?? '').trim();
       if (!text) return json({ error: 'Dime qué querés buscar (ej. "dame dentistas en Quito que sostengan el ticket")' }, 400);
       const maxLeads = Math.min(Math.max(Number(body.maxLeads) || 8, 1), 20);
-      // Guard de balance: una orquestación completa (Maps + PDL×N + Hunter×N +
-      // ContactOut) puede costar $3-5. Avisar temprano si el saldo no alcanza.
-      try {
-        const bal = await monidGet('/v1/wallet/balance') as { balance?: { value?: number } };
-        const valor = bal?.balance?.value ?? 0;
-        if (valor < 1) {
-          return json({ error: `Saldo Monid insuficiente (${bal?.balance?.value ?? 0}). Recarga en app.monid.ai antes de correr una prospección completa.` }, 402);
-        }
-      } catch { /* si balance falla, seguir y dejar que Monid rechace si no hay saldo */ }
-      const result = await orchestrate(text, { maxLeads });
-      if ('error' in result) return json(result, 422);
+      const intent = await parseIntent(text);
+      if (!intent.city && intent.tipo === 'local') {
+        return json({ error: 'No detecté una ciudad. Probá: "dame dentistas en Quito que sostengan el ticket".', intent }, 422);
+      }
+      const targets = await discoverTargets(intent, maxLeads);
+      return json({ intent, targets, total: targets.length, provider: 'monid' });
+    }
+
+    if (action === 'enrich-batch') {
+      // FASE 2 (lote ≤3): enriquecer los targets que el front ya descubrió.
+      const rawTargets = Array.isArray(body.targets) ? body.targets.slice(0, 3) : [];
+      if (!rawTargets.length) return json({ error: 'targets requerido (lote ≤3)' }, 400);
+      const targets = rawTargets.map((t: unknown) => t as Target);
+      const leads = await enrichBatch(targets);
+      return json({ leads, provider: 'monid' });
+    }
+
+    if (action === 'finalize') {
+      // FASE 3 (rápido): decision-makers para los que sostienen + filtro.
+      const leads = (Array.isArray(body.leads) ? body.leads : []) as LeadRow[];
+      const intent = (body.intent ?? { niche: 'negocio', city: '', objetivo: 'todos', tipo: 'local' }) as Intent;
+      const result = await finalizeOrch(leads, intent);
       return json({ ...result, provider: 'monid' });
     }
 
